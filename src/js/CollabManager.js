@@ -3,8 +3,8 @@ class CollabManager {
   constructor(editor) {
     this.editor = editor;
     this.ws = null;
-    this.host = 'localhost';
-    this.port = 8080;
+    this.host = 'pixelite.onrender.com';
+    this.port = '';
     this.sessionId = null;
     this.sessionName = '';
     this.memberId = null;
@@ -438,7 +438,7 @@ class CollabManager {
     
     this.showConnectingOverlay(__('Conectando...||Connecting...'));
     
-    this.ws = new WebSocket(`ws://${this.host}:${this.port}`);
+    this.ws = new WebSocket(`wss://${this.host}`);
     
     this.ws.onopen = () => {
       console.log('WebSocket connected');

@@ -5,18 +5,15 @@
  * 
  * Source: https://github.com/RetoraDev/PadManiacs
  * Version: v1.0.0 dev
- * Built: 2/27/2026, 2:19:54 PM
+ * Built: 2/27/2026, 5:06:49 PM
  * Platform: Development
- * Debug: true
+ * Debug: false
  * Minified: false
  */
 
-
-
-/* js/main.js */
 const COPYRIGHT = "(C) RETORA 2026";
 const VERSION = "v1.0.0 dev";
-const DEBUG = true;
+const DEBUG = false;
 
 // Global language processor
 window.__ = function(text) {
@@ -58,9 +55,6 @@ window.openExternalUrl = url => {
   }
 };
 
-
-
-/* js/SettingsManager.js */
 // Settings Manager Class
 class SettingsManager {
   constructor(editor) {
@@ -260,9 +254,6 @@ class SettingsManager {
   }
 }
 
-
-
-/* js/SettingsUI.js */
 // Settings UI Manager
 class SettingsUI {
   constructor(settingsManager, editor) {
@@ -707,9 +698,6 @@ class SettingsUI {
   }
 }
 
-
-
-/* js/GridManager.js */
 // Grid Manager Class
 class GridManager {
   constructor(editor) {
@@ -1063,9 +1051,6 @@ class GridManager {
   }
 }
 
-
-
-/* js/HistoryManager.js */
 // Undo History Manager 
 class HistoryManager {
   constructor(editor) {
@@ -1967,16 +1952,13 @@ class HistoryManager {
   }
 }
 
-
-
-/* js/CollabManager.js */
 // Collaboration Manager
 class CollabManager {
   constructor(editor) {
     this.editor = editor;
     this.ws = null;
-    this.host = 'localhost';
-    this.port = 8080;
+    this.host = 'pixelite.onrender.com';
+    this.port = '';
     this.sessionId = null;
     this.sessionName = '';
     this.memberId = null;
@@ -2410,7 +2392,7 @@ class CollabManager {
     
     this.showConnectingOverlay(__('Conectando...||Connecting...'));
     
-    this.ws = new WebSocket(`ws://${this.host}:${this.port}`);
+    this.ws = new WebSocket(`wss://${this.host}`);
     
     this.ws.onopen = () => {
       console.log('WebSocket connected');
@@ -3337,9 +3319,6 @@ class CollabManager {
   }
 }
 
-
-
-/* js/FileBrowser.js */
 // File Browser class
 class FileBrowser {
   constructor(options = {}) {
@@ -3956,9 +3935,6 @@ class FileBrowser {
   }
 }
 
-
-
-/* js/PixelArtEditor.js */
 // Main App
 class PixelArtEditor {
   constructor(container) {
