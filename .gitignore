@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+*.zip
+*.apk
+
+# Environment and secrets
+.env
+*.keystore
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
