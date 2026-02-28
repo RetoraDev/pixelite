@@ -3,8 +3,7 @@ class CollabManager {
   constructor(editor) {
     this.editor = editor;
     this.ws = null;
-    this.host = 'pixelite.onrender.com';
-    this.port = '';
+    this.host = HOST;
     this.sessionId = null;
     this.sessionName = '';
     this.memberId = null;
@@ -52,7 +51,7 @@ class CollabManager {
       blue: '#4444ff',
       green: '#44ff44',
       yellow: '#ffff44',
-      orange: '#ff8844',
+      orange: '#ff5722',
       purple: '#aa44ff',
       pink: '#ff44aa',
       cyan: '#44ffff',
@@ -136,8 +135,8 @@ class CollabManager {
     this.pingIndicator = document.createElement('div');
     this.pingIndicator.className = 'collab-ping-indicator';
     this.pingIndicator.innerHTML = `
-      <span class="ping-dot" style="width: 8px; height: 8px; border-radius: 50%; background-color: #44ff44;"></span>
-      <span class="ping-value" style="color: var(--text-color);">0ms</span>
+      <span class="ping-dot" style="background-color: #44ff44;"></span>
+      <span class="ping-value">---</span>
     `;
     this.editor.uiLayer.appendChild(this.pingIndicator);
 
@@ -147,49 +146,19 @@ class CollabManager {
 
   createSessionOverlay() {
     this.sessionOverlay = document.createElement('div');
-    this.sessionOverlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: var(--bg-color);
-      z-index: 10000;
-      display: none;
-      flex-direction: column;
-    `;
+    this.sessionOverlay.className = "collab-session-overlay";
     
     // Header
     const header = document.createElement('div');
-    header.style.cssText = `
-      height: 50px;
-      background-color: var(--ui-color);
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-    `;
+    header.className = "collab-session-header";
     
     const title = document.createElement('h2');
-    title.style.cssText = `font-size: 18px; color: var(--text-color);`;
+    title.className = "collab-session-title";
     title.textContent = __('Sesión Colaborativa||Collaborative Session');
     
     const closeBtn = document.createElement('button');
+    closeBtn.className = "collab-close-btn";
     closeBtn.innerHTML = '&times;';
-    closeBtn.style.cssText = `
-      width: 32px;
-      height: 32px;
-      background: transparent;
-      border: none;
-      color: var(--text-color);
-      font-size: 24px;
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    `;
     closeBtn.addEventListener('click', () => {
       this.sessionOverlay.style.display = 'none';
     });
@@ -199,11 +168,7 @@ class CollabManager {
     
     // Content
     this.sessionContent = document.createElement('div');
-    this.sessionContent.style.cssText = `
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    `;
+    this.sessionContent.className = "collab-session-content";
     
     this.sessionOverlay.appendChild(header);
     this.sessionOverlay.appendChild(this.sessionContent);
@@ -436,13 +401,13 @@ class CollabManager {
   connectWebSocket() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     
-    this.showConnectingOverlay(__('Conectando...||Connecting...'));
+    this.editor.showLoadingScreen(__('Conectando...||Connecting...'));
     
-    this.ws = new WebSocket(`wss://${this.host}`);
+    this.ws = new WebSocket(this.host);
     
     this.ws.onopen = () => {
       console.log('WebSocket connected');
-      this.hideConnectingOverlay();
+      this.editor.hideLoadingScreen();
       this.manualDisconnect = false;
       this.startPingInterval();
     };
@@ -463,7 +428,7 @@ class CollabManager {
     
     this.ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      this.hideConnectingOverlay();
+      this.editor.hideLoadingScreen();
       this.editor.showNotification(__('Error de conexión||Connection error'), 3000);
     };
   }
@@ -956,17 +921,11 @@ class CollabManager {
     
     if (!cursor) {
       cursor = document.createElement('div');
-      cursor.style.cssText = `
-        position: absolute;
-        transform: translate(-5px, -5px);
-        pointer-events: none;
-        z-index: 15;
-        transition: all 0.05s ease;
-      `;
+      cursor.className = "collab-cursor-item";
       
       cursor.innerHTML = `
-        <div style="width: 16px; height: 16px; border: 2px solid; border-radius: 2px; transform: rotate(45deg);"></div>
-        <div style="position: absolute; top: -20px; left: 0; color: white; font-size: 10px; padding: 2px 4px; border-radius: 3px; white-space: nowrap;"></div>
+        <div class="collab-cursor-ping"></div>
+        <div class="collab-cursor-name"></div>
       `;
       
       this.cursorContainer.appendChild(cursor);
@@ -1042,7 +1001,7 @@ class CollabManager {
     
     return { x: screenX, y: screenY };
   }
-
+  
   renderSessionMenu() {
     this.sessionContent.innerHTML = '';
     
@@ -1225,10 +1184,127 @@ class CollabManager {
     this.sessionContent.appendChild(disconnectBtn);
   }
 
+  renderSessionMenu() {
+    this.sessionContent.innerHTML = '';
+    
+    // Session info
+    const infoCard = document.createElement('div');
+    infoCard.className = "collab-info-card";
+    
+    infoCard.innerHTML = `
+      <div class="collab-info-item">
+        <span class="collab-info-label">${__('Sala||Room')}:</span>
+        <span class="collab-info-value">${this.sessionName || __('Sala sin nombre||Unnamed room')}</span>
+      </div>
+      <div class="collab-info-item">
+        <span class="collab-info-label">${__('Miembros||Members')}:</span>
+        <span class="collab-info-value">${this.members.size}</span>
+      </div>
+      <div class="collab-info-item">
+        <span style="collab-info-label">${__('ID||ID')}:</span>
+        <span class="collab-info-value token">${this.sessionId || 'Unknown'}</span>
+        <button id="copyIdBtn" class="collab-copy-btn">
+          ${__('Copiar||Copy')}
+        </button>
+      </div>
+    `;
+    
+    const copyBtn = infoCard.querySelector('#copyIdBtn');
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(this.sessionId);
+      this.editor.showNotification(__('ID copiado||ID copied'), 1000);
+    });
+    
+    this.sessionContent.appendChild(infoCard);
+    
+    // Members list
+    const membersSection = document.createElement('div');
+    membersSection.className = "collab-members-section";
+    
+    membersSection.innerHTML = `<h3>${__('Miembros||Members')}</h3>`;
+    
+    const membersList = document.createElement('div');
+    membersList.className = "collab-members-list";
+    
+    this.members.forEach(member => {
+      const memberItem = document.createElement('div');
+      memberItem.className = member.id === this.memberId ? "collab-member-item current-user" : "collab-member-item";
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = "collab-member-name";
+      nameSpan.style.color = member.id === this.memberId ? 'white' : this.getColorHex(member.color);
+      
+      const nameText = document.createElement('span');
+      nameText.textContent = member.name;
+      nameSpan.appendChild(nameText);
+      
+      if (member.isHost) {
+        const hostBadge = document.createElement('span');
+        hostBadge.className = "collab-host-badge";
+        hostBadge.textContent = 'HOST';
+        nameSpan.appendChild(hostBadge);
+      }
+      
+      if (member.id === this.memberId) {
+        const youBadge = document.createElement('span');
+        youBadge.className = "collab-you-badge";
+        youBadge.textContent = __('TÚ||YOU');
+        nameSpan.appendChild(youBadge);
+      }
+      
+      memberItem.appendChild(nameSpan);
+      
+      // Kick button for host
+      if (this.isHost && member.id !== this.memberId) {
+        const kickBtn = document.createElement('button');
+        kickBtn.textContent = __('Expulsar||Kick');
+        kickBtn.className = "collab-kick-button";
+        kickBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.confirmKickMember(member);
+        });
+        memberItem.appendChild(kickBtn);
+      }
+      
+      membersList.appendChild(memberItem);
+    });
+    
+    membersSection.appendChild(membersList);
+    this.sessionContent.appendChild(membersSection);
+    
+    // Disconnect button
+    const disconnectBtn = document.createElement('button');
+    disconnectBtn.className = this.isHost ? "collab-disconnect-btn danger" : "collab-disconnect-btn";
+    disconnectBtn.textContent = this.isHost ? __('Terminar sesión||End Session') : __('Desconectar||Disconnect');
+    disconnectBtn.addEventListener('click', () => {
+      this.editor.showPopup(
+        this.isHost ? __('Terminar sesión||End Session') : __('Desconectar||Disconnect'),
+        this.isHost ? __('¿Terminar la sesión para todos?||End session for everyone?') : __('¿Desconectarse de la sesión?||Disconnect from session?'),
+        [
+          {
+            text: __('Cancelar||Cancel'),
+            class: 'cancel',
+            action: () => this.editor.hidePopup()
+          },
+          {
+            text: __('Sí||Yes'),
+            action: () => {
+              this.disconnect();
+              this.sessionOverlay.style.display = 'none';
+              this.editor.hidePopup();
+            }
+          }
+        ]
+      );
+    });
+    
+    this.sessionContent.appendChild(disconnectBtn);
+  }
+
   confirmKickMember(member) {
     this.editor.showPopup(
       __('Expulsar miembro||Kick member'),
-      `${__('¿Expulsar a||Kick')} ${member.name}?`,
+      `${__('¿Expulsar a||Kick')} ${this.wrapMemberName(member)}?`,
       [
         {
           text: __('Cancelar||Cancel'),
@@ -1259,10 +1335,10 @@ class CollabManager {
   
   addMessageHtml(msg) {
     const msgEl = document.createElement('div');
-    msgEl.style.cssText = `font-size: 12px; margin-bottom: 4px; word-break: break-word;`;
+    msgEl.className = "collab-chat-message";
     msgEl.innerHTML = `
-      <span style="color: ${this.getColorHex(msg.memberColor)}; font-weight: bold;">${this.escapeHtml(msg.memberName || 'Unknown')}:</span>
-      <span style="color: var(--text-color);"> ${this.escapeHtml(msg.message)}</span>
+      <span class="collab-chat-name" style="color: ${this.getColorHex(msg.memberColor)};">${this.escapeHtml(msg.memberName || 'Unknown')}:</span>
+      <span class="collab-chat-text"> ${this.escapeHtml(msg.message)}</span>
     `;
     this.chatMessagesDiv.appendChild(msgEl);
   }
@@ -1294,61 +1370,6 @@ class CollabManager {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
-    }
-  }
-
-  showConnectingOverlay(message) {
-    this.connectingOverlay = document.createElement('div');
-    this.connectingOverlay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.7);
-      z-index: 10001;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-    `;
-    
-    const spinner = document.createElement('div');
-    spinner.style.cssText = `
-      border: 4px solid rgba(255,255,255,0.1);
-      border-top: 4px solid var(--primary-color);
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 20px;
-    `;
-    
-    const text = document.createElement('div');
-    text.style.cssText = `color: white; font-size: 16px;`;
-    text.textContent = message;
-    
-    if (!document.querySelector('#spin-keyframes')) {
-      const style = document.createElement('style');
-      style.id = 'spin-keyframes';
-      style.textContent = `
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `;
-      document.head.appendChild(style);
-    }
-    
-    this.connectingOverlay.appendChild(spinner);
-    this.connectingOverlay.appendChild(text);
-    document.body.appendChild(this.connectingOverlay);
-  }
-
-  hideConnectingOverlay() {
-    if (this.connectingOverlay) {
-      this.connectingOverlay.remove();
-      this.connectingOverlay = null;
     }
   }
 

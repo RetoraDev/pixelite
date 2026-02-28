@@ -5,19 +5,27 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "node build.js --all --debug",
-    "build:all": "node build.js --all --debug",
-    "build:web": "node build.js --web --debug",
-    "build:cordova": "node build.js --cordova --debug --no-install",
-    "build:min": "node build.js --all --minify --debug",
+    "build": "npm run build:all",
+    "build:all": "node build.js --all",
+    "build:web": "node build.js --web --minify",
+    "build:cordova": "node build.js --cordova",
+    "build:android": "npm run build:cordova",
+    "build:min": "node build.js --all --minify",
     "build:dev": "node build.js --none --debug",
     "build:release": "node build.js --all --minify --zipalign",
-    "serve": "python -m http.server 3000",
+    "serve": "node index.js",
+    "serve:src": "node index.js --src",
     "dev": "npm run build:dev && npm run serve:dist",
     "dev:fast": "npm run serve:src",
-    "clean": "rm -rf dist",
-    "clean:all": "rm -rf dist && rm -f *.zip *.apk"
+    "clean": "rm -rf dist && mkdir dist"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RetoraDev/pixelite.git"
+  },
+  "author": "RetoraDev",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/RetoraDev/pixelite#readme",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -25,5 +33,9 @@
     "nodemon": "^3.1.14",
     "uuid": "^13.0.0",
     "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "clean-css": "^5.3.3",
+    "terser": "^5.46.0"
   }
 }

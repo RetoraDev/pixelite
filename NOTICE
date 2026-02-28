@@ -1,0 +1,19 @@
+NOTICE
+
+This software includes third-party libraries with separate copyright notices
+and license terms. The use of these libraries is subject to their respective
+licenses.
+
+-------------------------------------------------------------------------------
+
+Library: eruda.js
+Source: https://github.com/liriliri/eruda
+Copyright: (c) 2016-present liriliri
+License: MIT (https://opensource.org/licenses/MIT)
+
+Description: Eruda is a console for mobile browsers.
+
+-------------------------------------------------------------------------------
+
+For all other parts of the software, the Pixelite License applies as stated
+in the LICENSE file.

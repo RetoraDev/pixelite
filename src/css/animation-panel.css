@@ -1,0 +1,144 @@
+/*
+  Animation panel 
+*/
+.animation-timeline {
+  position: absolute;
+  bottom: 50px;
+  left: 0;
+  right: 0;
+  height: 180px;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  background-color: var(--ui-color);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  z-index: 15;
+}
+
+.animation-timeline.visible {
+  transform: translateY(0);
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background-color: var(--ui-highlight);
+  border-bottom: 1px solid var(--border-color);
+  gap: 10px;
+}
+
+.timeline-header .ui-button {
+  width: 32px;
+  height: 32px;
+}
+
+.fps-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.fps-control input {
+  width: 50px;
+  padding: 4px;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  border-radius: 3px;
+}
+
+.timeline-content {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  overflow-x: auto;
+  flex: 1;
+}
+
+.timeline-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px;
+  background-color: var(--bg-color);
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 70px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  position: relative;
+}
+
+.timeline-frame.active {
+  background-color: var(--primary-color);
+  transform: scale(1.05);
+}
+
+.timeline-frame.dragging {
+  opacity: 0.6;
+}
+
+.frame-thumb {
+  margin-bottom: 5px;
+}
+
+.frame-thumb canvas {
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+}
+
+.frame-time {
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 2px 4px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  margin-bottom: 3px;
+  cursor: pointer;
+}
+
+.frame-time:active, .frame-time:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: var(--text-color);
+}
+
+.frame-number {
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.animation-preview {
+  position: absolute;
+  right: 0px;
+  width: 120px;
+  height: auto;
+  transform: translateY(-100%);
+  border: 2px solid var(--border-color);
+  background-color: #fff;
+  background-image: var(--transparent-bg);
+  display: none;
+}
+
+.animation-preview.visible {
+  display: block;
+}
+
+/* Scrollbar styling for timeline */
+.timeline-content::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline-content::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+.timeline-content::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border-radius: 3px;
+}
+
+.timeline-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color);
+}

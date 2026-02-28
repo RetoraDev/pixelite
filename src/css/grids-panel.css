@@ -1,0 +1,399 @@
+/*
+  Grids Panel
+*/
+.grid-panel {
+  position: absolute;
+  bottom: 50px;
+  left: 0;
+  right: 0;
+  height: 360px; /* Double the animation panel height */
+  transform: translateY(110%);
+  transition: transform 0.3s ease;
+  background-color: var(--ui-color);
+  border-top: 2px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  box-shadow: 0 -4px 10px var(--shadow-color);
+}
+
+.grid-panel.visible {
+  transform: translateY(0);
+}
+
+/* Panel Header */
+.grid-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background-color: var(--ui-highlight);
+  border-bottom: 1px solid var(--border-color);
+  height: 40px;
+}
+
+.grid-panel-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+.grid-panel-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.grid-panel-close:hover,
+.grid-panel-close:active {
+  background-color: var(--bg-color);
+}
+
+/* Toolbar */
+.grid-toolbar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--ui-color);
+}
+
+.grid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.grid-btn.primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.grid-btn.primary:hover,
+.grid-btn.primary:active {
+  filter: brightness(1.1);
+}
+
+.grid-btn .icon {
+  width: 16px;
+  height: 16px;
+  filter: brightness(1);
+}
+
+/* Grid List */
+.grid-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Grid Item */
+.grid-item {
+  position: relative;
+  background-color: var(--bg-color);
+  border-radius: 6px;
+  padding: 16px;
+  position: relative;
+  border: 1px solid var(--border-color);
+  display: flex;
+  gap: 16px;
+}
+
+/* Grid Preview */
+.grid-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  border: 2px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+/* Grid Info */
+.grid-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.grid-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.grid-name-input {
+  flex: 1;
+  padding: 6px 8px;
+  background-color: var(--ui-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+.grid-name-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+/* Toggle Switch */
+.grid-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.grid-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.grid-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-color);
+  border: 2px solid var(--border-color);
+  transition: .2s;
+  border-radius: 24px;
+}
+
+.grid-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-dim);
+  transition: .2s;
+  border-radius: 50%;
+}
+
+input:checked + .grid-toggle-slider {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+input:checked + .grid-toggle-slider:before {
+  transform: translateX(20px);
+  background-color: white;
+}
+
+/* Grid Controls */
+.grid-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.grid-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.grid-control-label {
+  min-width: 60px;
+  color: var(--text-dim);
+}
+
+.grid-control input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: var(--ui-color);
+  border-radius: 2px;
+  -webkit-appearance: none;
+}
+
+.grid-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--primary-color);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+}
+
+.grid-control input[type="color"] {
+  width: 40px;
+  height: 30px;
+  padding: 2px;
+  background: var(--ui-color);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.grid-control-value {
+  min-width: 45px;
+  text-align: right;
+  color: var(--text-color);
+  font-weight: bold;
+}
+
+/* Number input styles */
+.grid-number-input {
+  width: 70px;
+  padding: 6px 8px;
+  background-color: var(--ui-color);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-color);
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.grid-number-input::-webkit-outer-spin-button,
+.grid-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.grid-number-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.grid-number-input:hover {
+  border-color: var(--ui-highlight);
+}
+
+.grid-unit {
+  min-width: 25px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* Color input */
+.grid-color-input {
+  width: 50px;
+  height: 34px;
+  padding: 2px;
+  background: var(--ui-color);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.grid-color-input:hover {
+  border-color: var(--primary-color);
+}
+
+/* Remove Button */
+.grid-remove-btn {
+  position: absolute;
+  top: -16px; /* Move up to overflow */
+  right: -8px; /* Move right to overflow */
+  width: 28px;
+  height: 28px;
+  border: none;
+  background-color: var(--primary-color); /* Make it stand out */
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%; /* Make it circular */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); /* Add shadow for depth */
+  z-index: 15; /* Ensure it's above the grid item */
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.grid-remove-btn:hover,
+.grid-remove-btn:active {
+  background-color: #ff4444; /* Red on hover for warning */
+  transform: scale(1.1); /* Slight grow on hover */
+  box-shadow: 0 4px 10px rgba(255, 68, 68, 0.4);
+}
+
+/* Empty State */
+.grid-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Grid Overlay */
+.grid-overlay {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.grid-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/* Scrollbar */
+.grid-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.grid-list::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+.grid-list::-webkit-scrollbar-thumb {
+  background: var(--ui-highlight);
+  border-radius: 4px;
+}
+
+.grid-list::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+  .grid-control {
+    flex-wrap: wrap;
+  }
+  
+  .grid-control-label {
+    min-width: 50px;
+  }
+  
+  .grid-number-input {
+    width: 60px;
+  }
+}

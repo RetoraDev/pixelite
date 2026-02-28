@@ -2,7 +2,11 @@
 
 const fs = require("fs");
 const path = require("path");
+const terser = require("terser");
+const CleanCSS = require('clean-css');
 const { exec, execSync } = require("child_process");
+
+require('dotenv').config();
 
 // Build config
 const config = {
@@ -31,7 +35,18 @@ const jsFileOrder = [
 
 // Default order css files
 const cssFileOrder = [
-  "css/main.css"
+  "css/main.css",
+  "css/icons.css",
+  "css/menu-panel.css",
+  "css/layers-panel.css",
+  "css/animation-panel.css",
+  "css/grids-panel.css",
+  "css/popup.css",
+  "css/file-browser.css",
+  "css/color-picker.css",
+  "css/settings.css",
+  "css/collab.css",
+  "css/keyframes.css"
 ];
 
 let packageInfo = {};
@@ -89,11 +104,11 @@ function getPackageInfo() {
 
 function getLicenseHeader(platform) {
   return `/**
- * PadManiacs Rhythm Game
+ * Pixelite: Real-time collaborative pixel art editor with animation support
  * Copyright ${copyright}
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
- * Source: https://github.com/RetoraDev/PadManiacs
+ * Source: https://github.com/RetoraDev/pixelite
  * Version: ${versionName}
  * Built: ${new Date().toLocaleString()}
  * Platform: ${getPlatformDisplayName(platform)}
@@ -196,25 +211,18 @@ function processFileContent(content, filePath) {
   content = content
     .replace('const COPYRIGHT = "%";', `const COPYRIGHT = "${copyright}";`)
     .replace('const VERSION = "%";', `const VERSION = "${versionName}";`)
+    .replace('const HOST = "%";', `const HOST = "${config.flags.debug ? process.env.LOCALHOST : process.env.HOST}";`)
     .replace('const DEBUG = "%";', `const DEBUG = ${config.flags.debug};`);
-
-  // Add file header comment for debugging
-  if (config.flags.debug) {
-    content = `\n\n/* ${filePath} */\n` + content;
-  }
 
   return content;
 }
 
-async function minifyCode(code, platform) {
+async function mininyJSCode(code, platform) {
   if (!config.flags.minify) {
     return code;
   }
 
   try {
-    // Import terser from lib folder
-    const terser = require(config.libDir + "/terser.js");
-
     const minified = await terser.minify(code, {
       mangle: {
         toplevel: false,
@@ -232,6 +240,37 @@ async function minifyCode(code, platform) {
     return getLicenseHeader(platform) + "\n\n" + minified.code;
   } catch (error) {
     log("Minification failed, using original code:", "warning", error.message);
+    return getLicenseHeader(platform) + "\n\n" + code;
+  }
+}
+
+async function minifyCSSCode(code, platform) {
+  if (!config.flags.minify) {
+    return code;
+  }
+
+  try {
+    const cleanCSS = new CleanCSS({
+      level: 2,
+      format: false, // ← Cambia esto a false para minificar
+      sourceMap: false,
+      compatibility: '*'
+    });
+
+    const minified = cleanCSS.minify(code);
+
+    if (minified.errors && minified.errors.length > 0) {
+      log("CSS Minification errors:", "warning", minified.errors.join(', '));
+      return getLicenseHeader(platform) + "\n\n" + code;
+    }
+
+    if (minified.warnings && minified.warnings.length > 0) {
+      log("CSS Minification warnings:", "warning", minified.warnings.join(', '));
+    }
+
+    return getLicenseHeader(platform) + "\n\n" + minified.styles;
+  } catch (error) {
+    log("CSS Minification failed, using original code:", "warning", error.message);
     return getLicenseHeader(platform) + "\n\n" + code;
   }
 }
@@ -271,7 +310,7 @@ async function concatenateJSFiles(platform) {
   
   if (config.flags.minify) {
     log("Minifying JavaScript code...", "info");
-    return await minifyCode(output, platform);
+    return await mininyJSCode(output, platform);
   } else {
     return getLicenseHeader(platform) + "\n\n" + output;
   }
@@ -284,7 +323,7 @@ async function concatenateCSSFiles(platform) {
   
   if (config.flags.minify) {
     log("Minifying CSS code...", "info");
-    return await minifyCode(output, platform);
+    return await minifyCSSCode(output, platform);
   } else {
     return getLicenseHeader(platform) + "\n\n" + output;
   }
@@ -545,7 +584,7 @@ async function buildBaseFiles(platform) {
   
   // Concatenate all CSS files
   const concatenatedCSS = await concatenateCSSFiles(platform);
-  fs.writeFileSync(path.join(config.distDir, 'editor.css'), concatenatedCSS);
+  fs.writeFileSync(path.join(config.distDir, 'style.css'), concatenatedCSS);
   
   fs.copyFileSync('src/index.html', path.join(config.distDir, 'index.html'));
   
@@ -602,4 +641,21 @@ function exit(signal = 0) {
   process.exit(signal);
 }
 
-build();
+// Run build if this script is executed directly
+if (require.main === module) {
+  build();
+}
+
+module.exports = {
+  config,
+  buildBaseFiles,
+  buildForPlatform,
+  buildAndroid,
+  buildWeb,
+  build,
+  execSync,
+  buildProcess: process,
+  processFileContent,
+  jsFileOrder,
+  cssFileOrder
+};

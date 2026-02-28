@@ -12,6 +12,8 @@
 
 Real-time collaborative pixel art editor with layer support, animation timeline, and export capabilities. Built for both web and Android (Cordova). Windows Platform Coming Soon!
 
+![](images/splash_5-4.jpg)
+
 [![Launch In Browser](https://img.shields.io/badge/Launch_In_Browser-ff5722?style=for-the-badge&logo=google-chrome&logoColor=white)](https://retoradev.github.io/pixelite/dist/)
 
 [![Download On Itch.io](https://img.shields.io/badge/Download_On_Itch.io-ff2449?style=for-the-badge&logo=itch.io&logoColor=white)](https://retora.itch.io/pixelite)

@@ -1,5 +1,6 @@
 const COPYRIGHT = "%";
 const VERSION = "%";
+const HOST = "%";
 const DEBUG = "%";
 
 // Global language processor

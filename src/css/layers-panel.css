@@ -1,0 +1,114 @@
+/*
+  Layers Panel
+*/
+.layers-panel {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 250px;
+  height: calc(100% - 90px);
+  background-color: var(--ui-color);
+  box-shadow: -2px 0 5px var(--shadow-color);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.layers-panel.visible {
+  transform: translateX(0);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-title {
+  font-weight: bold;
+}
+
+.panel-close {
+  cursor: pointer;
+}
+
+.layers-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 5px;
+  background-color: var(--bg-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  position: relative;
+}
+
+.layer-item.active {
+  border-left: 3px solid var(--primary-color);
+  background-color: var(--ui-highlight);
+}
+
+.layer-item.dragging {
+  opacity: 0.5;
+  background-color: var(--primary-color);
+}
+
+.layer-thumb-container {
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.layer-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.layer-info span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.layer-item:hover .layer-actions {
+  opacity: 1;
+}
+
+.layer-action {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-color);
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.layer-action:hover {
+  background-color: var(--ui-highlight);
+}

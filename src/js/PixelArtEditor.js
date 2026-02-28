@@ -103,8 +103,6 @@ class PixelArtEditor {
       if (this.showMiniView) {
         this.animationPreview.classList.add("visible");
       }
-
-      this.hideLoadingScreen();
     } catch (error) {
       console.error("Editor initialization error:", error);
       this.showError(error);
@@ -730,11 +728,16 @@ class PixelArtEditor {
   initUI() {
     this.loadingElement = document.createElement("div");
     this.loadingElement.className = "loading-overlay";
-    this.loadingElement.innerHTML = `
-      <div class="loading-spinner"></div>
-      <div class="loading-text">Loading</div>
-    `;
     this.container.appendChild(this.loadingElement);
+    
+    this.loadingSpinner = document.createElement("div");
+    this.loadingSpinner.className = "loading-spinner";
+    this.loadingElement.appendChild(this.loadingSpinner);
+    
+    this.loadingText = document.createElement("div");
+    this.loadingText.className = "loading-text";
+    this.loadingText.innerHTML = "Loading...";
+    this.loadingElement.appendChild(this.loadingText);
 
     this.errorElement = document.createElement("div");
     this.errorElement.className = "editor-error";
@@ -1551,7 +1554,7 @@ class PixelArtEditor {
   
   showLoadingScreen(text = "Loading") {
     this.loadingElement.style.display = "flex";
-    this.loadingElement.querySelector(".loading-text").innerHTML = text;
+    this.loadingText.innerHTML = text;
   }
   
   hideLoadingScreen() {

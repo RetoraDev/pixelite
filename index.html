@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Pixelite</title>
+    <link rel="icon" href="dist/favicon.png" />
+    <link rel="stylesheet" href="dist/editor.css" />
+    <script src="lib/eruda.js"></script>
+  </head>
+  <body>
+    <script src="dist/editor.js"></script>
+    <canvas id="debug-canvas"></canvas>
+    <script>
+      if (window.eruda && DEBUG) eruda.init();
+      const editor = new PixelArtEditor();
+    </script>
+  </body>
+</html>

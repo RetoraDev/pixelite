@@ -1,0 +1,199 @@
+/*
+  File Browser Styles 
+*/
+.file-browser-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.file-browser-dialog {
+  background-color: #3d3d3d;
+  border-radius: 8px;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: calc(100vh - 40px); /* Account for padding */
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden; /* Prevent content from overflowing rounded corners */
+}
+
+.file-browser-title {
+  font-size: 18px;
+  margin-bottom: 15px;
+  color: #ffffff;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.file-browser-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Allows content to shrink properly */
+  overflow: hidden; /* Contain the list */
+}
+
+.file-browser-list {
+  border: 1px solid #1d1d1d;
+  background-color: #2d2d2d;
+  border-radius: 4px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 100px; /* Minimum height */
+  max-height: 300px; /* Maximum height before scrolling */
+}
+
+.file-item {
+  padding: 10px;
+  cursor: pointer;
+  color: #e0e0e0;
+  border-bottom: 1px solid #1d1d1d;
+  transition: background-color 0.2s;
+  word-break: break-all;
+}
+
+.file-item:last-child {
+  border-bottom: none;
+}
+
+.file-item:hover {
+  background-color: #4d4d4d;
+}
+
+.file-item.directory {
+  color: #4fc3f7;
+}
+
+.file-item .icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.cordova-path {
+  color: #a0a0a0;
+  font-size: 12px;
+  margin-bottom: 10px;
+  word-break: break-all;
+  padding: 5px;
+  background-color: #2d2d2d;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.file-browser-filename {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  background-color: #2d2d2d;
+  border: 1px solid #1d1d1d;
+  color: #e0e0e0;
+  border-radius: 4px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.file-browser-type {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  background-color: #2d2d2d;
+  border: 1px solid #1d1d1d;
+  color: #e0e0e0;
+  border-radius: 4px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.file-browser-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 5px;
+  margin-top: 15px;
+}
+
+.file-browser-cancel {
+  padding: 8px 15px;
+  background-color: #424242;
+  border: none;
+  color: #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.file-browser-confirm {
+  padding: 8px 15px;
+  background-color: #ff5722;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.file-browser-browse {
+  width: 100%;
+  padding: 12px;
+  background-color: #ff5722;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.loading,
+.empty,
+.error {
+  padding: 20px;
+  text-align: center;
+  color: #a0a0a0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error {
+  color: #f44336;
+}
+
+/* Scrollbar styling */
+.file-browser-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.file-browser-list::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 0 4px 4px 0;
+}
+
+.file-browser-list::-webkit-scrollbar-thumb {
+  background: #4d4d4d;
+  border-radius: 4px;
+}
+
+.file-browser-list::-webkit-scrollbar-thumb:hover {
+  background: #5d5d5d;
+}
