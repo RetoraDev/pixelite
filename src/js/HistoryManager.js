@@ -69,7 +69,7 @@ class HistoryManager {
     
     return {
       entry,
-      message: `Undo '${entry.description}'`
+      message: __(`(Deshacer|Undo) '${entry.description}'`)
     };
   }
   
@@ -82,7 +82,7 @@ class HistoryManager {
     
     return {
       entry,
-      message: `Redo '${entry.description}'`
+      message: __(`(Rehacer|Redo) '${entry.description}'`)
     };
   }
 
@@ -184,6 +184,7 @@ class HistoryManager {
       // Remove the frame that was added
       this.editor.project.frames.splice(operation.index, 1);
       this.editor.frameTimes.splice(operation.index, 1);
+      this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
     } else {
       // Add the frame back
       const newFrame = {
@@ -212,6 +213,7 @@ class HistoryManager {
       
       this.editor.project.frames.splice(operation.index, 0, newFrame);
       this.editor.frameTimes.splice(operation.index, 0, operation.frameTime);
+      this.editor.project.currentFrame = operation.index;
     }
   }
 
@@ -243,10 +245,12 @@ class HistoryManager {
       
       this.editor.project.frames.splice(operation.index, 0, restoredFrame);
       this.editor.frameTimes.splice(operation.index, 0, operation.frameTime);
+      this.editor.project.currentFrame = operation.index;
     } else {
       // Remove the frame again
       this.editor.project.frames.splice(operation.index, 1);
       this.editor.frameTimes.splice(operation.index, 1);
+      this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
     }
   }
 
@@ -290,6 +294,7 @@ class HistoryManager {
     if (isUndo) {
       // Remove the added layer
       frame.layers.splice(layerIndex, 1);
+      this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
     } else {
       // Add the layer back
       const layer = this.editor.createBlankLayer(
@@ -310,6 +315,8 @@ class HistoryManager {
       }
       
       frame.layers.splice(layerIndex, 0, layer);
+
+      this.editor.project.currentLayer = layerIndex;
     }
   }
 
@@ -337,9 +344,12 @@ class HistoryManager {
       }
       
       frame.layers.splice(layerIndex, 0, layer);
+      
+      this.editor.project.currentLayer = layerIndex;
     } else {
       // Remove the layer again
       frame.layers.splice(layerIndex, 1);
+      this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
     }
   }
 

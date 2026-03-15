@@ -561,8 +561,8 @@ async function buildForPlatform() {
     await buildBaseFiles('web');
     
     // Then build each platform with their specific environment
-    await buildWeb();
     await buildAndroid();
+    await buildWeb();
   } else if (platform === 'web') {
     await buildBaseFiles('web');
     await buildWeb();

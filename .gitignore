@@ -4,6 +4,9 @@ node_modules/
 # Build outputs
 *.zip
 *.apk
+dist/*.zip
+dist/*.apk
+dist/*.idsig
 
 # Environment and secrets
 .env

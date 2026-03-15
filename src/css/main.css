@@ -441,6 +441,24 @@ a {
   opacity: 1;
 }
 
+/* Operation message */
+.operation-message {
+  position: fixed;
+  bottom: 60px;
+  left: 8px;
+  z-index: 1000000000000000000000;
+  color: var(--text-color);
+  font-size: 0.7em;
+  transition: opacity 0.3s;
+  text-shadow: 0 0 10px var(--shadow-color);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.operation-message.visible {
+  opacity: 1;
+}
+
 /*
   Bottom Menus
 */

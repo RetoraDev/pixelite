@@ -19,7 +19,7 @@ window.__ = function(text) {
 
   // Handle parenthetical cases (ES|EN)
   const parenRegex = /\(([^)|]+)\|([^)]+)\)/g;
-  text = text.replace(parenRegex, (match, esText, enText) => {
+  text = text.replace(parenRegex, (match, enText, esText) => {
     return language === 0 ? esText : enText;
   });
 

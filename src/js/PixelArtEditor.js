@@ -65,6 +65,7 @@ class PixelArtEditor {
     this.timelapseFPS = 30;
     this.referenceGrids = [];
     this.floatingColors = new Map();
+    this.registerLayerVisibilityChanges = false;
     
     // Collab Session
     this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
@@ -204,6 +205,20 @@ class PixelArtEditor {
       defaultValue: false,
       onInit: (value, editor) => {
         editor.showMiniView = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'registerLayerVisibilityChanges',
+      label: 'Registrar cambios de visibilidad||Register visibility changes',
+      description: 'Registrar cambios de visibilidad de capas en la historia de deshacer||Register layer visibility changes in undo history',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.registerLayerVisibilityChanges = value;
+      },
+      onUpdate: (value, oldScale, editor) => {
+        editor.registerLayerVisibilityChanges = value;
       }
     });
     
@@ -422,7 +437,7 @@ class PixelArtEditor {
     this.autoSaveInterval = setInterval(() => {
       if (this.project) {
         this.saveProject(true);
-        this.showNotification(__('Proyecto auto-guardado||Project auto-saved'));
+        this.showToast(__('Proyecto auto-guardado||Project auto-saved'));
       }
     }, 5 * 60 * 1000); // 5 minutes
   }
@@ -693,7 +708,7 @@ class PixelArtEditor {
               const password = document.getElementById('collab-join-password').value;
               
               if (!sessionId) {
-                this.showNotification(__('ID de sala requerido||Room ID required'), 2000);
+                this.showToast(__('ID de sala requerido||Room ID required'), 2000);
                 return;
               }
               
@@ -1192,7 +1207,7 @@ class PixelArtEditor {
       onDown: (x, y, remote) => {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
-        this.historyManager.startBatch("draw", 'Draw Pixels');
+        this.historyManager.startBatch("draw", __('Dibujar||Draw'));
         this.drawPixel(x, y);
       },
       onMove: (x, y) => {
@@ -1224,7 +1239,7 @@ class PixelArtEditor {
       onDown: (x, y) => {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
-        this.historyManager.startBatch("draw", 'Eraser Pixels');
+        this.historyManager.startBatch("draw", __('Borrar||Erase'));
         this.drawPixel(x, y, { color: "transparent" });
       },
       onMove: (x, y) => {
@@ -1254,6 +1269,7 @@ class PixelArtEditor {
       icon: "tool-line",
       cursor: "crosshair",
       onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Línea||Line'));
         this.startLine(x, y);
       },
       onMove: (x, y) => {
@@ -1280,6 +1296,7 @@ class PixelArtEditor {
         perfect: { type: "boolean", default: false }
       },
       onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Rectángulo||Rectangle'));
         this.startRect(x, y);
       },
       onMove: (x, y) => {
@@ -1306,6 +1323,7 @@ class PixelArtEditor {
         perfect: { type: "boolean", default: false }
       },
       onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Elipse||Ellipse'));
         this.startEllipse(x, y);
       },
       onMove: (x, y) => {
@@ -1328,6 +1346,7 @@ class PixelArtEditor {
       icon: "tool-bucket",
       cursor: "crosshair",
       onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Rellenar||Bucket fill'));
         this.fillArea(x, y);
         this.saveToHistory();
       }
@@ -2113,14 +2132,14 @@ class PixelArtEditor {
 
     this.lastPalette.colors.push(color);
     this.updatePaletteGrid();
-    this.showNotification("Color added to palette");
+    this.showToast(__("Color añadido a la paleta||Color added to palette"));
   }
 
   removeColorFromPalette(index) {
     if (this.lastPalette && this.lastPalette.colors) {
       this.lastPalette.colors.splice(index, 1);
       this.updatePaletteGrid();
-      this.showNotification("Color removed from palette");
+      this.showToast(__("Color quitado de la paleta||Color removed from palette"));
     }
   }
 
@@ -2136,10 +2155,10 @@ class PixelArtEditor {
     container.splice(index, 1);
     if (container === this.recentColors) {
       this.updateRecentColorsGrid();
-      this.showNotification("Color removed from recent colors");
+      this.showToast(__("Color quitado de recientes||Color removed from recent colors"));
     } else {
       this.updatePaletteGrid();
-      this.showNotification("Color removed from palette");
+      this.showToast(__("Color quitado de la paleta||Color removed from palette"));
     }
     this.hideColorMenu();
   }
@@ -2154,9 +2173,9 @@ class PixelArtEditor {
           const fileData = await this.readFile(fileInfo);
           this.parsePalFile(fileData);
           this.updatePaletteGrid();
-          this.showNotification(__("Paleta cargada||Palette loaded successfully"));
+          this.showToast(__("Paleta cargada||Palette loaded successfully"));
         } catch (error) {
-          this.showNotification(`Error loading palette: ${error.message}`, 5000);
+          this.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
           console.error(error);
         }
       }
@@ -2167,7 +2186,7 @@ class PixelArtEditor {
 
   savePalette() {
     if (!this.lastPalette || !this.lastPalette.colors || this.lastPalette.colors.length === 0) {
-      this.showNotification(__("No hay paleta que guardar||No palette to save"), 3000);
+      this.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
       return;
     }
 
@@ -2181,9 +2200,9 @@ class PixelArtEditor {
         try {
           const palContent = this.generatePalFile();
           await this.saveFile(fileInfo.name, "pal", palContent);
-          this.showNotification(__("Paleta guardada||Palette saved successfully"));
+          this.showToast(__("Paleta guardada||Palette saved successfully"));
         } catch (error) {
-          this.showNotification(`Error saving palette: ${error.message}`, 5000);
+          this.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
           console.error(error);
         }
       }
@@ -3375,7 +3394,7 @@ class PixelArtEditor {
       this.ctx.globalAlpha = 1.0;
     }
 
-    // Update UI
+    //  UI
     this.updateFramesUI();
     this.updateLayersUI();
     this.updateAnimationPreview();
@@ -3466,7 +3485,7 @@ class PixelArtEditor {
   
   undo() {
     const undid = this.historyManager.undo()
-    
+
     if (undid) {
       this.render();
       this.showOperationMessage(undid.message);
@@ -3491,9 +3510,9 @@ class PixelArtEditor {
         try {
           const fileData = await this.readFile(fileInfo);
           await this.setReferenceImage(fileData);
-          this.showNotification(__("Referencia cargada||Reference image loaded"));
+          this.showToast(__("Referencia cargada||Reference image loaded"));
         } catch (error) {
-          this.showNotification(`Error loading reference: ${error.message}`, 5000);
+          this.showToast(__(`(Error al cargar la referencia|Error loading reference): ${error.message}`), 5000);
         }
       }
     });
@@ -4517,7 +4536,7 @@ class PixelArtEditor {
   }
 
   // UI helpers
-  showNotification(message, duration = 3000) {
+  showToast(message, duration = 3000) {
     this.notificationElement.innerHTML = message;
     this.notificationElement.classList.add("visible");
 
@@ -4614,7 +4633,7 @@ class PixelArtEditor {
             this.newProject(width, height);
             this.hidePopup();
           } else {
-            this.showNotification(__("Dimensiones inválidas||Invalid dimensions"));
+            this.showToast(__("Dimensiones inválidas||Invalid dimensions"));
           }
         }
       }
@@ -4672,7 +4691,7 @@ class PixelArtEditor {
               this.hidePopup();
               resolve(textInput.value);
             } else {
-              this.showNotification(__("Expresión hexadecimal inválida||Invalid HEX color expression"));
+              this.showToast(__("Expresión hexadecimal inválida||Invalid HEX color expression"));
               reject();
             }
           }
@@ -5053,10 +5072,10 @@ class PixelArtEditor {
   }
 
   // Animation Frame Management
-  addFrame() {
+  addFrame(frameIndex = this.project.frames.length) {
     if (!this.project) return;
   
-    this.historyManager.startBatch("add_frame", "Add Frame");
+    this.historyManager.startBatch("add_layer", __("(Añadir|Add) Frame"));
   
     const newFrame = {
       layers: []
@@ -5071,7 +5090,8 @@ class PixelArtEditor {
       newFrame.layers.push(newLayer);
     }
   
-    const frameIndex = this.project.frames.length;
+    // TODO: Add frame at specific frame index
+  
     this.project.frames.push(newFrame);
     this.frameTimes.push(this.currentFrameTime);
     this.project.currentFrame = frameIndex;
@@ -5079,7 +5099,7 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'add_frame',
-      description: 'Add Frame',
+      description: __('(Añadir|Add) Frame'),
       index: frameIndex,
       frameTime: this.currentFrameTime,
       layers: currentFrame.layers.map(layer => ({
@@ -5088,31 +5108,32 @@ class PixelArtEditor {
         imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
       }))
     };
+    
+    this.showOperationMessage(__('Nuevo Frame añadido||New Frame added'));
   
     this.historyManager.addChange(operation);
     this.historyManager.endBatch();
-  
+
     this.render();
   }
   
-  removeFrame() {
+  removeFrame(index = this.project.currentFrame) {
     if (!this.project || this.project.frames.length <= 1) return;
+    
+    this.historyManager.startBatch("remove_layer", __("(Quitar|Add) Frame"));
   
-    this.historyManager.startBatch("remove_frame", "Remove Frame");
+    const removedFrame = this.project.frames[index];
+    const removedFrameTime = this.frameTimes[index];
   
-    const frameIndex = this.project.currentFrame;
-    const removedFrame = this.project.frames[frameIndex];
-    const removedFrameTime = this.frameTimes[frameIndex];
-  
-    this.project.frames.splice(frameIndex, 1);
-    this.frameTimes.splice(frameIndex, 1);
-    this.project.currentFrame = Math.min(frameIndex, this.project.frames.length - 1);
+    this.project.frames.splice(index, 1);
+    this.frameTimes.splice(index, 1);
+    this.project.currentFrame = Math.min(index, this.project.frames.length - 1);
   
     // Record operation
     const operation = {
       type: 'remove_frame',
-      description: 'Remove Frame',
-      index: frameIndex,
+      description: __('(Quitar|Remove) Frame'),
+      index: index,
       frameTime: removedFrameTime,
       layers: removedFrame.layers.map(layer => ({
         name: layer.name,
@@ -5120,6 +5141,8 @@ class PixelArtEditor {
         imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
       }))
     };
+    
+    this.showOperationMessage(__('Frame quitado||Frame removed'));
   
     this.historyManager.addChange(operation);
     this.historyManager.endBatch();
@@ -5175,7 +5198,7 @@ class PixelArtEditor {
   addLayer() {
     if (!this.project) return;
   
-    this.historyManager.startBatch("add_layer", "Add Layer");
+    this.historyManager.startBatch("add_layer", __("Añadir Capa||Add Layer"));
   
     const frame = this.project.frames[this.project.currentFrame];
     const newLayer = this.createBlankLayer(this.project.width, this.project.height, `Layer ${frame.layers.length + 1}`);
@@ -5187,15 +5210,17 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'add_layer',
-      description: 'Add Layer',
+      description: __('Añadir Capa||Add Layer'),
       frameIndex: this.project.currentFrame,
       layerIndex: layerIndex,
       layerData: {
         name: newLayer.name,
-        visible: newLayer.visible,
+        visible: this.registerLayerVisibilityChanges ? newLayer.visible : true,
         imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
       }
     };
+    
+    this.showOperationMessage("Nueva capa añadida||New layer added");
   
     this.historyManager.addChange(operation);
     this.historyManager.endBatch();
@@ -5210,7 +5235,7 @@ class PixelArtEditor {
     const frame = this.project.frames[this.project.currentFrame];
     if (frame.layers.length <= 1) return;
   
-    this.historyManager.startBatch("remove_layer", "Remove Layer");
+    this.historyManager.startBatch("remove_layer", __("Quitar capa||Remove Layer"));
   
     const layerIndex = this.project.currentLayer;
     const removedLayer = frame.layers[layerIndex];
@@ -5221,15 +5246,17 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'remove_layer',
-      description: 'Remove Layer',
+      description: __('Quitar capa||Remove Layer'),
       frameIndex: this.project.currentFrame,
       layerIndex: layerIndex,
       layerData: {
         name: removedLayer.name,
-        visible: removedLayer.visible,
+        visible: this.registerLayerVisibilityChanges ? removedLayer.visible : true,
         imageData: Array.from(removedLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
       }
     };
+    
+    this.showOperationMessage("Capa quitada||Layer removed");
   
     this.historyManager.addChange(operation);
     this.historyManager.endBatch();
@@ -5248,14 +5275,18 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'change_layer_visibility',
-      description: 'Change Layer Visibility',
+      description: __('Cambiar visibilidad de la capa||Change Layer Visibility'),
       frameIndex: frameIndex,
       layerIndex: layerIndex,
       visible: visible,
       oldVisible: oldVisibility
     };
   
-    this.historyManager.addChange(operation);
+    // Only save if enabled
+    if (this.registerLayerVisibilityChanges) {
+      this.historyManager.addChange(operation);
+    }
+    
     this.render();
   }
   
@@ -5302,6 +5333,7 @@ class PixelArtEditor {
   updateFramesUI() {
     if (!this.project) return;
 
+    // OPTIMIZE: Do not redraw the entire container
     this.timelineContent.innerHTML = "";
 
     // Initialize frame times if needed
@@ -5409,6 +5441,7 @@ class PixelArtEditor {
   updateLayersUI() {
     if (!this.project) return;
   
+    // OPTIMIZE: Do not redraw the entire container
     this.layersContainer.innerHTML = "";
     
     // Add "+" button at the top
@@ -5455,9 +5488,11 @@ class PixelArtEditor {
       
       // Add transparency grid if layer has transparency
       if (this.hasTransparency(layer.canvas)) {
+        const w = Math.floor(this.project.width / 10) + 1;
+        const h = Math.floor(this.project.height / 10) + 1;
         thumbCtx.fillStyle = "rgba(0, 0, 0, 0.1)";
-        for (let y = 0; y < 4; y++) {
-          for (let x = 0; x < 4; x++) {
+        for (let y = 0; y < w; y++) {
+          for (let x = 0; x < h; x++) {
             if ((x + y) % 2 === 0) {
               thumbCtx.fillRect(x * 10, y * 10, 10, 10);
             }
@@ -5521,7 +5556,7 @@ class PixelArtEditor {
       removeBtn.title = "Remove Layer";
       removeBtn.addEventListener("click", e => {
         e.stopPropagation();
-        this.removeLayerWithUndo(i);
+        this.removeLayer(i);
       });
       layerActions.appendChild(removeBtn);
   
@@ -5562,45 +5597,6 @@ class PixelArtEditor {
     }
   }
 
-  removeFrameWithUndo(index) {
-    if (this.project.frames.length <= 1) return;
-
-    const deletedFrame = this.project.frames[index];
-    const deletedFrameTime = this.frameTimes[index];
-
-    this.project.frames.splice(index, 1);
-    this.frameTimes.splice(index, 1);
-    this.project.currentFrame = Math.min(index, this.project.frames.length - 1);
-
-    this.render();
-
-    this.showUndoToast(__("Frame Borrado||Frame Deleted"), () => {
-      this.project.frames.splice(index, 0, deletedFrame);
-      this.frameTimes.splice(index, 0, deletedFrameTime);
-      this.project.currentFrame = index;
-      this.render();
-    });
-  }
-
-  removeLayerWithUndo(index) {
-    const frame = this.project.frames[this.project.currentFrame];
-    if (frame.layers.length <= 1) return;
-
-    const deletedLayer = frame.layers[index];
-    frame.layers.splice(index, 1);
-    this.project.currentLayer = Math.min(index, frame.layers.length - 1);
-
-    this.updateLayersUI();
-    this.render();
-
-    this.showUndoToast(__("Capa Borrada||Layer Deleted"), () => {
-      frame.layers.splice(index, 0, deletedLayer);
-      this.project.currentLayer = index;
-      this.updateLayersUI();
-      this.render();
-    });
-  }
-
   setupSwipeToDelete(element, index, type) {
     let startX, startY;
     let isSwiping = false;
@@ -5636,9 +5632,9 @@ class PixelArtEditor {
       if (Math.abs(deltaX) > 60) {
         // Swipe threshold reached - delete item
         if (type === "frame") {
-          this.removeFrameWithUndo(index);
+          this.removeFrame(index);
         } else {
-          this.removeLayerWithUndo(index);
+          this.removeLayer(index);
         }
       }
 
@@ -5649,12 +5645,12 @@ class PixelArtEditor {
     });
   }
 
-  showUndoToast(message, undoCallback) {
+  showUndoToast(message, button, undoCallback) {
     const toast = document.createElement("div");
     toast.className = "undo-toast";
     toast.innerHTML = `
-    <span>${message}</span>
-    <button class="undo-button">${__("Deshacer||Undo")}</button>
+    <span>${message || ''}</span>
+    <button class="undo-button">${button || __("Deshacer||Undo")}</button>
   `;
 
     document.body.appendChild(toast);
@@ -5709,7 +5705,7 @@ class PixelArtEditor {
 
       if (deltaY < -60) {
         // Swipe threshold reached - delete frame
-        this.removeFrameWithUndo(index);
+        this.removeFrame(index);
       }
 
       // Reset transform
@@ -5961,20 +5957,20 @@ class PixelArtEditor {
           } else if (fileInfo.type === "pal") {
             this.parsePalFile(fileData);
             this.updatePaletteGrid();
-            this.showNotification(__(`(Paleta|Palette) ${fileInfo.name} (cargada|loaded)`));
+            this.showToast(__(`(Paleta|Palette) ${fileInfo.name} (cargada|loaded)`));
           } else {
             this.importImage(fileData, fileInfo.name);
           }
 
-          this.showNotification(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
+          this.showToast(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
           this.menuPanel.classList.remove("visible");
         } catch (error) {
-          this.showNotification(`Error opening file: ${error.message}`, 5000);
+          this.showToast(__(`(Error al abrir el archivo|Error opening file): ${error.message}`), 5000);
           console.error(error);
         }
       },
       onError: error => {
-        this.showNotification(`File error: ${error.message}`, 5000);
+        this.showToast(__(`(Error de archivo|File error): ${error.message}`), 5000);
       }
     });
 
@@ -6008,9 +6004,9 @@ class PixelArtEditor {
             await this.saveFile(fileInfo.name, "png", dataURL);
           }
 
-          this.showNotification(`File saved as ${fileInfo.name}`);
+          this.showToast(__(`(Archivo guardado como|File saved as) ${fileInfo.name}`));
         } catch (error) {
-          this.showNotification(`Error saving file: ${error.message}`, 5000);
+          this.showToast(__(`(Error al guardar el archivo|Error saving file): ${error.message}`), 5000);
           console.error(error);
         }
       }
@@ -6035,9 +6031,9 @@ class PixelArtEditor {
           const dataURL = canvas.toDataURL("image/png");
 
           await this.saveFile(fileInfo.name, "png", dataURL);
-          this.showNotification(`Frame exported as ${fileInfo.name}`);
+          this.showToast(__(`Frame (exportado como|exported as) ${fileInfo.name}`));
         } catch (error) {
-          this.showNotification(`Error exporting frame: ${error.message}`, 5000);
+          this.showToast(__(`(Error exportando el frame|Error exporting frame): ${error.message}`), 5000);
           console.error(error);
         }
       }
@@ -6048,7 +6044,7 @@ class PixelArtEditor {
 
   exportAnimation() {
     if (!this.project || this.project.frames.length <= 1) {
-      this.showNotification("Project has only one frame", 3000);
+      this.showToast("Project has only one frame", 3000);
       return;
     }
 
@@ -6064,9 +6060,9 @@ class PixelArtEditor {
           const dataURL = spriteSheet.toDataURL("image/png");
 
           await this.saveFile(fileInfo.name, "png", dataURL);
-          this.showNotification(`Animation exported as ${fileInfo.name}`);
+          this.showToast(__(`(Animación exportada como|Animation exported as) ${fileInfo.name}`));
         } catch (error) {
-          this.showNotification(`Error exporting animation: ${error.message}`, 5000);
+          this.showToast(__(`(Error exportando animación|Error exporting animation): ${error.message}`), 5000);
           console.error(error);
         }
       }
@@ -6221,14 +6217,14 @@ class PixelArtEditor {
       }, 100);
     } catch (error) {
       console.error("Browser save failed:", error);
-      this.showNotification(__("Error al guardar||Failed to save file"), 3000);
+      this.showToast(__("Error al guardar||Failed to save file"), 3000);
     }
   }
 
   // Timelapse export methods
   async exportTimelapse() {
     if (!this.project || !this.historyManager.history.length) {
-      this.showNotification(__("No hay suficiente historia para exportar el proceso||Not enough history to export a timelapse!"));
+      this.showToast(__("No hay suficiente historia para exportar el proceso||Not enough history to export a timelapse"));
       return;
     }
 
@@ -6289,7 +6285,7 @@ class PixelArtEditor {
             this.hidePopup();
             this.saveTimelapseWithBrowser(videoBlob);
           } catch (error) {
-            this.showNotification(`Error generating timelapse: ${error.message}`, 5000);
+            this.showToast(__(`(Error generando proceso|Error generating timelapse): ${error.message}`), 5000);
           }
         }
       }
@@ -6309,9 +6305,9 @@ class PixelArtEditor {
       onConfirm: async fileInfo => {
         try {
           await this.saveFile(fileInfo.name, "webm", videoBlob);
-          this.showNotification(__("Timelapse exportado||Timelapse saved successfully"));
+          this.showToast(__("Timelapse exportado||Timelapse saved successfully"));
         } catch (error) {
-          this.showNotification(`Error saving timelapse: ${error.message}`, 5000);
+          this.showToast(__(`(Error guardando proceso|Error saving timelapse): ${error.message}`), 5000);
         }
       }
     });
