@@ -630,7 +630,7 @@ class HistoryManager {
       const newFrame = {
         layers: operation.layers.map(layerData => {
           const canvas = document.createElement('canvas');
-          const ctx = this.getCanvasContext(canvas);
+          const ctx = this.editor.getCanvasContext(canvas);
           const layer = {
             canvas: canvas,
             ctx: ctx,
@@ -664,7 +664,7 @@ class HistoryManager {
       const restoredFrame = {
         layers: operation.layers.map(layerData => {
           const canvas = document.createElement('canvas');
-          const ctx = this.getCanvasContext(canvas);
+          const ctx = this.editor.getCanvasContext(canvas);
           const layer = {
             canvas: canvas,
             ctx: ctx,
@@ -722,7 +722,7 @@ class HistoryManager {
       frame.layers.splice(layerIndex, 1);
     } else {
       const canvas = document.createElement('canvas');
-      const ctx = this.getCanvasContext(canvas);
+      const ctx = this.editor.getCanvasContext(canvas);
       const layer = {
         canvas: canvas,
         ctx: ctx,
@@ -752,7 +752,7 @@ class HistoryManager {
     
     if (isUndo) {
       const canvas = document.createElement('canvas');
-      const ctx = this.getCanvasContext(canvas);
+      const ctx = this.editor.getCanvasContext(canvas);
       const layer = {
         canvas: canvas,
         ctx: ctx,

@@ -317,17 +317,17 @@ class PixelArtEditor {
     perfCat.addSetting({
       id: 'maxUndoSteps',
       label: 'Pasos de deshacer máximos||Max undo steps',
-      description: 'Límite de historial de deshacer||Undo history limit',
+      description: 'Límite de historial de deshacer (0 = Ilimitado)||Undo history limit (0 = Unlimited)',
       type: 'number',
       defaultValue: 50,
-      min: 10,
-      max: 200,
+      min: 0,
+      max: 2000,
       step: 10,
       onInit: (value, editor) => {
-        editor.historyManager.maxHistoryLength = value;
+        editor.historyManager.maxHistoryLength = value ? value : Infinity;
       },
       onUpdate: (value, oldValue, editor) => {
-        editor.historyManager.maxHistoryLength = value;
+        editor.historyManager.maxHistoryLength = value ? value : Infinity;
       }
     });
     

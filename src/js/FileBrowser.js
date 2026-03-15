@@ -15,11 +15,11 @@ class FileBrowser {
     };
     
     this.mimeMap = {
-      pxl: "text/*",
+      pxl: "text/*, application/*",
       png: "image/png",
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
-      txt: "text/plain",
+      txt: "text/plain, application/json",
       default: "*"
     };
     
