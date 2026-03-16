@@ -382,6 +382,10 @@ class HistoryManager {
     
     // For simplicity, we'll store the entire image data for transformations
     // This is still more efficient than full project snapshots
+    // But we can optimize this in the future
+    
+    ctx.clearRect(0, 0, this.editor.project.width, this.editor.project.height);
+    
     const imageData = new ImageData(
       new Uint8ClampedArray(isUndo ? transformData.oldImageData : transformData.newImageData),
       this.editor.project.width,

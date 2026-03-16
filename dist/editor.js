@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.0
- * Built: 3/15/2026, 2:03:13 PM
+ * Built: 3/16/2026, 1:29:09 PM
  * Platform: Web
  * Debug: false
  * Minified: false
@@ -1436,6 +1436,10 @@ class HistoryManager {
     
     // For simplicity, we'll store the entire image data for transformations
     // This is still more efficient than full project snapshots
+    // But we can optimize this in the future
+    
+    ctx.clearRect(0, 0, this.editor.project.width, this.editor.project.height);
+    
     const imageData = new ImageData(
       new Uint8ClampedArray(isUndo ? transformData.oldImageData : transformData.newImageData),
       this.editor.project.width,
@@ -6491,13 +6495,13 @@ class PixelArtEditor {
 
     const flipHItem = document.createElement("div");
     flipHItem.className = "menu-item";
-    flipHItem.textContent = __("Girar Horizontal||Flip Horizontal");
+    flipHItem.textContent = __("Espejo Horizontal||Flip Horizontal");
     flipHItem.addEventListener("click", () => this.flipHorizontal());
     transformSection.appendChild(flipHItem);
 
     const flipVItem = document.createElement("div");
     flipVItem.className = "menu-item";
-    flipVItem.textContent = __("Girar Vertical||Flip Vertical");
+    flipVItem.textContent = __("Espejo Vertical||Flip Vertical");
     flipVItem.addEventListener("click", () => this.flipVertical());
     transformSection.appendChild(flipVItem);
 
@@ -6578,11 +6582,7 @@ class PixelArtEditor {
     const viewSection = document.createElement("div");
     viewSection.className = "menu-section";
     container.appendChild(viewSection);
-
-    const h3 = document.createElement("h3");
-    h3.textContent = __("Visualization||View Options");
-    viewSection.appendChild(h3);
-
+    
     const zoomInItem = document.createElement("div");
     zoomInItem.className = "menu-item";
     zoomInItem.textContent = __("Acercar||Zoom In");
@@ -6634,12 +6634,6 @@ class PixelArtEditor {
     grayscaleItem.textContent = __("Escala de Grises||Grayscale");
     grayscaleItem.addEventListener("click", () => this.grayscale());
     colorSection.appendChild(grayscaleItem);
-
-    const brightnessItem = document.createElement("div");
-    brightnessItem.className = "menu-item";
-    brightnessItem.textContent = __("Ajustar Brillo...||Adjust Brightness...");
-    brightnessItem.addEventListener("click", () => this.showBrightnessDialog());
-    colorSection.appendChild(brightnessItem);
   }
 
   createHelpMenu(container) {
@@ -8671,8 +8665,8 @@ class PixelArtEditor {
 
   flipHorizontal() {
     if (!this.project) return;
-  
-    this.historyManager.startBatch("transform", "Flip Horizontal");
+    
+    this.historyManager.startBatch("transform", __("Espejo Horizontal||Flip Horizontal"));
   
     const frame = this.project.frames[this.project.currentFrame];
     const layer = frame.layers[this.project.currentLayer];
@@ -8682,7 +8676,11 @@ class PixelArtEditor {
     const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
   
     // Perform flip
-    const imageData = oldImageData;
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
     const data = imageData.data;
   
     for (let y = 0; y < this.project.height; y++) {
@@ -8704,7 +8702,7 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'transform',
-      description: 'Flip Horizontal',
+      description: __('Espejo Horizontal||Flip Horizontal'),
       frameIndex: this.project.currentFrame,
       layerIndex: this.project.currentLayer,
       transformType: 'flip_horizontal',
@@ -8723,7 +8721,7 @@ class PixelArtEditor {
   flipVertical() {
     if (!this.project) return;
   
-    this.historyManager.startBatch("transform", "Flip Vertical");
+    this.historyManager.startBatch("transform", __("Girar Horizontal||Flip Vertical"));
   
     const frame = this.project.frames[this.project.currentFrame];
     const layer = frame.layers[this.project.currentLayer];
@@ -8733,7 +8731,11 @@ class PixelArtEditor {
     const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
   
     // Perform flip
-    const imageData = oldImageData;
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
     const data = imageData.data;
   
     for (let y = 0; y < Math.floor(this.project.height / 2); y++) {
@@ -8755,7 +8757,7 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'transform',
-      description: 'Flip Vertical',
+      description: __('Girar Horizontal||Flip Vertical'),
       frameIndex: this.project.currentFrame,
       layerIndex: this.project.currentLayer,
       transformType: 'flip_vertical',
@@ -8771,10 +8773,10 @@ class PixelArtEditor {
     this.render();
   }
   
-  rotate(degrees) {
+  rotate(degrees = 0) {
     if (!this.project) return;
   
-    this.historyManager.startBatch("transform", `Rotate ${degrees}°`);
+    this.historyManager.startBatch("transform", __(`(Rotar|Rotate) ${degrees}°`));
   
     const frame = this.project.frames[this.project.currentFrame];
     const layer = frame.layers[this.project.currentLayer];
@@ -8828,7 +8830,7 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'transform',
-      description: `Rotate ${degrees}°`,
+      description: __(`(Rotar|Rotate) ${degrees}°`),
       frameIndex: this.project.currentFrame,
       layerIndex: this.project.currentLayer,
       transformType: `rotate_${degrees}`,
@@ -8864,7 +8866,7 @@ class PixelArtEditor {
   invertColors() {
     if (!this.project) return;
   
-    this.historyManager.startBatch("color_adjustment", "Invert Colors");
+    this.historyManager.startBatch("color_adjustment", __("Invertir Colores||Invert Colors"));
   
     const frame = this.project.frames[this.project.currentFrame];
     const layer = frame.layers[this.project.currentLayer];
@@ -8888,7 +8890,7 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'color_adjustment',
-      description: 'Invert Colors',
+      description: __('Invertir Colores||Invert Colors'),
       frameIndex: this.project.currentFrame,
       layerIndex: this.project.currentLayer,
       adjustmentType: 'invert',
@@ -8907,7 +8909,7 @@ class PixelArtEditor {
   grayscale() {
     if (!this.project) return;
   
-    this.historyManager.startBatch("color_adjustment", "Grayscale");
+    this.historyManager.startBatch("color_adjustment", __("Escala de Grises||Grayscale"));
   
     const frame = this.project.frames[this.project.currentFrame];
     const layer = frame.layers[this.project.currentLayer];
@@ -8917,7 +8919,11 @@ class PixelArtEditor {
     const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
   
     // Perform grayscale
-    const imageData = oldImageData;
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
     const data = imageData.data;
   
     for (let i = 0; i < data.length; i += 4) {
@@ -8932,7 +8938,7 @@ class PixelArtEditor {
     // Record operation
     const operation = {
       type: 'color_adjustment',
-      description: 'Grayscale',
+      description: __('Escala de Grises||Grayscale'),
       frameIndex: this.project.currentFrame,
       layerIndex: this.project.currentLayer,
       adjustmentType: 'grayscale',
@@ -8948,77 +8954,6 @@ class PixelArtEditor {
     this.render();
   }
   
-  adjustBrightness(value) {
-    if (!this.project) return;
-  
-    this.historyManager.startBatch("color_adjustment", "Adjust Brightness");
-  
-    const frame = this.project.frames[this.project.currentFrame];
-    const layer = frame.layers[this.project.currentLayer];
-    const ctx = layer.ctx;
-  
-    // Store old image data
-    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
-  
-    // Perform brightness adjustment
-    const imageData = oldImageData;
-    const data = imageData.data;
-    const factor = 1 + value / 100;
-  
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, data[i] * factor)); // R
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor)); // G
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor)); // B
-    }
-  
-    ctx.putImageData(imageData, 0, 0);
-  
-    // Record operation
-    const operation = {
-      type: 'color_adjustment',
-      description: 'Adjust Brightness',
-      frameIndex: this.project.currentFrame,
-      layerIndex: this.project.currentLayer,
-      adjustmentType: 'brightness',
-      adjustmentData: {
-        value: value,
-        oldImageData: Array.from(oldImageData.data),
-        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
-      }
-    };
-  
-    this.historyManager.addChange(operation);
-    this.historyManager.endBatch();
-  
-    this.render();
-  }
-  
-  showBrightnessDialog() {
-    const content = document.createElement("div");
-    content.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px;">Brightness (-100 to 100):</label>
-                <input type="range" id="brightness-value" min="-100" max="100" value="0" style="width: 100%;">
-            </div>
-        `;
-
-    this.showPopup(__("Ajuste de Brillo||Adjust Brightness"), content, [
-      {
-        text: __("Cancelar||Cancel"),
-        class: "cancel",
-        action: () => this.hidePopup()
-      },
-      {
-        text: __("Aplicar||Apply"),
-        action: () => {
-          const value = parseInt(document.getElementById("brightness-value").value);
-          this.adjustBrightness(value);
-          this.hidePopup();
-        }
-      }
-    ]);
-  }
-
   showAboutDialog() {
     this.showPopup(
       __("Acerca de Pixelite||About Pixelite"),

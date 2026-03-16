@@ -15,6 +15,11 @@ dist/*.idsig
 # Logs
 *.log
 
+# Incomplete ideas and experiments
+untracked/
+
 # OS files
 .DS_Store
 Thumbs.db
+.nomedia
+.nosearch
