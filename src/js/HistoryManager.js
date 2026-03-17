@@ -128,6 +128,9 @@ class HistoryManager {
         case 'color_adjustment':
           this.applyColorAdjustmentOperation(operation, isUndo);
           break;
+        case 'resize_canvas':
+          this.applyResizeCanvasOperation(operation, isUndo);
+          break;
       }
     });
     
@@ -410,7 +413,100 @@ class HistoryManager {
     
     ctx.putImageData(imageData, 0, 0);
   }
-
+  
+  applyResizeCanvasOperation(operation, isUndo) {
+    const { oldWidth, oldHeight, newWidth, newHeight, cropX, cropY, framesData } = operation;
+    
+    // Store current frame/layer indices
+    const currentFrame = this.editor.project.currentFrame;
+    const currentLayer = this.editor.project.currentLayer;
+    
+    // Determine which dimensions to use
+    const targetWidth = isUndo ? oldWidth : newWidth;
+    const targetHeight = isUndo ? oldHeight : newHeight;
+    
+    // Resize project dimensions first
+    this.editor.project.width = targetWidth;
+    this.editor.project.height = targetHeight;
+    this.editor.resetCanvasSize();
+    
+    // Restore/transform each layer
+    this.editor.project.frames.forEach((frame, fIndex) => {
+      // Make sure we have data for this frame
+      const frameData = framesData && framesData[fIndex];
+      if (!frameData) return;
+      
+      frame.layers.forEach((layer, lIndex) => {
+        const layerData = frameData.layers && frameData.layers[lIndex];
+        if (!layerData) return;
+        
+        // Ensure we have valid image data array
+        const expectedLength = 4 * oldWidth * oldHeight;
+        let imageDataArray = layerData.imageData;
+        
+        // If the array length doesn't match, create a blank array of correct size
+        if (!imageDataArray || imageDataArray.length !== expectedLength) {
+          imageDataArray = new Array(expectedLength).fill(0);
+        }
+        
+        if (isUndo) {
+          // Undo: restore original size and content
+          const imageData = new ImageData(
+            new Uint8ClampedArray(imageDataArray),
+            oldWidth,
+            oldHeight
+          );
+          
+          // Create temp canvas with original size
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = oldWidth;
+          tempCanvas.height = oldHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.putImageData(imageData, 0, 0);
+          
+          // Resize layer canvas to original size
+          layer.canvas.width = oldWidth;
+          layer.canvas.height = oldHeight;
+          
+          // Draw back to resized canvas
+          layer.ctx.clearRect(0, 0, oldWidth, oldHeight);
+          layer.ctx.drawImage(tempCanvas, 0, 0);
+        } else {
+          // Redo: crop to new size
+          const imageData = new ImageData(
+            new Uint8ClampedArray(imageDataArray),
+            oldWidth,
+            oldHeight
+          );
+          
+          // Create temp canvas with original content
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = oldWidth;
+          tempCanvas.height = oldHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.putImageData(imageData, 0, 0);
+          
+          // Resize layer canvas to new size
+          layer.canvas.width = newWidth;
+          layer.canvas.height = newHeight;
+          
+          // Draw cropped area
+          layer.ctx.clearRect(0, 0, newWidth, newHeight);
+          layer.ctx.drawImage(tempCanvas, -cropX, -cropY);
+        }
+      });
+    });
+    
+    // Restore frame/layer indices
+    this.editor.project.currentFrame = Math.min(currentFrame, this.editor.project.frames.length - 1);
+    this.editor.project.currentLayer = Math.min(currentLayer, 
+      this.editor.project.frames[this.editor.project.currentFrame].layers.length - 1);
+    
+    // Update transform and render
+    this.editor.updateCanvasTransform();
+    this.editor.render();
+  }
+  
   // Generate timelapse by replaying history
   async generateTimelapse(fps, scale, progressCallback) {
     // Create a temporary project to replay history

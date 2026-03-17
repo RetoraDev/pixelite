@@ -3588,7 +3588,7 @@ class PixelArtEditor {
     
     const state = this.canvasResizeState;
     
-    // Handle negative dimensions (if user dragged left/up)
+    // Handle negative dimensions
     const cropX = state.width < 0 ? state.x + state.width : state.x;
     const cropY = state.height < 0 ? state.y + state.height : state.y;
     const cropWidth = Math.abs(state.width);
@@ -3600,10 +3600,25 @@ class PixelArtEditor {
     const oldWidth = this.project.width;
     const oldHeight = this.project.height;
     
+    // Store all layers image data before resize
+    const framesData = [];
+    this.project.frames.forEach(frame => {
+      const frameData = {
+        layers: []
+      };
+      frame.layers.forEach(layer => {
+        const imageData = layer.ctx.getImageData(0, 0, oldWidth, oldHeight);
+        frameData.layers.push({
+          imageData: Array.from(imageData.data)
+        });
+      });
+      framesData.push(frameData);
+    });
+    
     // Perform resize
     this.resizeCanvas(cropX, cropY, cropWidth, cropHeight);
     
-    // Record operation
+    // Record operation with full layer data
     const operation = {
       type: 'resize_canvas',
       description: __('Redimensionar Canvas||Resize Canvas'),
@@ -3612,14 +3627,15 @@ class PixelArtEditor {
       newWidth: cropWidth,
       newHeight: cropHeight,
       cropX: cropX,
-      cropY: cropY
+      cropY: cropY,
+      framesData: framesData // Store all layer data for undo
     };
     
     this.historyManager.addChange(operation);
     this.historyManager.endBatch();
     
     this.stopResizeCanvas();
-  }
+  }  
   
   cancelResizeCanvas() {
     this.stopResizeCanvas();
