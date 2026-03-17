@@ -1,4 +1,3 @@
-// Main App
 class PixelArtEditor {
   constructor(container) {
     this.container = container || document.createElement("div");
@@ -66,6 +65,11 @@ class PixelArtEditor {
     this.referenceGrids = [];
     this.floatingColors = new Map();
     this.registerLayerVisibilityChanges = false;
+    this.isCanvasResizing = false;
+    this.canvasResizeState = {
+      x: 0, y : 0,
+      width: 0, height: 0
+    };
     
     // Collab Session
     this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
@@ -768,7 +772,7 @@ class PixelArtEditor {
     this.canvasContainer.className = "editor-canvas-container";
     this.editorElement.appendChild(this.canvasContainer);
     
-    // Create interactive overlay for floating palette colors
+    // Create interactive overlay
     this.overlayLayer = document.createElement("div");
     this.overlayLayer.className = "editor-overlay-layer";
     this.editorElement.appendChild(this.overlayLayer);
@@ -776,7 +780,7 @@ class PixelArtEditor {
     // Create delete zone for floating palette colors
     this.floatingColorsDeleteZone = document.createElement("div");
     this.overlayLayer.appendChild(this.floatingColorsDeleteZone);
-        
+    
     setTimeout(() => {
       this.floatingColorsDeleteZone.className = "palette-delete-zone";
     
@@ -1129,6 +1133,27 @@ class PixelArtEditor {
     this.gridOverlay.style.left = "0";
     this.gridOverlay.style.pointerEvents = "none";
     this.canvasContainer.appendChild(this.gridOverlay);
+    
+    // Create canvas resize controls
+    this.canvasResizeControls = document.createElement("div");
+    this.canvasResizeControls.className = "canvas-resize-controls";
+    this.canvasWrapper.appendChild(this.canvasResizeControls);
+
+    this.canvasResizeX = document.createElement("div");
+    this.canvasResizeX.className = "canvas-resize-edge vertical";
+    this.canvasResizeControls.appendChild(this.canvasResizeX);
+    
+    this.canvasResizeY = document.createElement("div");
+    this.canvasResizeY.className = "canvas-resize-edge";
+    this.canvasResizeControls.appendChild(this.canvasResizeY);
+    
+    this.canvasResizeWidth = document.createElement("div");
+    this.canvasResizeWidth.className = "canvas-resize-edge vertical";
+    this.canvasResizeControls.appendChild(this.canvasResizeWidth);
+    
+    this.canvasResizeHeight = document.createElement("div");
+    this.canvasResizeHeight.className = "canvas-resize-edge";
+    this.canvasResizeControls.appendChild(this.canvasResizeHeight);
 
     this.ctx = this.getCanvasContext(this.canvas);
 
@@ -2520,6 +2545,12 @@ class PixelArtEditor {
     h3.textContent = __("Transformar||Transform");
     transformSection.appendChild(h3);
 
+    const resizeCanvasItem = document.createElement("div");
+    resizeCanvasItem.className = "menu-item";
+    resizeCanvasItem.textContent = __("Redimensionar Canvas||Resize Canvas");
+    resizeCanvasItem.addEventListener("click", () => this.startResizeCanvas());
+    transformSection.appendChild(resizeCanvasItem);
+    
     const flipHItem = document.createElement("div");
     flipHItem.className = "menu-item";
     flipHItem.textContent = __("Espejo Horizontal||Flip Horizontal");
@@ -2737,7 +2768,7 @@ class PixelArtEditor {
     this.animationPreview.classList.toggle("visible");
   }
 
-  blockInputIfPanelsVisible() {
+  shouldBlockInput() {
     // Block touch if some panels are visible
     if (this.menuPanel.classList.contains("visible")) {
       this.toggleMenu();
@@ -2745,13 +2776,14 @@ class PixelArtEditor {
     } else if (this.layersPanel.classList.contains("visible")) {
       this.togglePanel("layers");
       return true;
-    } else {
-      return false;
     }
+     
+    // Otherwise don't block
+    return false;
   }
 
   handleMouseDown(e) {
-    if (this.blockInputIfPanelsVisible()) return; // Hide menus if visible
+    if (this.shouldBlockInput()) return; // Hide menus if visible
 
     const pos = this.getCanvasPosition(e.clientX, e.clientY);
     if (!pos) return;
@@ -2823,7 +2855,7 @@ class PixelArtEditor {
   }
   
   handleTouchStart(e) {
-    if (this.blockInputIfPanelsVisible()) return;
+    if (this.shouldBlockInput()) return;
     if (this.isColorPicking) {
       e.preventDefault();
       return;
@@ -2845,7 +2877,7 @@ class PixelArtEditor {
       
       // Don't start drawing immediately - wait to see if it's a pan
       this._touchTimer = setTimeout(() => {
-        if (!this.isPanning && this._isPotentialTap) {
+        if (!this.isCanvasResizing && !this.isPanning && this._isPotentialTap) {
           this.isDrawing = true;
           this.startX = pos.x;
           this.startY = pos.y;
@@ -3159,7 +3191,7 @@ class PixelArtEditor {
     this.animationPanel.style.bottom = `${bottomBarHeight}px`;
   }
 
-  getCanvasPosition(clientX, clientY) {
+  getCanvasPosition(clientX, clientY, ensureBounds = true) {
     if (!this.project) return null;
   
     // Get container position and dimensions
@@ -3183,9 +3215,11 @@ class PixelArtEditor {
     const canvasY = Math.floor(worldY / this.scale + this.project.height / 2);
   
     // Check bounds
-    if (canvasX < 0 || canvasX >= this.project.width || 
-        canvasY < 0 || canvasY >= this.project.height) {
-      return null;
+    if (ensureBounds) {
+      if (canvasX < 0 || canvasX >= this.project.width || 
+          canvasY < 0 || canvasY >= this.project.height) {
+        return null;
+      }
     }
   
     return { x: canvasX, y: canvasY };
@@ -3309,7 +3343,7 @@ class PixelArtEditor {
 
     this.updateFramesUI();
     this.updateLayersUI();
-    this.resizeCanvas();
+    this.resetCanvasSize();
     this.resetZoom();
     this.render();
   }
@@ -3341,11 +3375,363 @@ class PixelArtEditor {
     return project;
   }
 
-  resizeCanvas() {
+  resetCanvasSize() {
     if (!this.project) return;
 
     this.canvas.width = this.project.width;
     this.canvas.height = this.project.height;
+  }
+  
+  startResizeCanvas() {
+    if (!this.project) return;
+    
+    this.isCanvasResizing = true;
+    
+    // Initialize resize state
+    this.canvasResizeState = {
+      x: 0,
+      y: 0,
+      width: this.project.width,
+      height: this.project.height
+    };
+    
+    // Show controls
+    this.showCanvasResizeControls();
+    this.enterImmersive();
+    
+    // Show bottom confirmation
+    this.showBottomConfirmation(
+      __('Aceptar||Accept'),
+      __('Cancelar||Cancel'),
+      (accepted) => {
+        if (accepted) {
+          this.finishResizeCanvas();
+        } else {
+          this.cancelResizeCanvas();
+        }
+      }
+    );
+    
+    // Setup event handlers
+    this.setupResizeEventHandlers();
+  }
+  
+  setupResizeEventHandlers() {
+    if (this.resizeHandlersSetup) return;
+    
+    // Set cursors
+    this.canvasResizeX.style.cursor = 'ew-resize';
+    this.canvasResizeY.style.cursor = 'ns-resize';
+    this.canvasResizeWidth.style.cursor = 'ew-resize';
+    this.canvasResizeHeight.style.cursor = 'ns-resize';
+    
+    const handleResizeStart = (e, edge) => {
+      if (!this.isCanvasResizing) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Get position in canvas coordinates (project space)
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      
+      const pos = this.getCanvasPosition(clientX, clientY, false);
+      if (!pos) return;
+      
+      this.resizeDragState = {
+        active: true,
+        edge: edge,
+        startCanvasX: pos.x,
+        startCanvasY: pos.y,
+        startState: { ...this.canvasResizeState }
+      };
+      
+      // Add global handlers
+      document.addEventListener('mousemove', this.handleResizeMove);
+      document.addEventListener('mouseup', this.handleResizeEnd);
+      document.addEventListener('touchmove', this.handleResizeMove, { passive: false });
+      document.addEventListener('touchend', this.handleResizeEnd);
+      document.addEventListener('touchcancel', this.handleResizeEnd);
+    };
+    
+    const handleResizeMove = (e) => {
+      if (!this.resizeDragState?.active) return;
+      
+      e.preventDefault();
+      
+      // Get current position in canvas coordinates
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      
+      const pos = this.getCanvasPosition(clientX, clientY, false);
+      if (!pos) return;
+      
+      const edge = this.resizeDragState.edge;
+      const start = this.resizeDragState.startState;
+      let needsUpdate = false;
+      
+      switch(edge) {
+        case 'x': // Left edge - only X changes
+          {
+            const newX = Math.round(pos.x);
+            if (newX !== this.canvasResizeState.x) {
+              this.canvasResizeState.x = newX;
+              this.canvasResizeState.width = start.width + (start.x - newX);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'y': // Top edge - only Y changes
+          {
+            const newY = Math.round(pos.y);
+            if (newY !== this.canvasResizeState.y) {
+              this.canvasResizeState.y = newY;
+              this.canvasResizeState.height = start.height + (start.y - newY);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'width': // Right edge - only width changes
+          {
+            const newWidth = Math.round(pos.x - start.x);
+            if (newWidth !== this.canvasResizeState.width) {
+              this.canvasResizeState.width = Math.max(1, newWidth);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'height': // Bottom edge - only height changes
+          {
+            const newHeight = Math.round(pos.y - start.y);
+            if (newHeight !== this.canvasResizeState.height) {
+              this.canvasResizeState.height = Math.max(1, newHeight);
+              needsUpdate = true;
+            }
+            break;
+          }
+      }
+      
+      // Ensure width/height don't go negative
+      if (this.canvasResizeState.width < 1) this.canvasResizeState.width = 1;
+      if (this.canvasResizeState.height < 1) this.canvasResizeState.height = 1;
+      
+      if (needsUpdate) {
+        this.updateCanvasResizeControls();
+      }
+    };
+    
+    const handleResizeEnd = () => {
+      this.resizeDragState = null;
+      document.removeEventListener('mousemove', this.handleResizeMove);
+      document.removeEventListener('mouseup', this.handleResizeEnd);
+      document.removeEventListener('touchmove', this.handleResizeMove);
+      document.removeEventListener('touchend', this.handleResizeEnd);
+      document.removeEventListener('touchcancel', this.handleResizeEnd);
+    };
+    
+    // Bind methods
+    this.handleResizeMove = handleResizeMove.bind(this);
+    this.handleResizeEnd = handleResizeEnd.bind(this);
+    
+    // Add event listeners
+    this.canvasResizeX.addEventListener('mousedown', (e) => handleResizeStart(e, 'x'));
+    this.canvasResizeX.addEventListener('touchstart', (e) => handleResizeStart(e, 'x'), { passive: false });
+    
+    this.canvasResizeY.addEventListener('mousedown', (e) => handleResizeStart(e, 'y'));
+    this.canvasResizeY.addEventListener('touchstart', (e) => handleResizeStart(e, 'y'), { passive: false });
+    
+    this.canvasResizeWidth.addEventListener('mousedown', (e) => handleResizeStart(e, 'width'));
+    this.canvasResizeWidth.addEventListener('touchstart', (e) => handleResizeStart(e, 'width'), { passive: false });
+    
+    this.canvasResizeHeight.addEventListener('mousedown', (e) => handleResizeStart(e, 'height'));
+    this.canvasResizeHeight.addEventListener('touchstart', (e) => handleResizeStart(e, 'height'), { passive: false });
+    
+    this.resizeHandlersSetup = true;
+  }  
+
+  showCanvasResizeControls() {
+    this.canvasResizeControls.style.display = 'block';
+    this.updateCanvasResizeControls();
+  }
+  
+  updateCanvasResizeControls() {
+    if (!this.canvasResizeState) return;
+    
+    const state = this.canvasResizeState;
+    
+    // Position the container
+    this.canvasResizeControls.style.left = `${state.x}px`;
+    this.canvasResizeControls.style.top = `${state.y}px`;
+    this.canvasResizeControls.style.width = `${state.width}px`;
+    this.canvasResizeControls.style.height = `${state.height}px`;
+    
+    // Position edges
+    this.canvasResizeX.style.left = `-1px`;
+    this.canvasResizeX.style.height = `${state.height}px`;
+    
+    this.canvasResizeY.style.top = `-1px`;
+    this.canvasResizeY.style.width = `${state.width}px`;
+    
+    this.canvasResizeWidth.style.left = `${state.width}px`;
+    this.canvasResizeWidth.style.height = `${state.height}px`;
+    
+    this.canvasResizeHeight.style.top = `${state.height}px`;
+    this.canvasResizeHeight.style.width = `${state.width}px`;
+  }
+  
+  hideCanvasResizeControls() {
+    this.canvasResizeControls.style.display = "none";
+  }
+  
+  finishResizeCanvas() {
+    if (!this.canvasResizeState) return;
+    
+    const state = this.canvasResizeState;
+    
+    // Handle negative dimensions (if user dragged left/up)
+    const cropX = state.width < 0 ? state.x + state.width : state.x;
+    const cropY = state.height < 0 ? state.y + state.height : state.y;
+    const cropWidth = Math.abs(state.width);
+    const cropHeight = Math.abs(state.height);
+    
+    // Start history batch
+    this.historyManager.startBatch('resize', __('Redimensionar Canvas||Resize Canvas'));
+    
+    const oldWidth = this.project.width;
+    const oldHeight = this.project.height;
+    
+    // Perform resize
+    this.resizeCanvas(cropX, cropY, cropWidth, cropHeight);
+    
+    // Record operation
+    const operation = {
+      type: 'resize_canvas',
+      description: __('Redimensionar Canvas||Resize Canvas'),
+      oldWidth: oldWidth,
+      oldHeight: oldHeight,
+      newWidth: cropWidth,
+      newHeight: cropHeight,
+      cropX: cropX,
+      cropY: cropY
+    };
+    
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    this.stopResizeCanvas();
+  }
+  
+  cancelResizeCanvas() {
+    this.stopResizeCanvas();
+    this.showToast(__('Redimensión cancelada||Resize cancelled'));
+  }
+  
+  stopResizeCanvas() {
+    this.isCanvasResizing = false;
+    this.canvasResizeState = null;
+    this.resizeDragState = null;
+    
+    this.hideCanvasResizeControls();
+    this.hideBottomConfirmation();
+    this.exitImmersive();
+  }
+  
+  resizeCanvas(x = 0, y = 0, width = 32, height = 32, silent) {
+    if (!this.project) return;
+    
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
+    x = Math.floor(x);
+    y = Math.floor(y);
+    
+    this.project.width = width;
+    this.project.height = height;
+    this.resetCanvasSize();
+    
+    this.project.frames.forEach(frame => {
+      frame.layers.forEach(layer => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.drawImage(layer.canvas, -x, -y);
+        
+        layer.canvas.width = width;
+        layer.canvas.height = height;
+        layer.ctx.clearRect(0, 0, width, height);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+      });
+    });
+    
+    this.updateCanvasTransform();
+    this.render();
+    
+    if (!silent) {
+      this.showOperationMessage(__('Canvas redimensionado||Canvas resized'));
+    }
+  }
+  
+  enterImmersive() {
+    this.topBar.style.display = "none";
+    this.bottomBar.style.display = "none";
+    this.menuPanel.style.display = "none";
+    this.animationPanel.style.display = "none";
+    this.layersPanel.style.display = "none";
+    if (this.gridManager) this.gridManager.panel.style.display = "none";
+  }
+  
+  exitImmersive() {
+    this.topBar.style.display = "flex";
+    this.bottomBar.style.display = "flex";
+    this.menuPanel.style.display = "flex";
+    this.animationPanel.style.display = "flex";
+    this.layersPanel.style.display = "flex";
+    if (this.gridManager) this.gridManager.panel.style.display = "flex";
+  }
+
+  showBottomConfirmation(acceptText, cancelText, callback) {
+    if (!this.bottomConfirmation) {
+      this.bottomConfirmation = document.createElement('div');
+      this.bottomConfirmation.className = 'bottom-confirmation';
+      
+      this.confirmAccept = document.createElement('button');
+      this.confirmAccept.className = 'confirm-accept';
+      
+      this.confirmCancel = document.createElement('button');
+      this.confirmCancel.className = 'confirm-cancel';
+      
+      this.bottomConfirmation.appendChild(this.confirmAccept);
+      this.bottomConfirmation.appendChild(this.confirmCancel);
+      document.body.appendChild(this.bottomConfirmation);
+    }
+    
+    this.confirmAccept.textContent = acceptText;
+    this.confirmCancel.textContent = cancelText;
+    this.resizeCallback = callback;
+    this.bottomConfirmation.style.display = 'flex';
+    
+    this.confirmAccept.removeEventListener('click', this.handleResizeAccept);
+    this.confirmCancel.removeEventListener('click', this.handleResizeCancel);
+    
+    this.handleResizeAccept = () => {
+      if (this.resizeCallback) this.resizeCallback(true);
+      this.hideBottomConfirmation();
+    };
+    
+    this.handleResizeCancel = () => {
+      if (this.resizeCallback) this.resizeCallback(false);
+      this.hideBottomConfirmation();
+    };
+    
+    this.confirmAccept.addEventListener('click', this.handleResizeAccept);
+    this.confirmCancel.addEventListener('click', this.handleResizeCancel);
+  }
+  
+  hideBottomConfirmation() {
+    if (this.bottomConfirmation) {
+      this.bottomConfirmation.style.display = 'none';
+    }
   }
 
   render() {
@@ -3449,7 +3835,7 @@ class PixelArtEditor {
       }
     }
 
-    this.resizeCanvas();
+    this.resetCanvasSize();
     this.render();
   }
 
@@ -4879,7 +5265,7 @@ class PixelArtEditor {
       const temp = this.project.width;
       this.project.width = this.project.height;
       this.project.height = temp;
-      this.resizeCanvas();
+      this.resetCanvasSize();
     }
   
     this.render();
@@ -6402,7 +6788,7 @@ class PixelArtEditor {
     }
 
     // Initialize project
-    this.resizeCanvas();
+    this.resetCanvasSize();
     this.resetZoom();
 
     // Update UI
