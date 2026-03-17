@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.0
- * Built: 3/17/2026, 2:36:07 AM
+ * Built: 3/17/2026, 1:19:23 PM
  * Platform: Web
  * Debug: false
  * Minified: false
@@ -4824,7 +4824,7 @@ class PixelArtEditor {
     
     this.loadingText = document.createElement("div");
     this.loadingText.className = "loading-text";
-    this.loadingText.innerHTML = "Loading...";
+    this.loadingText.innerHTML = __("Cargando...||Loading...");
     this.loadingElement.appendChild(this.loadingText);
 
     this.errorElement = document.createElement("div");
@@ -4953,14 +4953,17 @@ class PixelArtEditor {
 
     // Tool switcher
     this.toolSwitcher = this.createButton("switch-tool", "icon-switch-tool", () => this.switchLastTool());
+    this.toolSwitcher.title = __("Rotar herramientas (Espacio)||Switch tools (Space)");
     this.toolSelectionContainer.appendChild(this.toolSwitcher);
 
     // Animation panel toggle
     this.animationButton = this.createButton("animation", "icon-animation", () => this.togglePanel("animation"));
+    this.animationButton.title = __("(Animación|Animation) (Ctrl + A)");
     this.bottomBar.appendChild(this.animationButton);
 
     // Layers panel toggle
     this.layersButton = this.createButton("layers", "icon-layers", () => this.togglePanel("layers"));
+    this.layersButton.title = __("(Capas|Layers) (Ctrl + L)");
     this.bottomBar.appendChild(this.layersButton);
 
     // Undo/Redo buttons
@@ -4969,9 +4972,11 @@ class PixelArtEditor {
     this.bottomBar.appendChild(this.undoRedoButtons);
 
     this.undoButton = this.createButton("undo", "icon-undo", () => this.undo());
+    this.undoButton.title = __("(Deshacer|Undo) (Ctrl + Z)");
     this.undoRedoButtons.appendChild(this.undoButton);
 
     this.redoButton = this.createButton("redo", "icon-redo", () => this.redo());
+    this.redoButton.title = __("(Rehacer|Redo) (Ctrl + Y)");
     this.undoRedoButtons.appendChild(this.redoButton);
 
     // Menu panel
@@ -5298,6 +5303,7 @@ class PixelArtEditor {
       displayName: __("Lápiz||Pencil"),
       icon: "tool-pencil",
       cursor: "crosshair",
+      shortcut: "d",
       onDown: (x, y, remote) => {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
@@ -5330,6 +5336,7 @@ class PixelArtEditor {
       displayName: __("Borrador||Eraser"),
       icon: "tool-eraser",
       cursor: "crosshair",
+      shortcut: "s",
       onDown: (x, y) => {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
@@ -5362,6 +5369,7 @@ class PixelArtEditor {
       displayName: __("Línea||Line"),
       icon: "tool-line",
       cursor: "crosshair",
+      shortcut: "l",
       onDown: (x, y) => {
         this.historyManager.startBatch("draw", __('Línea||Line'));
         this.startLine(x, y);
@@ -5385,6 +5393,7 @@ class PixelArtEditor {
       displayName: __("Rectángulo||Rectangle"),
       icon: "tool-rect",
       cursor: "crosshair",
+      shortcut: "r",
       settings: {
         filled: { type: "boolean", default: false },
         perfect: { type: "boolean", default: false }
@@ -5412,6 +5421,7 @@ class PixelArtEditor {
       displayName: __("Elipse||Ellipse"),
       icon: "tool-ellipse",
       cursor: "crosshair",
+      shortcut: "e",
       settings: {
         filled: { type: "boolean", default: false },
         perfect: { type: "boolean", default: false }
@@ -5439,6 +5449,7 @@ class PixelArtEditor {
       displayName: __("Cubeta||Paint Bucket"),
       icon: "tool-bucket",
       cursor: "crosshair",
+      shortcut: "b",
       onDown: (x, y) => {
         this.historyManager.startBatch("draw", __('Rellenar||Bucket fill'));
         this.fillArea(x, y);
@@ -5452,13 +5463,14 @@ class PixelArtEditor {
       displayName: __("Pipeta||Pipette"),
       icon: "tool-pipette",
       cursor: "crosshair",
+      shortcut: "a",
       onDown: (x, y) => {
         this.pickColor(x, y);
       }
     });
     
     // Set default tool
-    this.setTool("Pencil");
+    this.setTool("Pencil", true);
     this.lastTool = "Eraser";
   }
 
@@ -5656,6 +5668,11 @@ class PixelArtEditor {
     this.colorIndicator.addEventListener("mousedown", this.handleColorPickStart.bind(this));
     this.colorIndicator.addEventListener("touchstart", this.handleColorPickStart.bind(this), { passive: false });
     this.colorIndicator.addEventListener("touchcancel", this.handleTouchCancel.bind(this));
+    
+    document.addEventListener("mousemove", this.handleColorPickMove.bind(this));
+    document.addEventListener("mouseup", this.handleColorPickEnd.bind(this));
+    document.addEventListener("touchmove", this.handleColorPickMove.bind(this), { passive: false });
+    document.addEventListener("touchend", this.handleColorPickEnd.bind(this));
   }
 
   updateBrushSizeIndicator() {
@@ -5699,12 +5716,6 @@ class PixelArtEditor {
       // Show the line
       this.colorPickLine.style.display = "block";
       this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, this.colorPickStartPos.x, this.colorPickStartPos.y);
-
-      // Add move and end listeners
-      document.addEventListener("mousemove", this.handleColorPickMove.bind(this));
-      document.addEventListener("mouseup", this.handleColorPickEnd.bind(this));
-      document.addEventListener("touchmove", this.handleColorPickMove.bind(this), { passive: false });
-      document.addEventListener("touchend", this.handleColorPickEnd.bind(this));
     }, 300); // to distinguish click from drag
 
     e.preventDefault();
@@ -6871,9 +6882,7 @@ class PixelArtEditor {
         if (this.isDrawing) {
           this.handleMouseUp(e);
         }
-        this.isPanning = true;
-        this.panStartX = e.clientX;
-        this.panStartY = e.clientY;
+        this.startPan(e);
         break;
       case 2: // Right click
         this.onMouseUp(e);
@@ -6991,6 +7000,7 @@ class PixelArtEditor {
       this.touchStartScale = this.scale;
       this.touchStartPosX = this.posX;
       this.touchStartPosY = this.posY;
+      this.startPan({ clientX: this.touchCenterX, clientY: this.touchCenterY });
   
       // Get the canvas point under the center using fixed precision
       const canvasPoint = this.getCanvasPosition(this.touchCenterX, this.touchCenterY);
@@ -7083,42 +7093,11 @@ class PixelArtEditor {
       // Calculate zoom factor with minimum change threshold to reduce flicker
       if (this.touchDistance > 0 && Math.abs(newDistance - this.touchDistance) > 1) {
         const zoomFactor = newDistance / this.touchDistance;
-        const newScale = this.touchStartScale * zoomFactor;
         
-        // Clamp scale
-        this.scale = Math.max(this.minScale, Math.min(newScale, this.maxScale));
-        
-        // Get container dimensions
-        const rect = this.canvasContainer.getBoundingClientRect();
-        
-        // Calculate where the touch center point should be in canvas coordinates
-        // This is the key fix for zoom centering
-        const canvasX = this.touchCenterCanvasX;
-        const canvasY = this.touchCenterCanvasY;
-        
-        // Calculate where this canvas point should be on screen at new scale
-        // Formula: screenX = (canvasX - width/2) * scale + containerWidth/2 + posX
-        const targetScreenX = (canvasX - this.project.width / 2) * this.scale + rect.width / 2 + this.touchStartPosX;
-        const targetScreenY = (canvasY - this.project.height / 2) * this.scale + rect.height / 2 + this.touchStartPosY;
-        
-        // Calculate the offset needed to keep the canvas point under the new center
-        const deltaX = newCenterX - targetScreenX;
-        const deltaY = newCenterY - targetScreenY;
-        
-        // Update position with rounding to reduce subpixel flicker
-        this.posX = Math.round(this.touchStartPosX + deltaX);
-        this.posY = Math.round(this.touchStartPosY + deltaY);
+        this.pan(newCenterX, newCenterY, zoomFactor);
       } else {
-        // Pure panning (no significant zoom)
-        const deltaX = newCenterX - this.touchCenterX;
-        const deltaY = newCenterY - this.touchCenterY;
-        
-        this.posX = Math.round(this.touchStartPosX + deltaX);
-        this.posY = Math.round(this.touchStartPosY + deltaY);
+        this.pan(newCenterX, newCenterY, 1);
       }
-      
-      this.updateCanvasTransform();
-      
     } else if (e.touches.length === 3 && this.isBrushResizing) {
       // Three-finger brush size adjustment
       e.preventDefault();
@@ -7214,36 +7193,44 @@ class PixelArtEditor {
   }
 
   handleKeyDown(e) {
-    // Handle keyboard shortcuts
-    switch (e.key) {
-      case "z":
-        if (e.ctrlKey || e.metaKey) {
-          this.undo();
-          e.preventDefault();
-        }
-        break;
-      case "y":
-        if (e.ctrlKey || e.metaKey) {
-          this.redo();
-          e.preventDefault();
-        }
-        break;
-      case "b":
-        this.setTool("Pencil");
-        break;
-      case "e":
-        this.setTool("Eraser");
-        break;
-      case "l":
-        this.setTool("Line");
-        break;
-      case "r":
-        this.setTool("Rectangle");
-        break;
-      case " ":
-        // Space for panning (implement if needed)
-        break;
+    const { ctrlKey, key } = event;
+    
+    // Handle system keyboard shortcuts
+    if (ctrlKey) {
+      if (key == "z") {
+        this.undo();
+        e.preventDefault();
+        return;
+      } else if (key == "y") {
+        this.undo();
+        e.preventDefault();
+        return;
+      } else if (key == "a") {
+        this.togglePanel("animation");
+        e.preventDefault();
+        return;
+      } else if (key == "l") {
+        this.togglePanel("layers");
+        e.preventDefault();
+        return;
+      } else if (key == " ") {
+        this.switchLastTool();
+        e.preventDefault();
+        return;
+      } else if (key == "Escape") {
+        this.toggleMenu();
+        e.preventDefault();
+        return;
+      }
     }
+    
+    // Handle tool keyboard shortcuts
+    for (const tool of Object.values(this.tools)) {
+      if (tool.shortcut && tool.shortcut == e.key) {
+        this.setTool(tool.name);
+        return;
+      }
+    };
   }
 
   handleResize() {
@@ -7298,20 +7285,44 @@ class PixelArtEditor {
     return x >= 0 && x < this.project.width && y >= 0 && y < this.project.height;
   }
   
-  pan(clientX, clientY, scaleFactor = 1) {
-    // Calculate pan
-    let deltaX = clientX - this.panStartX;
-    let deltaY = clientY - this.panStartY;
-    
+  startPan(e) {
+    this.isPanning = true;
+    this.panStartX = e.clientX;
+    this.panStartY = e.clientY;
+    this.panStartCanvasPoint = this.getCanvasPosition(e.clientX, e.clientY);
+    this.panStartScale = this.scale;
+  }
+  
+  pan(clientX, clientY, zoomFactor = 1) {
+    const newScale = this.panStartScale * zoomFactor;
+        
+    // Clamp scale
+    this.scale = Math.max(this.minScale, Math.min(newScale, this.maxScale));
+        
+    // Get container dimensions
     const rect = this.canvasContainer.getBoundingClientRect();
-      
-    this.posX = this.panStartX + deltaX - rect.width / 2;
-    this.posY = this.panStartY + deltaY - rect.height / 2;
+        
+    // Calculate where th point should be in canvas coordinates
+    const canvasX = this.panStartCanvasPoint.x;
+    const canvasY = this.panStartCanvasPoint.y;
+        
+    // Calculate where this canvas point should be on screen at new scale
+    // Formula: screenX = (canvasX - width/2) * scale + containerWidth/2 + posX
+    const targetScreenX = (canvasX - this.project.width / 2) * this.scale + rect.width / 2 + this.panStartCanvasPoint.x;
+    const targetScreenY = (canvasY - this.project.height / 2) * this.scale + rect.height / 2 + this.panStartCanvasPoint.y;
+        
+    // Calculate the offset needed to keep the canvas point under the new center
+    const deltaX = clientX - targetScreenX;
+    const deltaY = clientY - targetScreenY;
+        
+    // Update position with rounding to reduce subpixel flicker
+    this.posX = Math.round(this.panStartCanvasPoint.x + deltaX);
+    this.posY = Math.round(this.panStartCanvasPoint.y + deltaY);
     
     this.updateCanvasTransform();
   }
 
-  zoom(factor, clientX = this.touchStartPosY, clientY = this.touchStartPosY) {
+  zoom(factor, clientX = this.panStartCanvasPoint.x, clientY = this.panStartCanvasPoint.y) {
     const oldScale = this.scale;
     this.scale *= factor;
 
@@ -7781,10 +7792,10 @@ class PixelArtEditor {
       this.bottomConfirmation.className = 'bottom-confirmation';
       
       this.confirmAccept = document.createElement('button');
-      this.confirmAccept.className = 'confirm-accept';
+      this.confirmAccept.className = 'ui-button confirm-accept';
       
       this.confirmCancel = document.createElement('button');
-      this.confirmCancel.className = 'confirm-cancel';
+      this.confirmCancel.className = 'ui-button confirm-cancel';
       
       this.bottomConfirmation.appendChild(this.confirmAccept);
       this.bottomConfirmation.appendChild(this.confirmCancel);
@@ -8785,7 +8796,7 @@ class PixelArtEditor {
     return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3];
   }
 
-  pickColor(x, y, includeReferenceImage = true) {
+  pickColor(x, y, includeReferenceImage = true, silent = false) {
     if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
 
     const frame = this.project.frames[this.project.currentFrame];
@@ -8798,12 +8809,17 @@ class PixelArtEditor {
         // If pixel is not transparent
         const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
         this.setColor(color);
+        if (!silent) this.showOperationMessage(`<span style="aspect-ratio: 1/1; width: 1em; height: 1em; background: ${color}">${color}</span>`);
         return true;
       } else {
         return false;
       }
     };
-
+    
+    // Check for current layer first
+    const layerCtx = this.getCurrentLayerContext();
+    if (pickFromCtx(layerCtx)) return;
+    
     // Check layers from top to bottom
     for (let l = frame.layers.length - 1; l >= 0; l--) {
       const layer = frame.layers[l];
@@ -8830,6 +8846,7 @@ class PixelArtEditor {
       displayName: toolDef.displayName || toolDef.name,
       icon: toolDef.icon,
       cursor: toolDef.cursor || "default",
+      shortcut: toolDef.shortcut || null,
       onDown: toolDef.onDown,
       onMove: toolDef.onMove,
       onUp: toolDef.onUp,
@@ -8841,11 +8858,11 @@ class PixelArtEditor {
       this.setTool(toolDef.name);
       this.toolDropdown.classList.remove("visible");
     });
-    toolButton.title = toolDef.displayName;
+    toolButton.title = toolDef.shortcut ? toolDef.displayName + ` (${toolDef.shortcut.toUpperCase()})` : toolDef.displayName;
     this.toolDropdown.appendChild(toolButton);
   }
 
-  setTool(toolName) {
+  setTool(toolName, silent) {
     if (!this.tools[toolName]) {
       throw new Error(`Tool '${toolName}' not found`);
     }
@@ -8868,6 +8885,8 @@ class PixelArtEditor {
 
     // Show/hide settings button
     this.toolSettingsButton.style.display = Object.keys(this.currentTool.settings).length > 0 ? "flex" : "none";
+
+    if (!silent) this.showOperationMessage(__(this.currentTool.displayName));
 
     // Hide any open settings popup
     this.hideToolSettings();
@@ -9007,7 +9026,7 @@ class PixelArtEditor {
   }
   
   showOperationMessage(message, duration = 3000) {
-    this.operationMessageElement.textContent = message;
+    this.operationMessageElement.innerHTML = message;
     this.operationMessageElement.classList.add("visible");
 
     setTimeout(() => {

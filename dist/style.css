@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.0
- * Built: 3/17/2026, 2:36:07 AM
+ * Built: 3/17/2026, 1:19:23 PM
  * Platform: Web
  * Debug: false
  * Minified: false
@@ -72,6 +72,15 @@ input, select {
 
 a {
   color: var(--primary-color);
+}
+
+button {
+  transition: filter 0.3s;
+}
+
+button:hover,
+button:active {
+  filter: brightness(120%);
 }
 
 /*
@@ -264,6 +273,7 @@ a {
   align-items: center;
   cursor: pointer;
   position: relative;
+  transition: background 0.3s;
 }
 
 .ui-button:hover {
@@ -739,11 +749,11 @@ a {
   display: none;
   gap: 10px;
   z-index: 1000;
-  background: var(--bg-color, #2a2a2a);
+  background: var(--ui-color);
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid var(--border-color, #444);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 10px var(--shadow-color);
 }
 
 .confirm-accept,
@@ -758,13 +768,13 @@ a {
 }
 
 .confirm-accept {
-  background: #4CAF50;
-  color: white;
+  background-color: var(--ui-primary);
+  color: var(--text-color);
 }
 
 .confirm-cancel {
-  background: #f44336;
-  color: white;
+  background-color: transparent;
+  color: var(--text-color);
 }
 
 /*
@@ -937,6 +947,11 @@ a {
   padding: 8px 15px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
+  transition: background 0.3s;
+}
+
+.menu-tab:hover {
+  background: var(--ui-highlight);
 }
 
 .menu-tab.active {

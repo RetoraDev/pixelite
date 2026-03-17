@@ -33,6 +33,11 @@
   padding: 8px 15px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
+  transition: background 0.3s;
+}
+
+.menu-tab:hover {
+  background: var(--ui-highlight);
 }
 
 .menu-tab.active {
