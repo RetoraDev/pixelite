@@ -1,114 +1,186 @@
-/*
-  Layers Panel
-*/
+/* Layers Panel */
 .layers-panel {
   position: absolute;
-  top: 40px;
+  bottom: 50px;
+  left: 0;
   right: 0;
-  width: 250px;
-  height: calc(100% - 90px);
-  background-color: var(--ui-color);
-  box-shadow: -2px 0 5px var(--shadow-color);
-  transform: translateX(100%);
+  height: 400px;
+  transform: translateY(100%);
   transition: transform 0.3s ease;
-  z-index: 15;
+  background-color: var(--ui-color);
+  border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  padding: 10px;
-  overflow-y: auto;
+  z-index: 14;
 }
 
 .layers-panel.visible {
   transform: translateX(0);
 }
 
+/* Panel header */
 .panel-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding-bottom: 5px;
+  padding: 8px 10px;
+  background-color: var(--ui-highlight);
   border-bottom: 1px solid var(--border-color);
+  gap: 10px;
+  height: 40px;
+}
+
+.panel-header .ui-button {
+  width: 32px;
+  height: 32px;
 }
 
 .panel-title {
   font-weight: bold;
+  color: var(--text-color);
+  flex: 1;
 }
 
 .panel-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 24px;
   cursor: pointer;
-}
-
-.layers-container {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.layer-item {
   display: flex;
   align-items: center;
-  padding: 10px;
-  margin-bottom: 5px;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.panel-close:hover {
   background-color: var(--bg-color);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease;
-  position: relative;
 }
 
-.layer-item.active {
-  border-left: 3px solid var(--primary-color);
+/* Layers header */
+.layers-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
   background-color: var(--ui-highlight);
-}
-
-.layer-item.dragging {
-  opacity: 0.5;
-  background-color: var(--primary-color);
-}
-
-.layer-thumb-container {
-  margin-right: 10px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 4px;
   flex-shrink: 0;
 }
 
-.layer-info {
+.layers-header .ui-button {
+  width: 32px;
+  height: 32px;
+}
+
+/* Layers container */
+.layers-container {
   flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-color);
+}
+
+/* Layer item */
+.layer-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  background-color: var(--bg-color);
+  cursor: pointer;
+  min-width: 70px;
+  transition: all 0.2s ease;
+  position: relative;
+  height: 50px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 8px;
+}
+
+.layer-item:last-child {
+  border-bottom: none;
+}
+
+.layer-item.active {
+  background-color: var(--primary-color);
+}
+
+.layer-item.active .layer-name {
+  color: white;
+}
+
+.layer-item.dragging {
+  opacity: 0.6;
+  background-color: var(--primary-color);
+}
+
+/* Layer thumbnail - 44x44 */
+.layer-thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.layer-thumb canvas {
+  width: 44px;
+  height: 44px;
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* Layer name */
+.layer-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 
-.layer-info span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* Layer actions */
 .layer-actions {
   display: flex;
-  flex-direction: row;
-  gap: 4px;
+  gap: 2px;
   opacity: 0.6;
   transition: opacity 0.2s ease;
+  flex-shrink: 0;
 }
 
 .layer-item:hover .layer-actions {
   opacity: 1;
 }
 
-.layer-action {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: none;
-  color: var(--text-color);
-  cursor: pointer;
+.layer-actions .ui-button {
+  width: 28px;
+  height: 28px;
   border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
 }
 
-.layer-action:hover {
-  background-color: var(--ui-highlight);
+.layer-actions .ui-button .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Scrollbar - exactly like timeline */
+.layers-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.layers-container::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+.layers-container::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border-radius: 3px;
+}
+
+.layers-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color);
 }

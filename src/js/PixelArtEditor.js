@@ -5652,139 +5652,6 @@ class PixelArtEditor {
     this.historyManager.addChange(operation);
   }
 
-  // Layer Management
-  addLayer() {
-    if (!this.project) return;
-  
-    this.historyManager.startBatch("add_layer", __("Añadir Capa||Add Layer"));
-  
-    const frame = this.project.frames[this.project.currentFrame];
-    const newLayer = this.createBlankLayer(this.project.width, this.project.height, `Layer ${frame.layers.length + 1}`);
-    const layerIndex = frame.layers.length;
-  
-    frame.layers.push(newLayer);
-    this.project.currentLayer = layerIndex;
-  
-    // Record operation
-    const operation = {
-      type: 'add_layer',
-      description: __('Añadir Capa||Add Layer'),
-      frameIndex: this.project.currentFrame,
-      layerIndex: layerIndex,
-      layerData: {
-        name: newLayer.name,
-        visible: this.registerLayerVisibilityChanges ? newLayer.visible : true,
-        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
-      }
-    };
-    
-    this.showOperationMessage(__("Nueva capa añadida||New layer added"));
-  
-    this.historyManager.addChange(operation);
-    this.historyManager.endBatch();
-  
-    this.render();
-  }
-  
-  removeLayer() {
-    if (!this.project) return;
-  
-    const frame = this.project.frames[this.project.currentFrame];
-    if (frame.layers.length <= 1) return;
-  
-    this.historyManager.startBatch("remove_layer", __("Quitar capa||Remove Layer"));
-  
-    const layerIndex = this.project.currentLayer;
-    const removedLayer = frame.layers[layerIndex];
-  
-    frame.layers.splice(layerIndex, 1);
-    this.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
-  
-    // Record operation
-    const operation = {
-      type: 'remove_layer',
-      description: __('Quitar capa||Remove Layer'),
-      frameIndex: this.project.currentFrame,
-      layerIndex: layerIndex,
-      layerData: {
-        name: removedLayer.name,
-        visible: this.registerLayerVisibilityChanges ? removedLayer.visible : true,
-        imageData: Array.from(removedLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
-      }
-    };
-    
-    this.showOperationMessage(__("Capa quitada||Layer removed"));
-  
-    this.historyManager.addChange(operation);
-    this.historyManager.endBatch();
-
-    this.render();
-  }
-  
-  setLayerVisibility(frameIndex, layerIndex, visible) {
-    if (!this.project || !this.project.frames[frameIndex] || !this.project.frames[frameIndex].layers[layerIndex]) return;
-  
-    const layer = this.project.frames[frameIndex].layers[layerIndex];
-    const oldVisibility = layer.visible;
-    layer.visible = visible;
-  
-    // Record operation
-    const operation = {
-      type: 'change_layer_visibility',
-      description: __('Cambiar visibilidad de la capa||Change Layer Visibility'),
-      frameIndex: frameIndex,
-      layerIndex: layerIndex,
-      visible: visible,
-      oldVisible: oldVisibility
-    };
-  
-    // Only save if enabled
-    if (this.registerLayerVisibilityChanges) {
-      this.historyManager.addChange(operation);
-    }
-    
-    this.render();
-  }
-  
-  moveLayer(frameIndex, fromIndex, toIndex) {
-    if (fromIndex === toIndex) return;
-  
-    this.historyManager.startBatch("move_layer", "Move Layer");
-  
-    const frame = this.project.frames[frameIndex];
-    const layer = frame.layers.splice(fromIndex, 1)[0];
-    frame.layers.splice(toIndex, 0, layer);
-    this.project.currentLayer = toIndex;
-  
-    // Record operation
-    const operation = {
-      type: 'move_layer',
-      description: 'Move Layer',
-      frameIndex: frameIndex,
-      fromIndex: fromIndex,
-      toIndex: toIndex
-    };
-  
-    this.historyManager.addChange(operation);
-    this.historyManager.endBatch();
-  
-    this.render();
-  }
-  
-  createBlankLayer(width, height, name = `Layer ${this.project && this.project.frames.length ? this.project.frames[0].layers.length + 1 : 1}`) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = this.getCanvasContext(canvas);
-
-    return {
-      canvas: canvas,
-      ctx: ctx,
-      visible: true,
-      name
-    };
-  }
-    
   updateFramesUI() {
     if (!this.project) return;
   
@@ -5981,126 +5848,469 @@ class PixelArtEditor {
     this.updateAnimationPreview();
   }
   
-  updateLayersUI() {
+  // Layer Management
+  addLayer() {
     if (!this.project) return;
   
-    // OPTIMIZE: Do not redraw the entire container
-    this.layersContainer.innerHTML = "";
-    
-    // Add "+" button at the top
-    const addButton = document.createElement("div");
-    addButton.className = "layer-item add-button";
-    addButton.innerHTML = `
-      <div class="add-button-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-        </svg>
-      </div>
-      <span>${__("Añadir Capa||Add Layer")}</span>
-    `;
-    addButton.addEventListener("click", () => this.addLayer());
-    this.layersContainer.appendChild(addButton);
+    this.historyManager.startBatch("add_layer", __("Añadir Capa||Add Layer"));
   
     const frame = this.project.frames[this.project.currentFrame];
+    const newLayer = this.createBlankLayer(this.project.width, this.project.height, `Layer ${frame.layers.length + 1}`);
+    const layerIndex = frame.layers.length;
+  
+    frame.layers.push(newLayer);
+    this.project.currentLayer = layerIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'add_layer',
+      description: __('Añadir Capa||Add Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: layerIndex,
+      layerData: {
+        name: newLayer.name,
+        visible: this.registerLayerVisibilityChanges ? newLayer.visible : true,
+        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+    
+    this.showOperationMessage(__("Nueva capa añadida||New layer added"));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  removeLayer() {
+    if (!this.project) return;
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    if (frame.layers.length <= 1) return;
+  
+    this.historyManager.startBatch("remove_layer", __("Quitar capa||Remove Layer"));
+  
+    const layerIndex = this.project.currentLayer;
+    const removedLayer = frame.layers[layerIndex];
+  
+    frame.layers.splice(layerIndex, 1);
+    this.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+  
+    // Record operation
+    const operation = {
+      type: 'remove_layer',
+      description: __('Quitar capa||Remove Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: layerIndex,
+      layerData: {
+        name: removedLayer.name,
+        visible: this.registerLayerVisibilityChanges ? removedLayer.visible : true,
+        imageData: Array.from(removedLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+    
+    this.showOperationMessage(__("Capa quitada||Layer removed"));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.render();
+  }
+  
+  setLayerVisibility(frameIndex, layerIndex, visible) {
+    if (!this.project || !this.project.frames[frameIndex] || !this.project.frames[frameIndex].layers[layerIndex]) return;
+  
+    const layer = this.project.frames[frameIndex].layers[layerIndex];
+    const oldVisibility = layer.visible;
+    layer.visible = visible;
+  
+    // Record operation
+    const operation = {
+      type: 'change_layer_visibility',
+      description: __('Cambiar visibilidad de la capa||Change Layer Visibility'),
+      frameIndex: frameIndex,
+      layerIndex: layerIndex,
+      visible: visible,
+      oldVisible: oldVisibility
+    };
+  
+    // Only save if enabled
+    if (this.registerLayerVisibilityChanges) {
+      this.historyManager.addChange(operation);
+    }
+    
+    this.render();
+  }
+  
+  moveLayer(frameIndex, fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+  
+    this.historyManager.startBatch("move_layer", "Move Layer");
+  
+    const frame = this.project.frames[frameIndex];
+    const layer = frame.layers.splice(fromIndex, 1)[0];
+    frame.layers.splice(toIndex, 0, layer);
+    this.project.currentLayer = toIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'move_layer',
+      description: 'Move Layer',
+      frameIndex: frameIndex,
+      fromIndex: fromIndex,
+      toIndex: toIndex
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+    
+  prevLayer() {
+    if (!this.project) return;
+    const newIndex = Math.max(0, this.project.currentLayer - 1);
+    this.project.currentLayer = newIndex;
+    this.updateLayersUI();
+  }
+  
+  nextLayer() {
+    if (!this.project) return;
+    const frame = this.project.frames[this.project.currentFrame];
+    const newIndex = Math.min(frame.layers.length - 1, this.project.currentLayer + 1);
+    this.project.currentLayer = newIndex;
+    this.updateLayersUI();
+  }
+  
+  duplicateLayer() {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const sourceIndex = this.project.currentLayer;
+    const sourceLayer = frame.layers[sourceIndex];
+    const newIndex = sourceIndex + 1;
+  
+    this.historyManager.startBatch("add_layer", __("Duplicar capa||Duplicate Layer"));
+  
+    // Create new layer with copy of content
+    const newLayer = this.createBlankLayer(
+      this.project.width, 
+      this.project.height, 
+      `${sourceLayer.name} (${__("copia||copy")})`
+    );
+    newLayer.visible = sourceLayer.visible;
+    newLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+  
+    // Insert after current
+    frame.layers.splice(newIndex, 0, newLayer);
+    this.project.currentLayer = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'add_layer',
+      description: __('Duplicar capa||Duplicate Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: newIndex,
+      layerData: {
+        name: newLayer.name,
+        visible: newLayer.visible,
+        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.showOperationMessage(__('Capa duplicada||Layer duplicated'));
+    this.updateLayersUI();
+    this.render();
+  }
+  
+  mergeLayerUp(layerIndex = this.project.currentLayer) {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    if (layerIndex >= frame.layers.length - 1) return; // Already top layer
+  
+    const targetIndex = layerIndex + 1;
+    
+    this.historyManager.startBatch("remove_layer", __("Combinar capas||Merge Layers"));
+  
+    // Draw current layer onto target layer
+    const sourceLayer = frame.layers[layerIndex];
+    const targetLayer = frame.layers[targetIndex];
+    
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+  
+    // Remove source layer
+    frame.layers.splice(layerIndex, 1);
+    this.project.currentLayer = targetIndex - 1;
+  
+    this.historyManager.endBatch();
+    
+    this.showOperationMessage(__('Capas combinadas||Layers merged'));
+    this.updateLayersUI();
+    this.render();
+  }
+  
+  mergeLayerDown(layerIndex = this.project.currentLayer) {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    if (layerIndex <= 0) return; // Already bottom layer
+  
+    const targetIndex = layerIndex - 1;
+    
+    this.historyManager.startBatch("remove_layer", __("Combinar capas||Merge Layers"));
+  
+    // Draw current layer onto target layer
+    const sourceLayer = frame.layers[layerIndex];
+    const targetLayer = frame.layers[targetIndex];
+    
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+  
+    // Remove source layer
+    frame.layers.splice(layerIndex, 1);
+    this.project.currentLayer = targetIndex;
+  
+    this.historyManager.endBatch();
+    
+    this.showOperationMessage(__('Capas combinadas||Layers merged'));
+    this.updateLayersUI();
+    this.render();
+  }
+    
+  createBlankLayer(width, height, name = `Layer ${this.project && this.project.frames.length ? this.project.frames[0].layers.length + 1 : 1}`) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = this.getCanvasContext(canvas);
+
+    return {
+      canvas: canvas,
+      ctx: ctx,
+      visible: true,
+      name
+    };
+  }
+  
+  updateLayersUI() {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const layerCount = frame.layers.length;
+    
+    // Clear the entire container (just like animation panel)
+    this.layersContainer.innerHTML = "";
+    
+    // Create header with controls (like timeline header)
+    const header = document.createElement("div");
+    header.className = "layers-header";
+    
+    // Previous layer button
+    const prevLayerBtn = document.createElement("button");
+    prevLayerBtn.className = "ui-button";
+    prevLayerBtn.innerHTML = '<div class="icon icon-prev"></div>';
+    prevLayerBtn.title = __("Capa anterior||Previous Layer");
+    prevLayerBtn.addEventListener("click", () => this.prevLayer());
+    header.appendChild(prevLayerBtn);
+    
+    // Next layer button
+    const nextLayerBtn = document.createElement("button");
+    nextLayerBtn.className = "ui-button";
+    nextLayerBtn.innerHTML = '<div class="icon icon-next"></div>';
+    nextLayerBtn.title = __("Capa siguiente||Next Layer");
+    nextLayerBtn.addEventListener("click", () => this.nextLayer());
+    header.appendChild(nextLayerBtn);
+    
+    // Add layer button
+    const addLayerBtn = document.createElement("button");
+    addLayerBtn.className = "ui-button";
+    addLayerBtn.innerHTML = '<div class="icon icon-add"></div>';
+    addLayerBtn.title = __("Añadir capa||Add Layer");
+    addLayerBtn.addEventListener("click", () => this.addLayer());
+    header.appendChild(addLayerBtn);
+    
+    // Duplicate layer button
+    const duplicateLayerBtn = document.createElement("button");
+    duplicateLayerBtn.className = "ui-button";
+    duplicateLayerBtn.innerHTML = '<div class="icon icon-copy"></div>';
+    duplicateLayerBtn.title = __("Duplicar capa||Duplicate Layer");
+    duplicateLayerBtn.addEventListener("click", () => this.duplicateLayer());
+    header.appendChild(duplicateLayerBtn);
+    
+    // Merge with top button
+    const mergeTopBtn = document.createElement("button");
+    mergeTopBtn.className = "ui-button";
+    mergeTopBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
+    mergeTopBtn.title = __("Combinar con superior||Merge with Top");
+    mergeTopBtn.addEventListener("click", () => this.mergeLayerUp());
+    header.appendChild(mergeTopBtn);
+    
+    // Merge with bottom button
+    const mergeBottomBtn = document.createElement("button");
+    mergeBottomBtn.className = "ui-button";
+    mergeBottomBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
+    mergeBottomBtn.title = __("Combinar con inferior||Merge with Bottom");
+    mergeBottomBtn.addEventListener("click", () => this.mergeLayerDown());
+    header.appendChild(mergeBottomBtn);
+    
+    this.layersContainer.appendChild(header);
     
     // Create layers in reverse order (top layer first in UI)
-    for (let i = frame.layers.length - 1; i >= 0; i--) {
+    for (let i = layerCount - 1; i >= 0; i--) {
       const layer = frame.layers[i];
       const layerElement = document.createElement("div");
-      layerElement.className = `layer-item ${i === this.project.currentLayer ? "active" : ""}`;
+      layerElement.className = "layer-item";
+      if (i === this.project.currentLayer) {
+        layerElement.classList.add('active');
+      }
       layerElement.setAttribute("data-index", i);
       layerElement.draggable = true;
   
-      // Create thumbnail container
+      // Thumbnail container - 44x44
       const thumbContainer = document.createElement("div");
-      thumbContainer.className = "layer-thumb-container";
+      thumbContainer.className = "layer-thumb";
       layerElement.appendChild(thumbContainer);
   
-      // Create thumbnail
       const thumbCanvas = document.createElement("canvas");
-      thumbCanvas.width = this.project.width;
-      thumbCanvas.height = this.project.height;
-      thumbCanvas.style.width = "40px";
-      thumbCanvas.style.height = "auto";
+      thumbCanvas.width = 44;
+      thumbCanvas.height = 44;
       const thumbCtx = this.getCanvasContext(thumbCanvas);
+      thumbCtx.imageSmoothingEnabled = false;
       
-      // Draw layer content to thumbnail
-      if (layer.canvas) {
-        thumbCtx.drawImage(layer.canvas, 0, 0, this.project.width, this.project.height, 0, 0, thumbCanvas.width, thumbCanvas.height);
-      }
+      // Calculate scaling to fit 44x44
+      const scale = Math.min(44 / this.project.width, 44 / this.project.height);
+      const scaledWidth = Math.floor(this.project.width * scale);
+      const scaledHeight = Math.floor(this.project.height * scale);
+      const offsetX = Math.floor((44 - scaledWidth) / 2);
+      const offsetY = Math.floor((44 - scaledHeight) / 2);
       
-      // Add transparency grid if layer has transparency
-      if (this.hasTransparency(layer.canvas)) {
-        const w = Math.floor(this.project.width / 10) + 1;
-        const h = Math.floor(this.project.height / 10) + 1;
-        thumbCtx.fillStyle = "rgba(0, 0, 0, 0.1)";
-        for (let y = 0; y < w; y++) {
-          for (let x = 0; x < h; x++) {
-            if ((x + y) % 2 === 0) {
-              thumbCtx.fillRect(x * 10, y * 10, 10, 10);
-            }
+      // Draw checkerboard background
+      thumbCtx.fillStyle = "#fff";
+      thumbCtx.fillRect(0, 0, 44, 44);
+      
+      thumbCtx.fillStyle = "#ccc";
+      for (let y = 0; y < 44; y += 8) {
+        for (let x = 0; x < 44; x += 8) {
+          if ((Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0) {
+            thumbCtx.fillRect(x, y, 8, 8);
           }
         }
       }
-  
+      
+      // Draw layer content
+      if (layer.canvas) {
+        thumbCtx.drawImage(
+          layer.canvas, 
+          0, 0, this.project.width, this.project.height,
+          offsetX, offsetY, scaledWidth, scaledHeight
+        );
+      }
+      
       thumbContainer.appendChild(thumbCanvas);
   
-      // Layer info
-      const layerInfo = document.createElement("div");
-      layerInfo.className = "layer-info";
-      layerInfo.innerHTML = `<span>${layer.name}</span>`;
-      layerElement.appendChild(layerInfo);
+      // Layer name
+      const layerName = document.createElement("div");
+      layerName.className = "layer-name";
+      layerName.textContent = layer.name;
+      layerElement.appendChild(layerName);
   
       // Layer actions
       const layerActions = document.createElement("div");
       layerActions.className = "layer-actions";
   
+      // Move up button - disabled if at top
+      const moveUpBtn = document.createElement("button");
+      moveUpBtn.className = "ui-button layer-action";
+      moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
+      moveUpBtn.title = __("Subir||Move Up");
+      if (i >= layerCount - 1) {
+        moveUpBtn.disabled = true;
+        moveUpBtn.classList.add("disabled");
+      } else {
+        moveUpBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.moveLayer(this.project.currentFrame, i, i + 1);
+        });
+      }
+      layerActions.appendChild(moveUpBtn);
+  
+      // Move down button - disabled if at bottom
+      const moveDownBtn = document.createElement("button");
+      moveDownBtn.className = "ui-button layer-action";
+      moveDownBtn.innerHTML = '<div class="icon icon-down"></div>';
+      moveDownBtn.title = __("Bajar||Move Down");
+      if (i <= 0) {
+        moveDownBtn.disabled = true;
+        moveDownBtn.classList.add("disabled");
+      } else {
+        moveDownBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.moveLayer(this.project.currentFrame, i, i - 1);
+        });
+      }
+      layerActions.appendChild(moveDownBtn);
+  
       // Visibility toggle
       const visibilityBtn = document.createElement("button");
-      visibilityBtn.className = "layer-action visibility";
-      visibilityBtn.innerHTML = layer.visible ? '<svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M12 9a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3m0 8a5 5 0 0 1-5-5a5 5 0 0 1 5-5a5 5 0 0 1 5 5a5 5 0 0 1-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M11.83 9L15 12.16V12a3 3 0 0 0-3-3h-.17m-4.3.8l1.55 1.55c-.05.21-.08.42-.08.65a3 3 0 0 0 3 3c.22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53a5 5 0 0 1-5-5c0-.79.2-1.53.53-2.2M2 4.27l2.28 2.28l.45.45C3.08 8.3 1.78 10 1 12c1.73 4.39 6 7.5 11 7.5c1.55 0 3.03-.3 4.38-.84l.43.42L19.73 22 21 20.73 3.27 3 2 4.27z"/></svg>';
-      visibilityBtn.title = "Toggle Visibility";
+      visibilityBtn.className = "ui-button layer-action";
+      visibilityBtn.innerHTML = layer.visible ? 
+        '<div class="icon icon-visible"></div>' : 
+        '<div class="icon icon-hidden"></div>';
+      visibilityBtn.title = __("Visibilidad||Toggle Visibility");
       visibilityBtn.addEventListener("click", e => {
         e.stopPropagation();
         this.setLayerVisibility(this.project.currentFrame, i, !layer.visible);
       });
       layerActions.appendChild(visibilityBtn);
   
-      // Move up button (moves layer down in visual stack)
-      if (i < frame.layers.length - 1) {
-        const moveUpBtn = document.createElement("button");
-        moveUpBtn.className = "layer-action move-up";
-        moveUpBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6l-6 6l1.41 1.41z"/></svg>';
-        moveUpBtn.title = "Move Down in Stack";
-        moveUpBtn.addEventListener("click", e => {
+      // Merge up button - disabled if at top
+      const mergeUpBtn = document.createElement("button");
+      mergeUpBtn.className = "ui-button layer-action";
+      mergeUpBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
+      mergeUpBtn.title = __("Combinar arriba||Merge Up");
+      if (i >= layerCount - 1) {
+        mergeUpBtn.disabled = true;
+        mergeUpBtn.classList.add("disabled");
+      } else {
+        mergeUpBtn.addEventListener("click", e => {
           e.stopPropagation();
-          this.moveLayer(this.project.currentFrame, i, i + 1);
+          this.mergeLayerUp(i);
         });
-        layerActions.appendChild(moveUpBtn);
       }
+      layerActions.appendChild(mergeUpBtn);
   
-      // Move down button (moves layer up in visual stack)
-      if (i > 0) {
-        const moveDownBtn = document.createElement("button");
-        moveDownBtn.className = "layer-action move-down";
-        moveDownBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M7.41 8.58L12 13.17l4.59-4.59L18 10l-6 6l-6-6l1.41-1.42z"/></svg>';
-        moveDownBtn.title = "Move Up in Stack";
-        moveDownBtn.addEventListener("click", e => {
+      // Merge down button - disabled if at bottom
+      const mergeDownBtn = document.createElement("button");
+      mergeDownBtn.className = "ui-button layer-action";
+      mergeDownBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
+      mergeDownBtn.title = __("Combinar abajo||Merge Down");
+      if (i <= 0) {
+        mergeDownBtn.disabled = true;
+        mergeDownBtn.classList.add("disabled");
+      } else {
+        mergeDownBtn.addEventListener("click", e => {
           e.stopPropagation();
-          this.moveLayer(this.project.currentFrame, i, i - 1);
+          this.mergeLayerDown(i);
         });
-        layerActions.appendChild(moveDownBtn);
       }
+      layerActions.appendChild(mergeDownBtn);
   
-      // Remove button
+      // Remove button - always enabled if more than one layer
       const removeBtn = document.createElement("button");
-      removeBtn.className = "layer-action remove";
-      removeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41z"/></svg>';
-      removeBtn.title = "Remove Layer";
-      removeBtn.addEventListener("click", e => {
-        e.stopPropagation();
-        this.removeLayer(i);
-      });
+      removeBtn.className = "ui-button layer-action";
+      removeBtn.innerHTML = '<div class="icon icon-close"></div>';
+      removeBtn.title = __("Eliminar||Remove");
+      if (layerCount <= 1) {
+        removeBtn.disabled = true;
+        removeBtn.classList.add("disabled");
+      } else {
+        removeBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.removeLayer(i);
+        });
+      }
       layerActions.appendChild(removeBtn);
   
       layerElement.appendChild(layerActions);
@@ -6133,61 +6343,10 @@ class PixelArtEditor {
         this.updateLayersUI();
       });
   
-      // Swipe to delete
-      this.setupSwipeToDelete(layerElement, i, "layer");
-  
       this.layersContainer.appendChild(layerElement);
     }
-  }
-
-  setupSwipeToDelete(element, index, type) {
-    let startX, startY;
-    let isSwiping = false;
-
-    element.addEventListener("touchstart", e => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      isSwiping = true;
-    });
-
-    element.addEventListener("touchmove", e => {
-      if (!isSwiping) return;
-
-      const currentX = e.touches[0].clientX;
-      const currentY = e.touches[0].clientY;
-      const deltaX = currentX - startX;
-      const deltaY = currentY - startY;
-
-      // Horizontal swipe (delete)
-      if (Math.abs(deltaX) > 30 && Math.abs(deltaY) < 20) {
-        e.preventDefault();
-        element.style.transform = `translateX(${deltaX}px)`;
-        element.style.opacity = `${1 - Math.abs(deltaX) / 100}`;
-      }
-    });
-
-    element.addEventListener("touchend", e => {
-      if (!isSwiping) return;
-
-      const currentX = e.changedTouches[0].clientX;
-      const deltaX = currentX - startX;
-
-      if (Math.abs(deltaX) > 60) {
-        // Swipe threshold reached - delete item
-        if (type === "frame") {
-          this.removeFrame(index);
-        } else {
-          this.removeLayer(index);
-        }
-      }
-
-      // Reset transform
-      element.style.transform = "";
-      element.style.opacity = "";
-      isSwiping = false;
-    });
-  }
-
+  }  
+  
   showUndoToast(message, button, undoCallback) {
     const toast = document.createElement("div");
     toast.className = "undo-toast";

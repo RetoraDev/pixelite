@@ -270,6 +270,14 @@ button:active {
   background-color: var(--primary-color);
 }
 
+.ui-button:disabled {
+  opacity: 0.3;
+}
+
+.ui-button:disabled:hover {
+  background-color: transparent;
+}
+
 .ui-button .icon {
   width: 24px;
   height: 24px;
