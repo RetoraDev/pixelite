@@ -250,46 +250,6 @@ class ReferenceManager {
     this.editor.showToast(__("Referencia flotante añadida||Floating reference added"));
   }
 
-  renderFloatingReference(ref) {
-    // Remove existing element if any
-    const existing = document.getElementById(ref.id);
-    if (existing) existing.remove();
-    
-    // Create element
-    const el = document.createElement("div");
-    el.id = ref.id;
-    el.className = "floating-reference";
-    if (this.selectedRef && this.selectedRef.id === ref.id) {
-      el.classList.add("selected");
-    }
-    
-    el.style.left = ref.x + "px";
-    el.style.top = ref.y + "px";
-    el.style.width = ref.width + "px";
-    el.style.height = ref.height + "px";
-    el.style.transform = `rotate(${ref.rotation}deg)`;
-    
-    // Create image
-    const img = document.createElement("img");
-    img.src = ref.img.src;
-    img.draggable = false;
-    el.appendChild(img);
-    
-    // Create resize handle
-    const handle = document.createElement("div");
-    handle.className = "resize-handle";
-    el.appendChild(handle);
-    
-    // Event listeners
-    el.addEventListener("mousedown", (e) => this.startDrag(e, ref));
-    el.addEventListener("touchstart", (e) => this.startDrag(e, ref), { passive: false });
-    
-    handle.addEventListener("mousedown", (e) => this.startResize(e, ref));
-    handle.addEventListener("touchstart", (e) => this.startResize(e, ref), { passive: false });
-    
-    this.floatingContainer.appendChild(el);
-  }
-
   startDrag(e, ref) {
     e.preventDefault();
     e.stopPropagation();
@@ -432,6 +392,11 @@ class ReferenceManager {
         this.selectedRef = null;
       }
       
+      const el = document.getElementById(this.dragState.ref.id);
+      if (el) {
+        el.style.cursor = "grab";
+      }
+      
       this.dragState = null;
     }
     
@@ -439,7 +404,7 @@ class ReferenceManager {
       const el = document.getElementById(this.resizeState.ref.id);
       if (el) {
         el.classList.remove("resizing");
-        el.style.cursor = "move";
+        el.style.cursor = "grab";
       }
       this.resizeState = null;
     }
@@ -625,7 +590,7 @@ class ReferenceManager {
     el.style.width = ref.width + "px";
     el.style.height = ref.height + "px";
     el.style.transform = `rotate(${ref.rotation}deg)`;
-    el.style.cursor = "move";
+    el.style.cursor = "grab";
     
     // Create image
     const img = document.createElement("img");
@@ -664,12 +629,14 @@ class ReferenceManager {
       // Only start drag if not clicking a handle
       if (!e.target.classList.contains('resize-handle')) {
         this.startDrag(e, ref);
+        el.style.cursor = "grabbing";
       }
     });
     
     el.addEventListener("touchstart", (e) => {
       if (!e.target.classList.contains('resize-handle')) {
         this.startDrag(e, ref);
+        el.style.cursor = "grabbing";
       }
     }, { passive: false });
     

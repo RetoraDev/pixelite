@@ -54,7 +54,7 @@ const cssFileOrder = [
 ];
 
 let packageInfo = {};
-let versionName = "1.0.0";
+let versionName = "1.0.1";
 let copyright = "(C) RETORA";
 
 function log(text, type, error = null) {

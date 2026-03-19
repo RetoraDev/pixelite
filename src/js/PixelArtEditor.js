@@ -836,9 +836,6 @@ class PixelArtEditor {
     this.colorSelector.className = "color-selector";
     this.colorIndicator.appendChild(this.colorSelector);
 
-    // Color indicator events
-    this.colorIndicator.addEventListener("click", () => this.toggleSelectedColor());
-
     this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.showColorPicker());
     this.topBar.appendChild(this.colorPickerButton);
 
@@ -1548,16 +1545,17 @@ class PixelArtEditor {
     this.colorPickLine.className = "color-pick-line";
     this.colorPickLine.style.display = "none";
     document.body.appendChild(this.colorPickLine);
-
-    // Add event listeners for drag-to-pick
-    this.colorIndicator.addEventListener("mousedown", this.handleColorPickStart.bind(this));
-    this.colorIndicator.addEventListener("touchstart", this.handleColorPickStart.bind(this), { passive: false });
-    this.colorIndicator.addEventListener("touchcancel", this.handleTouchCancel.bind(this));
-    
-    document.addEventListener("mousemove", this.handleColorPickMove.bind(this));
-    document.addEventListener("mouseup", this.handleColorPickEnd.bind(this));
-    document.addEventListener("touchmove", this.handleColorPickMove.bind(this), { passive: false });
-    document.addEventListener("touchend", this.handleColorPickEnd.bind(this));
+  
+    // Mouse events
+    this.colorIndicator.addEventListener("mousedown", (e) => this.handleColorPickStart(e));
+    document.addEventListener("mousemove", (e) => this.handleColorPickMove(e));
+    document.addEventListener("mouseup", (e) => this.handleColorPickEnd(e));
+  
+    // Touch events
+    this.colorIndicator.addEventListener("touchstart", (e) => this.handleColorPickStart(e), { passive: false });
+    document.addEventListener("touchmove", (e) => this.handleColorPickMove(e), { passive: false });
+    document.addEventListener("touchend", (e) => this.handleColorPickEnd(e));
+    document.addEventListener("touchcancel", (e) => this.handleColorPickEnd(e));
   }
 
   updateBrushSizeIndicator() {
@@ -1578,144 +1576,165 @@ class PixelArtEditor {
 
   handleColorPickStart(e) {
     if (this.isDrawing || this.isPanning) return;
-
+  
+    // Prevent default for touch events
+    e.preventDefault();
+    e.stopPropagation();
+  
     // Store start time and position for tap detection
     this.colorPickStartTime = Date.now();
     this.colorPickStartPos = {
-      x: e.type === "touchstart" ? e.touches[0].clientX : e.clientX,
-      y: e.type === "touchstart" ? e.touches[0].clientY : e.clientY
+      x: e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX,
+      y: e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY
     };
-
+  
+    // Clear any existing timeout
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+  
     // Set a timeout to distinguish between click and drag
     this.colorPickTimeout = setTimeout(() => {
-      this.isColorPicking = true;
-
-      // Add visual feedback
-      this.colorIndicator.classList.add("dragging");
-
-      // Get start position from center of color indicator
-      const rect = this.colorIndicator.getBoundingClientRect();
-      this.colorPickStartX = rect.left + rect.width / 2;
-      this.colorPickStartY = rect.top + rect.height / 2;
-
-      // Show the line
-      this.colorPickLine.style.display = "block";
-      this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, this.colorPickStartPos.x, this.colorPickStartPos.y);
-    }, 300); // to distinguish click from drag
-
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
-  handleColorPickMove(e) {
-    if (!this.isColorPicking && this.colorPickStartPos) {
-      // Check if we should start color picking (user moved enough to indicate drag)
-      const currentX = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
-      const currentY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
-
-      const movedDistance = this.distance(currentX, currentY, this.colorPickStartPos.x, this.colorPickStartPos.y);
-
-      if (movedDistance > 15 && this.colorPickTimeout) {
-        // User is definitely dragging, trigger color picking immediately
-        clearTimeout(this.colorPickTimeout);
+      if (!this.isColorPicking) {
         this.isColorPicking = true;
+  
+        // Add visual feedback
         this.colorIndicator.classList.add("dragging");
-
+  
+        // Get start position from center of color indicator
         const rect = this.colorIndicator.getBoundingClientRect();
         this.colorPickStartX = rect.left + rect.width / 2;
         this.colorPickStartY = rect.top + rect.height / 2;
-
+  
+        // Show the line
         this.colorPickLine.style.display = "block";
-        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, currentX, currentY);
+        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, this.colorPickStartPos.x, this.colorPickStartPos.y);
       }
-      return;
+    }, 200); // Shorter timeout for better responsiveness
+  }
+  
+  handleColorPickMove(e) {
+    // If not color picking and no start position, ignore
+    if (!this.colorPickStartPos) return;
+  
+    // Prevent default for touch events
+    if (e.type.startsWith("touch")) {
+      e.preventDefault();
     }
-
+  
+    // Get current position
     let clientX, clientY;
-
-    if (e.type === "touchmove") {
+    if (e.type.startsWith("touch")) {
+      if (!e.touches || e.touches.length === 0) return;
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
     } else {
       clientX = e.clientX;
       clientY = e.clientY;
     }
-
+  
+    // If not yet color picking, check if we should start
+    if (!this.isColorPicking) {
+      const movedDistance = this.distance(clientX, clientY, this.colorPickStartPos.x, this.colorPickStartPos.y);
+  
+      if (movedDistance > 10 && this.colorPickTimeout) { // Lower threshold for better responsiveness
+        // Clear the timeout
+        clearTimeout(this.colorPickTimeout);
+        this.colorPickTimeout = null;
+        
+        // Start color picking immediately
+        this.isColorPicking = true;
+        this.colorIndicator.classList.add("dragging");
+  
+        const rect = this.colorIndicator.getBoundingClientRect();
+        this.colorPickStartX = rect.left + rect.width / 2;
+        this.colorPickStartY = rect.top + rect.height / 2;
+  
+        this.colorPickLine.style.display = "block";
+        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
+      }
+      return;
+    }
+  
     // Update the line position
     this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
   }
-
+  
   handleColorPickEnd(e) {
     // Clear the timeout if it's still pending
     if (this.colorPickTimeout) {
       clearTimeout(this.colorPickTimeout);
       this.colorPickTimeout = null;
     }
-
-    if (!this.isColorPicking) {
-      // This was a short click/tap, so toggle color selection
-      const isShortTap = Date.now() - this.colorPickStartTime < 200;
-      const movedDistance = this.colorPickStartPos ? this.distance(e.type === "touchend" ? e.changedTouches[0].clientX : e.clientX, e.type === "touchend" ? e.changedTouches[0].clientY : e.clientY, this.colorPickStartPos.x, this.colorPickStartPos.y) : 0;
-
-      if (isShortTap && movedDistance < 10) {
-        this.toggleSelectedColor();
-      }
-      return;
-    }
-
+  
+    // Get end position
     let clientX, clientY;
-
-    if (e.type === "touchend") {
+    if (e.type.startsWith("touchend") || e.type.startsWith("touchcancel")) {
+      if (!e.changedTouches || e.changedTouches.length === 0) {
+        // If no changed touches, just clean up
+        this.cleanupColorPicking();
+        return;
+      }
       clientX = e.changedTouches[0].clientX;
       clientY = e.changedTouches[0].clientY;
     } else {
       clientX = e.clientX;
       clientY = e.clientY;
     }
-
+  
+    // If we weren't color picking, this was a click/tap
+    if (!this.isColorPicking) {
+      // Only toggle if it was a short tap with minimal movement
+      const isShortTap = Date.now() - this.colorPickStartTime < 300;
+      const movedDistance = this.colorPickStartPos ? 
+        this.distance(clientX, clientY, this.colorPickStartPos.x, this.colorPickStartPos.y) : 0;
+  
+      if (isShortTap && movedDistance < 15) {
+        this.toggleSelectedColor();
+      }
+      
+      // Clean up
+      this.colorPickStartPos = null;
+      return;
+    }
+  
     // Check if we're over the canvas
     const rect = this.canvasContainer.getBoundingClientRect();
-    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+    if (clientX >= rect.left && clientX <= rect.right && 
+        clientY >= rect.top && clientY <= rect.bottom) {
       // Get the color from the canvas
       const canvasPos = this.getCanvasPosition(clientX, clientY);
       if (canvasPos) {
         this.pickColor(canvasPos.x, canvasPos.y);
       }
     }
-
+  
     // Clean up
     this.cleanupColorPicking();
-
-    e.preventDefault();
   }
-
+  
+  cleanupColorPicking() {
+    this.isColorPicking = false;
+    this.colorPickStartPos = null;
+    this.colorPickLine.style.display = "none";
+    this.colorIndicator.classList.remove("dragging");
+  
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+  }
+  
   updateColorPickLine(startX, startY, endX, endY) {
     const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
     const angle = (Math.atan2(endY - startY, endX - startX) * 180) / Math.PI;
-
+  
     this.colorPickLine.style.width = `${length}px`;
     this.colorPickLine.style.left = `${startX}px`;
     this.colorPickLine.style.top = `${startY}px`;
     this.colorPickLine.style.transform = `rotate(${angle}deg)`;
     this.colorPickLine.style.transformOrigin = "0 0";
-  }
-
-  cleanupColorPicking() {
-    this.isColorPicking = false;
-    this.colorPickLine.style.display = "none";
-    this.colorIndicator.classList.remove("dragging");
-
-    // Clear timeout if it exists
-    if (this.colorPickTimeout) {
-      clearTimeout(this.colorPickTimeout);
-      this.colorPickTimeout = null;
-    }
-
-    // Remove event listeners
-    document.removeEventListener("mousemove", this.handleColorPickMove.bind(this));
-    document.removeEventListener("mouseup", this.handleColorPickEnd.bind(this));
-    document.removeEventListener("touchmove", this.handleColorPickMove.bind(this));
-    document.removeEventListener("touchend", this.handleColorPickEnd.bind(this));
   }
 
   createColorPickerTab(name, onClick) {
@@ -2058,6 +2077,7 @@ class PixelArtEditor {
         const colorElement = document.createElement("div");
         colorElement.className = "palette-color";
         colorElement.style.backgroundColor = color;
+        colorElement.style.cursor = "grab";
         colorElement.draggable = true;
         colorElement.dataset.index = i;
   
@@ -2070,11 +2090,13 @@ class PixelArtEditor {
         colorElement.addEventListener("dragstart", e => {
           e.dataTransfer.setData("text/plain", i.toString());
           colorElement.classList.add("dragging");
+          colorElement.style.cursor = "grabbing";
           this.deleteZone.classList.add("visible");
         });
   
         colorElement.addEventListener("dragend", () => {
           colorElement.classList.remove("dragging");
+          colorElement.style.cursor = "grab";
           this.deleteZone.classList.remove("visible");
           this.colorPickerOverlay.classList.remove("drag-over");
         });
@@ -2099,7 +2121,8 @@ class PixelArtEditor {
     const addButton = document.createElement("div");
     addButton.className = "palette-add-button";
     addButton.innerHTML = "+";
-    addButton.title = "Add new color";
+    addButton.title = __("Añadir color||Add new color");
+    addButton.style.cursor = "pointer";
     addButton.addEventListener("click", () => {
       this.showHexColorInputDialog().then(color => this.addColorToPalette(color));
     });
@@ -2283,66 +2306,137 @@ class PixelArtEditor {
     const colorElement = document.createElement("div");
     colorElement.className = "palette-color floating";
     colorElement.style.backgroundColor = color;
+    colorElement.style.cursor = "grab";
     
-    const id = `color_${Date.now()}`;
+    const id = `color_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     colorElement.dataset.color = color;
     colorElement.dataset.id = id;
     colorElement.dataset.x = clientX;
     colorElement.dataset.y = clientY;
-    colorElement.draggable = true;
-    colorElement.moving = false;
     
     colorElement.style.top = `${clientY}px`;
     colorElement.style.left = `${clientX}px`;
+    colorElement.style.touchAction = "none"; // Prevent scrolling while interacting
+    colorElement.style.userSelect = "none"; // Prevent text selection
     
     // Click to select color
-    colorElement.addEventListener("click", () => {
+    colorElement.addEventListener("click", (e) => {
+      e.stopPropagation();
       this.setColor(color);
     });
-     
-    // Drag events
-    colorElement.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("text/plain", id);
+    
+    // Pointer event handlers for smooth dragging
+    let isDragging = false;
+    let startX, startY;
+    let startLeft, startTop;
+    
+    const onPointerDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       
-      // TODO: Fix incorrect data transfer to delete zone
+      // Capture pointer to continue receiving events even outside the element
+      colorElement.setPointerCapture(e.pointerId);
       
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = parseFloat(colorElement.style.left) || 0;
+      startTop = parseFloat(colorElement.style.top) || 0;
+      
+      // Visual feedback
+      colorElement.style.cursor = "grabbing";
       colorElement.classList.add("dragging");
       this.floatingColorsDeleteZone.classList.add("visible");
-    });
-
-    colorElement.addEventListener("dragend", (e) => {
-      e.preventDefault();
-      colorElement.classList.remove("dragging");
-      this.floatingColorsDeleteZone.classList.remove("visible");
       
-      // Only update position if we have valid coordinates
-      if (e.clientX && e.clientY) {
-        colorElement.style.top = `${e.clientY}px`;
-        colorElement.style.left = `${e.clientX}px`;
-        colorElement.dataset.x = e.clientX;
-        colorElement.dataset.y = e.clientY;
+      // Store initial state for potential undo
+      this._dragStartPos = { x: startLeft, y: startTop };
+    };
+    
+    const onPointerMove = (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      const newLeft = startLeft + deltaX;
+      const newTop = startTop + deltaY;
+      
+      colorElement.style.left = `${newLeft}px`;
+      colorElement.style.top = `${newTop}px`;
+      colorElement.dataset.x = newLeft;
+      colorElement.dataset.y = newTop;
+      
+      // Check if over delete zone
+      const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
+      const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
+                          e.clientY >= rect.top && e.clientY <= rect.bottom;
+      
+      if (isOverDelete) {
+        this.floatingColorsDeleteZone.classList.add("drag-over");
+      } else {
+        this.floatingColorsDeleteZone.classList.remove("drag-over");
+      }
+    };
+    
+    const onPointerUp = (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      // Check if released over delete zone
+      const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
+      const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
+                          e.clientY >= rect.top && e.clientY <= rect.bottom;
+      
+      if (isOverDelete) {
+        // Delete the color
+        this.removeFloatingPaletteColor(id);
+      } else {
+        // Save new position
         this.saveFloatingColors();
       }
-    });
+      
+      // Clean up
+      isDragging = false;
+      colorElement.style.cursor = "grab";
+      colorElement.classList.remove("dragging");
+      this.floatingColorsDeleteZone.classList.remove("visible", "drag-over");
+      
+      // Release pointer capture
+      colorElement.releasePointerCapture(e.pointerId);
+    };
     
-    colorElement.addEventListener("dragover", e => {
-      e.preventDefault();
-    });
-
+    // Add pointer event listeners
+    colorElement.addEventListener("pointerdown", onPointerDown);
+    colorElement.addEventListener("pointermove", onPointerMove);
+    colorElement.addEventListener("pointerup", onPointerUp);
+    colorElement.addEventListener("pointercancel", onPointerUp);
+    
+    // Prevent context menu on long press
+    colorElement.addEventListener("contextmenu", (e) => e.preventDefault());
+    
     this.overlayLayer.appendChild(colorElement);
     this.floatingColors.set(id, colorElement);
     this.saveFloatingColors();
-  }
+  }  
   
   removeFloatingPaletteColor(id) {
     const element = this.floatingColors.get(id);
     if (element) {
+      // Remove all pointer event listeners
+      element.removeEventListener("pointerdown", element._pointerDown);
+      element.removeEventListener("pointermove", element._pointerMove);
+      element.removeEventListener("pointerup", element._pointerUp);
+      element.removeEventListener("pointercancel", element._pointerUp);
+      
       element.remove(); // Remove from DOM
       this.floatingColors.delete(id); // Remove from Map
       this.saveFloatingColors();
     }
-  }
+  }  
   
   removeAllFloatingPaletteColors() {
     this.floatingColors.forEach(element => element[1]?.remove?.());
@@ -2776,8 +2870,6 @@ class PixelArtEditor {
         // TODO: Context menu
         break;
     }
-
-    e.preventDefault();
   }
 
   handleMouseMove(e) {
@@ -2804,9 +2896,10 @@ class PixelArtEditor {
     if (pos && this.currentTool && this.currentTool.onUp) {
       this.currentTool.onUp(pos.x, pos.y, this.startX, this.startY);
     }
+    
+    this.canvas.style.cursor = this.currentTool ? this.currentTool.cursor : "crosshair";
 
     this.isDrawing = false;
-    e.preventDefault();
   }
   
   handleMouseWheel(e) {
@@ -3041,6 +3134,8 @@ class PixelArtEditor {
         if (this.currentTool && this.currentTool.onUp) {
           this.currentTool.onUp(this.lastX, this.lastY, this.startX, this.startY);
         }
+        
+        this.canvas.style.cursor = this.currentTool ? this.currentTool.cursor : "crosshair";
       }
   
       // Reset all states
@@ -3173,6 +3268,7 @@ class PixelArtEditor {
   
   startPan(e) {
     this.isPanning = true;
+    this.canvasContainer.style.cursor = "grab";
     this.panStartX = e.clientX;
     this.panStartY = e.clientY;
     this.panStartCanvasPoint = this.getCanvasPosition(e.clientX, e.clientY);
@@ -5342,10 +5438,22 @@ class PixelArtEditor {
     this.showPopup(
       __("Acerca de Pixelite||About Pixelite"),
       `
-        <p>Pixelite ${this.version}</p>
-        <p>${__("Un editor de pixel art con soporte de animación||A simple pixel art editor with animation support")}.</p>
-        <p>${__("Creado por||Created by")} <a onclick="openExternalUrl('https://retora.html-5.me')">retora</a>.</p>
-      `
+        <div style="text-align: center;">
+          <h2 style="margin-top: 0; color: var(--primary-color);">Pixelite</h2>
+          <p><strong>${__("Versión||Version")} ${this.version}</strong></p>
+          <p>${__("© %Y RETORA. Todos los derechos reservados.||© %Y RETORA. All rights reserved.").replace('%Y', new Date().getFullYear())}</p>
+          <p>${__("Creado por||Created by")} <a onclick="openExternalUrl('https://retora.html-5.me')">retora</a>.</p></p>
+          <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0;">
+            <a href="https://retora.itch.io/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://retora.itch.io/pixelite')">itch.io</a>
+            <span>•</span>
+            <a href="https://github.com/RetoraDev/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://github.com/RetoraDev/pixelite')">GitHub</a>
+          </div>
+          <p style="font-size: 0.9em; color: var(--text-dim); margin-bottom: 0;">
+            ${__("Un editor de pixel art colaborativo con soporte de animación||Collaborative pixel art editor with animation support")}.
+          </p>
+        </div>
+      `,
+      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
     );
   }
 
@@ -5355,6 +5463,94 @@ class PixelArtEditor {
       __(`
         (El manual no está disponible todavía|Manual is not available yet)
       `),
+      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
+    );
+  }
+  
+  showManualDialog() {
+    const manualContent = document.createElement("div");
+    manualContent.style.maxHeight = "60vh";
+    manualContent.style.overflowY = "auto";
+    manualContent.style.padding = "10px";
+    
+    manualContent.innerHTML = `
+      <h3 style="margin-top: 0;">${__("Guía rápida||Quick Guide")}</h3>
+      
+      <h4>${__("Herramientas||Tools")}</h4>
+      <ul style="padding-left: 20px;">
+        <li><strong>${__("Lápiz||Pencil")} (D):</strong> ${__("Dibuja píxel a píxel||Draw pixel by pixel")}</li>
+        <li><strong>${__("Borrador||Eraser")} (S):</strong> ${__("Elimina píxeles||Erase pixels")}</li>
+        <li><strong>${__("Línea||Line")} (L):</strong> ${__("Dibuja líneas rectas||Draw straight lines")}</li>
+        <li><strong>${__("Rectángulo||Rectangle")} (R):</strong> ${__("Dibuja rectángulos||Draw rectangles")}</li>
+        <li><strong>${__("Elipse||Ellipse")} (E):</strong> ${__("Dibuja elipses||Draw ellipses")}</li>
+        <li><strong>${__("Cubeta||Bucket")} (B):</strong> ${__("Rellena áreas del mismo color||Fill areas of same color")}</li>
+        <li><strong>${__("Pipeta||Pipette")} (A):</strong> ${__("Selecciona color del lienzo||Pick color from canvas")}</li>
+      </ul>
+      
+      <h4>${__("Atajos de teclado||Keyboard Shortcuts")}</h4>
+      <ul style="padding-left: 20px;">
+        <li><strong>Ctrl+Z:</strong> ${__("Deshacer||Undo")}</li>
+        <li><strong>Ctrl+Y:</strong> ${__("Rehacer||Redo")}</li>
+        <li><strong>Ctrl+A:</strong> ${__("Mostrar/ocultar animación||Toggle animation panel")}</li>
+        <li><strong>Ctrl+L:</strong> ${__("Mostrar/ocultar capas||Toggle layers panel")}</li>
+        <li><strong>${__("Espacio||Space")}:</strong> ${__("Alternar entre últimas dos herramientas||Switch between last two tools")}</li>
+        <li><strong>Esc:</strong> ${__("Cerrar menús||Close menus")}</li>
+      </ul>
+      
+      <h4>${__("Gestos táctiles||Touch Gestures")}</h4>
+      <ul style="padding-left: 20px;">
+        <li><strong>${__("1 dedo||1 finger")}:</strong> ${__("Dibujar||Draw")}</li>
+        <li><strong>${__("2 dedos||1 fingers")}:</strong> ${__("Mover y hacer zoom||Pan and zoom")}</li>
+        <li><strong>${__("3 dedos||1 fingers")}:</strong> ${__("Ajustar tamaño del pincel||Adjust brush size")}</li>
+      </ul>
+      
+      <h4>${__("Capas||Layers")}</h4>
+      <ul style="padding-left: 20px;">
+        <li>${__("Arrastra para reordenar||Drag to reorder")}</li>
+        <li>${__("Botones de ojo para visibilidad||Eye buttons to toggle visibility")}</li>
+        <li>${__("Flechas para mover arriba/abajo||Arrows to move up/down")}</li>
+        <li>${__("Iconos de combinar para fusionar capas||Merge icons to combine layers")}</li>
+      </ul>
+      
+      <h4>${__("Animación||Animation")}</h4>
+      <ul style="padding-left: 20px;">
+        <li>${__("Haz clic en un frame para seleccionarlo||Click a frame to select it")}</li>
+        <li>${__("Arrastra frames para reordenar||Drag frames to reorder")}</li>
+        <li>${__("Doble clic en tiempo del frame para ajustar||Double-click frame time to adjust")}</li>
+        <li>${__("Botón + para nuevo frame||+ button for new frame")}</li>
+        <li>${__("Botón copiar para duplicar frame||Copy button to duplicate frame")}</li>
+      </ul>
+      
+      <h4>${__("Referencias||References")}</h4>
+      <ul style="padding-left: 20px;">
+        <li><strong>${__("Traza||Trace")}:</strong> ${__("Una imagen fija con opacidad ajustable||Single static image with adjustable opacity")}</li>
+        <li><strong>${__("Flotante||Floating")}:</strong> ${__("Múltiples imágenes arrastrables con pinza para redimensionar||Multiple draggable images with pinch to resize")}</li>
+        <li>${__("Arrastra a la zona de eliminar para quitar||Drag to delete zone to remove")}</li>
+      </ul>
+      
+      <h4>${__("Colaboración||Collaboration")}</h4>
+      <ul style="padding-left: 20px;">
+        <li>${__("Crea una sala y comparte el ID||Create a room and share the ID")}</li>
+        <li>${__("Los cursores muestran dónde dibujan otros||Cursors show where others are drawing")}</li>
+        <li>${__("Chat integrado para comunicarse||Built-in chat to communicate")}</li>
+        <li>${__("El anfitrión puede expulsar miembros||Host can kick members")}</li>
+      </ul>
+      
+      <h4>${__("Formatos soportados||Supported Formats")}</h4>
+      <ul style="padding-left: 20px;">
+        <li><strong>${__("Abrir||Open")}:</strong> PXL, PSD, PNG, JPG, GIF, PAL</li>
+        <li><strong>${__("Guardar||Save")}:</strong> PXL, PSD, PNG</li>
+        <li><strong>${__("Paletas||Palettes")}:</strong> PAL (JASC)</li>
+      </ul>
+      
+      <p style="text-align: center; margin-top: 20px; color: var(--text-dim);">
+        ${__("Más información en||More info at")} <a href="https://github.com/RetoraDev/pixelite" target="_blank" onclick="openExternalUrl('https://github.com/RetoraDev/pixelite')">GitHub</a>
+      </p>
+    `;
+    
+    this.showPopup(
+      __("Manual"),
+      manualContent,
       [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
     );
   }
@@ -5445,7 +5641,7 @@ class PixelArtEditor {
     const currentFrame = this.project.frames[currentIndex];
     const newIndex = currentIndex + 1;
   
-    this.historyManager.startBatch("add_frame", __("Duplicar Frame||Duplicate Frame"));
+    this.historyManager.startBatch("duplicate_frame", __("Duplicar Frame||Duplicate Frame"));
   
     // Create new frame with same structure
     const newFrame = {
@@ -5481,7 +5677,7 @@ class PixelArtEditor {
   
     // Record operation
     const operation = {
-      type: 'add_frame',
+      type: 'duplicate_frame',
       description: __('Duplicar Frame||Duplicate Frame'),
       index: newIndex,
       frameTime: this.frameTimes[newIndex],
@@ -5500,7 +5696,7 @@ class PixelArtEditor {
     // Update UI
     this.updateFramesUI();
     this.render();
-  }
+  }  
   
   moveFrame(fromIndex, toIndex, silent) {
     if (fromIndex === toIndex) return;
@@ -5886,7 +6082,7 @@ class PixelArtEditor {
     const sourceLayer = frame.layers[sourceIndex];
     const newIndex = sourceIndex + 1;
   
-    this.historyManager.startBatch("add_layer", __("Duplicar capa||Duplicate Layer"));
+    this.historyManager.startBatch("duplicate_layer", __("Duplicar capa||Duplicate Layer"));
   
     // Create new layer with copy of content
     const newLayer = this.createBlankLayer(
@@ -5903,7 +6099,7 @@ class PixelArtEditor {
   
     // Record operation
     const operation = {
-      type: 'add_layer',
+      type: 'duplicate_layer',
       description: __('Duplicar capa||Duplicate Layer'),
       frameIndex: this.project.currentFrame,
       layerIndex: newIndex,
@@ -5928,26 +6124,50 @@ class PixelArtEditor {
     const frame = this.project.frames[this.project.currentFrame];
     if (layerIndex >= frame.layers.length - 1) return; // Already top layer
   
+    const sourceIndex = layerIndex;
     const targetIndex = layerIndex + 1;
     
-    this.historyManager.startBatch("remove_layer", __("Combinar capas||Merge Layers"));
+    this.historyManager.startBatch("merge_layers", __("Combinar capas||Merge Layers"));
   
-    // Draw current layer onto target layer
-    const sourceLayer = frame.layers[layerIndex];
+    // Store data before merge
+    const sourceLayer = frame.layers[sourceIndex];
     const targetLayer = frame.layers[targetIndex];
     
-    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    const sourceData = {
+      name: sourceLayer.name,
+      visible: sourceLayer.visible,
+      imageData: Array.from(sourceLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+    
+    const targetData = {
+      name: targetLayer.name,
+      visible: targetLayer.visible,
+      imageData: Array.from(targetLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
   
-    // Remove source layer
-    frame.layers.splice(layerIndex, 1);
+    // Perform merge
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    frame.layers.splice(sourceIndex, 1);
     this.project.currentLayer = targetIndex - 1;
   
+    // Record operation
+    const operation = {
+      type: 'merge_layers',
+      description: __('Combinar capas||Merge Layers'),
+      frameIndex: this.project.currentFrame,
+      sourceIndex: sourceIndex,
+      targetIndex: targetIndex,
+      sourceData: sourceData,
+      targetData: targetData
+    };
+  
+    this.historyManager.addChange(operation);
     this.historyManager.endBatch();
     
     this.showOperationMessage(__('Capas combinadas||Layers merged'));
     this.updateLayersUI();
     this.render();
-  }
+  }  
   
   mergeLayerDown(layerIndex = this.project.currentLayer) {
     if (!this.project) return;
@@ -5955,27 +6175,51 @@ class PixelArtEditor {
     const frame = this.project.frames[this.project.currentFrame];
     if (layerIndex <= 0) return; // Already bottom layer
   
+    const sourceIndex = layerIndex;
     const targetIndex = layerIndex - 1;
     
-    this.historyManager.startBatch("remove_layer", __("Combinar capas||Merge Layers"));
+    this.historyManager.startBatch("merge_layers", __("Combinar capas||Merge Layers"));
   
-    // Draw current layer onto target layer
-    const sourceLayer = frame.layers[layerIndex];
+    // Store data before merge
+    const sourceLayer = frame.layers[sourceIndex];
     const targetLayer = frame.layers[targetIndex];
     
-    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    const sourceData = {
+      name: sourceLayer.name,
+      visible: sourceLayer.visible,
+      imageData: Array.from(sourceLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+    
+    const targetData = {
+      name: targetLayer.name,
+      visible: targetLayer.visible,
+      imageData: Array.from(targetLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
   
-    // Remove source layer
-    frame.layers.splice(layerIndex, 1);
+    // Perform merge
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    frame.layers.splice(sourceIndex, 1);
     this.project.currentLayer = targetIndex;
   
+    // Record operation
+    const operation = {
+      type: 'merge_layers',
+      description: __('Combinar capas||Merge Layers'),
+      frameIndex: this.project.currentFrame,
+      sourceIndex: sourceIndex,
+      targetIndex: targetIndex,
+      sourceData: sourceData,
+      targetData: targetData
+    };
+  
+    this.historyManager.addChange(operation);
     this.historyManager.endBatch();
     
     this.showOperationMessage(__('Capas combinadas||Layers merged'));
     this.updateLayersUI();
     this.render();
   }
-    
+      
   createBlankLayer(width, height, name = `Layer ${this.project && this.project.frames.length ? this.project.frames[0].layers.length + 1 : 1}`) {
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -7267,7 +7511,7 @@ class PixelArtEditor {
         this.updateFramesUI();
         this.render();
         
-        this.showToast(this.__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+        this.showToast(__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
         resolve();
         
       } catch (error) {
@@ -7314,7 +7558,7 @@ class PixelArtEditor {
       this.updateFramesUI();
       this.render();
       
-      this.showToast(this.__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+      this.showToast(__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
       
     } catch (error) {
       console.error('Error importing PSD from buffer:', error);

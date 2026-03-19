@@ -101,6 +101,9 @@ class HistoryManager {
         case 'remove_frame':
           this.applyRemoveFrameOperation(operation, isUndo);
           break;
+        case 'duplicate_frame':
+          this.applyDuplicateFrameOperation(operation, isUndo);
+          break;
         case 'edit_frame':
           this.applyEditFrameOperation(operation, isUndo);
           break;
@@ -115,6 +118,12 @@ class HistoryManager {
           break;
         case 'remove_layer':
           this.applyRemoveLayerOperation(operation, isUndo);
+          break;
+        case 'duplicate_layer':
+          this.applyDuplicateLayerOperation(operation, isUndo);
+          break;
+        case 'merge_layers':
+          this.applyMergeLayersOperation(operation, isUndo);
           break;
         case 'change_layer_visibility':
           this.applyLayerVisibilityOperation(operation, isUndo);
@@ -256,6 +265,43 @@ class HistoryManager {
       this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
     }
   }
+  
+  applyDuplicateFrameOperation(operation, isUndo) {
+    if (isUndo) {
+      // Remove the duplicated frame
+      this.editor.project.frames.splice(operation.index, 1);
+      this.editor.frameTimes.splice(operation.index, 1);
+      this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
+    } else {
+      // Restore the duplicated frame
+      const newFrame = {
+        layers: operation.layers.map(layerData => {
+          const layer = this.editor.createBlankLayer(
+            this.editor.project.width, 
+            this.editor.project.height,
+            layerData.name
+          );
+          layer.visible = layerData.visible;
+          
+          if (layerData.imageData) {
+            const ctx = layer.ctx;
+            const imageData = new ImageData(
+              new Uint8ClampedArray(layerData.imageData),
+              this.editor.project.width,
+              this.editor.project.height
+            );
+            ctx.putImageData(imageData, 0, 0);
+          }
+          
+          return layer;
+        })
+      };
+      
+      this.editor.project.frames.splice(operation.index, 0, newFrame);
+      this.editor.frameTimes.splice(operation.index, 0, operation.frameTime);
+      this.editor.project.currentFrame = operation.index;
+    }
+  }
 
   applyEditFrameOperation(operation, isUndo) {
     const { frameIndex, property, oldValue, newValue } = operation;
@@ -353,6 +399,92 @@ class HistoryManager {
       // Remove the layer again
       frame.layers.splice(layerIndex, 1);
       this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+    }
+  }
+  
+  applyDuplicateLayerOperation(operation, isUndo) {
+    const { frameIndex, layerIndex, layerData } = operation;
+    const frame = this.editor.project.frames[frameIndex];
+    
+    if (isUndo) {
+      // Remove the duplicated layer
+      frame.layers.splice(layerIndex, 1);
+      this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+    } else {
+      // Restore the duplicated layer
+      const layer = this.editor.createBlankLayer(
+        this.editor.project.width, 
+        this.editor.project.height,
+        layerData.name
+      );
+      layer.visible = layerData.visible;
+      
+      if (layerData.imageData) {
+        const ctx = layer.ctx;
+        const imageData = new ImageData(
+          new Uint8ClampedArray(layerData.imageData),
+          this.editor.project.width,
+          this.editor.project.height
+        );
+        ctx.putImageData(imageData, 0, 0);
+      }
+      
+      frame.layers.splice(layerIndex, 0, layer);
+      this.editor.project.currentLayer = layerIndex;
+    }
+  }
+  
+  applyMergeLayersOperation(operation, isUndo) {
+    const { frameIndex, sourceIndex, targetIndex, sourceData, targetData } = operation;
+    const frame = this.editor.project.frames[frameIndex];
+    
+    if (isUndo) {
+      // Restore both layers to their original state
+      const sourceLayer = this.editor.createBlankLayer(
+        this.editor.project.width,
+        this.editor.project.height,
+        sourceData.name
+      );
+      sourceLayer.visible = sourceData.visible;
+      
+      const sourceImageData = new ImageData(
+        new Uint8ClampedArray(sourceData.imageData),
+        this.editor.project.width,
+        this.editor.project.height
+      );
+      sourceLayer.ctx.putImageData(sourceImageData, 0, 0);
+      
+      const targetLayer = frame.layers[targetIndex];
+      targetLayer.ctx.clearRect(0, 0, this.editor.project.width, this.editor.project.height);
+      
+      const targetImageData = new ImageData(
+        new Uint8ClampedArray(targetData.imageData),
+        this.editor.project.width,
+        this.editor.project.height
+      );
+      targetLayer.ctx.putImageData(targetImageData, 0, 0);
+      
+      // Reinsert source layer at original position
+      frame.layers.splice(sourceIndex, 0, sourceLayer);
+      
+      // Adjust current layer if needed
+      if (sourceIndex <= this.editor.project.currentLayer) {
+        this.editor.project.currentLayer++;
+      }
+      
+    } else {
+      // Perform merge again
+      const sourceLayer = frame.layers[sourceIndex];
+      const targetLayer = frame.layers[targetIndex];
+      
+      targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+      frame.layers.splice(sourceIndex, 1);
+      
+      if (sourceIndex < this.editor.project.currentLayer) {
+        this.editor.project.currentLayer--;
+      } else if (sourceIndex === this.editor.project.currentLayer) {
+        this.editor.project.currentLayer = targetIndex;
+      }
     }
   }
 

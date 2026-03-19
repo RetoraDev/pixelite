@@ -10,17 +10,19 @@ window.__ = function(text) {
   // Get current language from SettingsManager if available
   const language = window.settings?.getLanguage?.() || 0;
 
-  // Handle simple split case (text||text)
+  // First handle parenthetical cases (ES|EN) - these are the highest priority
+  // Matches patterns like (Hello|Hola) and replaces with the appropriate language
+  const parenRegex = /\(([^|)]+)\|([^)]+)\)/g;
+  text = text.replace(parenRegex, (match, enText, esText) => {
+    return language === 0 ? esText : enText;
+  });
+
+  // Then handle simple split case (text||text)
+  // These are lower priority and won't interfere with already processed parentheses
   const simpleSplitRegex = /([^|(]+\|\|[^|)]+)/g;
   text = text.replace(simpleSplitRegex, match => {
     const parts = match.split('||');
     return parts[language] || parts[0];
-  });
-
-  // Handle parenthetical cases (ES|EN)
-  const parenRegex = /\(([^)|]+)\|([^)]+)\)/g;
-  text = text.replace(parenRegex, (match, enText, esText) => {
-    return language === 0 ? esText : enText;
   });
 
   return text;
