@@ -67,7 +67,6 @@
   border-radius: 6px;
   cursor: pointer;
   min-width: 70px;
-  transition: transform 0.2s ease, opacity 0.2s ease;
   position: relative;
 }
 

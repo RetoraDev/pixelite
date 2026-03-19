@@ -470,6 +470,8 @@ class FileBrowser {
         file: file
       });
     }
+    
+    event.target.value = "";
 
     this.hide();
   }
