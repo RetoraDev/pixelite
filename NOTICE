@@ -15,5 +15,14 @@ Description: Eruda is a console for mobile browsers.
 
 -------------------------------------------------------------------------------
 
+Library: ag-psd.js
+Source: https://github.com/Agamnentzar/ag-psd
+Copyright: (c) 2016 Agamnentzar
+License: MIT (https://opensource.org/licenses/MIT)
+
+Description: Javascript library for reading and writing PSD files
+
+-------------------------------------------------------------------------------
+
 For all other parts of the software, the Pixelite License applies as stated
 in the LICENSE file.

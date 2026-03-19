@@ -100,7 +100,8 @@ class SpritesheetLoader {
             this.loadSelectedFrames();
           }
         }
-      ]
+      ],
+      true
     );
     
     // Store reference to popup buttons for enabling/disabling
@@ -597,15 +598,9 @@ class SpritesheetLoader {
   }
 
   showLoadOptionDialog() {
-    const content = document.createElement("div");
-    content.className = "load-option-dialog";
-    content.innerHTML = `
-      <p>${__("¿Cómo quieres cargar los frames?||How do you want to load the frames?")}</p>
-    `;
-    
     this.editor.showPopup(
       __("Cargar Frames||Load Frames"),
-      content,
+      __("¿Cómo quieres cargar los frames?||How do you want to load the frames?"),
       [
         {
           text: __("Cancelar||Cancel"),
@@ -620,7 +615,7 @@ class SpritesheetLoader {
           }
         },
         {
-          text: __("Añadir a proyecto actual||Add to current project"),
+          text: __("Añadir al proyecto||Add to project"),
           action: () => {
             this.editor.hidePopup();
             this.addFramesToProject();

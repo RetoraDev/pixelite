@@ -1,0 +1,176 @@
+/* Trace Reference Controls */
+.trace-reference-controls {
+  position: absolute;
+  bottom: 60px;
+  left: 10px;
+  background-color: var(--ui-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  z-index: 25;
+  box-shadow: 0 2px 10px var(--shadow-color);
+}
+
+.trace-reference-controls.visible {
+  display: flex;
+}
+
+.trace-opacity-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trace-opacity-label {
+  font-size: 12px;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.trace-opacity-slider {
+  width: 100px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-color);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.trace-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+}
+
+.trace-opacity-value {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 30px;
+  text-align: center;
+}
+
+/* Floating References */
+.floating-references-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 12;
+}
+
+.floating-reference {
+  position: absolute;
+  transform-origin: center center;
+  cursor: move;
+  touch-action: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.floating-reference img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.floating-reference.resizing {
+  cursor: se-resize;
+}
+
+.floating-reference.selected {
+  filter: drop-shadow(0 0 0 2px var(--primary-color)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+/* Resize handles */
+.floating-reference .resize-handle {
+  position: absolute;
+  transition: background 0.3s;
+  background: transparent;
+  z-index: 21;
+  opacity: 0;
+}
+
+.floating-reference .resize-handle.nw {
+  top: -5px;
+  left: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: nw-resize;
+}
+
+.floating-reference .resize-handle.n {
+  top: -5px;
+  left: 15px;
+  right: 15px;
+  height: 10px;
+  cursor: n-resize;
+  width: auto;
+}
+
+.floating-reference .resize-handle.ne {
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: ne-resize;
+}
+
+.floating-reference .resize-handle.e {
+  right: -5px;
+  top: 15px;
+  bottom: 15px;
+  width: 10px;
+  cursor: e-resize;
+  height: auto;
+}
+
+.floating-reference .resize-handle.se {
+  bottom: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+}
+
+.floating-reference .resize-handle.s {
+  bottom: -5px;
+  left: 15px;
+  right: 15px;
+  height: 10px;
+  cursor: s-resize;
+  width: auto;
+}
+
+.floating-reference .resize-handle.sw {
+  bottom: -5px;
+  left: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: sw-resize;
+}
+
+.floating-reference .resize-handle.w {
+  left: -5px;
+  top: 15px;
+  bottom: 15px;
+  width: 10px;
+  cursor: w-resize;
+  height: auto;
+}
+
+/* Visual indicator for handles on hover */
+.resize-handle:active {
+  background: var(--primary-color);
+}

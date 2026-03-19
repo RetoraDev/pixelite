@@ -8,7 +8,7 @@
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  z-index: 99999999999999999999999;
+  z-index: 2000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -22,6 +22,12 @@
   pointer-events: auto;
 }
 
+/* Fullscreen overlay - no background, covers entire screen */
+.popup-overlay.fullscreen {
+  background-color: transparent;
+  padding: 0;
+}
+
 .popup-content {
   background-color: var(--ui-color);
   border-radius: 4px;
@@ -31,15 +37,24 @@
   overflow: auto;
 }
 
+.popup-overlay.fullscreen .popup-content {
+  min-width: 100%;
+  min-height: 100%;
+  border-radius: 0;
+  margin: 0;
+}
+
 .popup-title {
   margin-bottom: 15px;
   font-size: 18px;
+  flex-shrink: 0;
 }
 
 .popup-buttons {
   display: flex;
   justify-content: flex-end;
   margin-top: 15px;
+  flex-shrink: 0;
 }
 
 .popup-content input {
@@ -68,5 +83,5 @@
 .popup-buttons .confirm {
   background-color: var(--primary-color);
   border: none;
-  color: white;
+  color: var(--text-color);
 }

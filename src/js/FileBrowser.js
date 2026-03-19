@@ -15,11 +15,14 @@ class FileBrowser {
     };
     
     this.mimeMap = {
-      pxl: "text/*, application/*",
+      pxl: "text/plain, application/json, application/octet-stream",
       png: "image/png",
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
-      txt: "text/plain, application/json",
+      gif: "image/gif",
+      webp: "image/webp",
+      psd: "applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
+      txt: "text/plain, application/octet-stream",
       default: "*"
     };
     

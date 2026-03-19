@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1
- * Built: 3/19/2026, 5:08:32 AM
+ * Built: 3/19/2026, 3:58:07 PM
  * Platform: Web
  * Debug: false
  * Minified: false
@@ -210,7 +210,7 @@ button:active {
   overflow: hidden;
   touch-action: none;
   pointer-events: none;
-  z-index: 1;
+  z-index: 1001;
 }
 
 .editor-overlay-layer > * {
@@ -784,6 +784,54 @@ button:active {
   color: var(--text-color);
 }
 
+/* Floating Delete Zone */
+.delete-zone {
+  position: fixed;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+  display: flex;
+  background-color: var(--shadow-color);
+  border: 2px dashed var(--border-color);
+  border-radius: 50%;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  cursor: default;
+  z-index: 1001;
+  box-shadow: 0 4px 20px var(--shadow-color);
+  transition: all 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.delete-zone.visible {
+  opacity: 1;
+  pointer-events: auto;
+  bottom: 80px;
+}
+
+.delete-zone.drag-over {
+  background-color: rgba(255, 0, 0, 0.3);
+  border-color: #ff4444;
+  transform: translateX(-50%) scale(1.1);
+  animation: pulse-delete-zone 0.5s ease-in-out infinite;
+}
+
+.delete-zone svg {
+  width: 24px;
+  height: 24px;
+  color: var(--text-color);
+  transition: all 0.3s ease;
+}
+
+.delete-zone.drag-over svg {
+  color: #ff4444;
+  transform: scale(1.2);
+}
+
 /*
   Icons
 */
@@ -875,6 +923,12 @@ button:active {
 }
 .icon-merge-down {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 10l5 5 5-5H7z"/><path d="M5 6h14v2H5z"/></svg>');
+}
+.icon.icon-trace {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>');
+}
+.icon.icon-floating {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 4h-4v4h4V7zm-6 0H7v4h4V7zm6 6h-4v4h4v-4zm-6 0H7v4h4v-4z"/></svg>');
 }
 
 /* Tool Icons */
@@ -1749,7 +1803,7 @@ input:checked + .grid-toggle-slider:before {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  z-index: 99999999999999999999999;
+  z-index: 2000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1763,6 +1817,12 @@ input:checked + .grid-toggle-slider:before {
   pointer-events: auto;
 }
 
+/* Fullscreen overlay - no background, covers entire screen */
+.popup-overlay.fullscreen {
+  background-color: transparent;
+  padding: 0;
+}
+
 .popup-content {
   background-color: var(--ui-color);
   border-radius: 4px;
@@ -1772,15 +1832,24 @@ input:checked + .grid-toggle-slider:before {
   overflow: auto;
 }
 
+.popup-overlay.fullscreen .popup-content {
+  min-width: 100%;
+  min-height: 100%;
+  border-radius: 0;
+  margin: 0;
+}
+
 .popup-title {
   margin-bottom: 15px;
   font-size: 18px;
+  flex-shrink: 0;
 }
 
 .popup-buttons {
   display: flex;
   justify-content: flex-end;
   margin-top: 15px;
+  flex-shrink: 0;
 }
 
 .popup-content input {
@@ -1809,7 +1878,7 @@ input:checked + .grid-toggle-slider:before {
 .popup-buttons .confirm {
   background-color: var(--primary-color);
   border: none;
-  color: white;
+  color: var(--text-color);
 }
 
 /* Spritesheet Loader Styles */
@@ -2326,6 +2395,183 @@ input:checked + .grid-toggle-slider:before {
   }
 }
 
+/* Trace Reference Controls */
+.trace-reference-controls {
+  position: absolute;
+  bottom: 60px;
+  left: 10px;
+  background-color: var(--ui-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  z-index: 25;
+  box-shadow: 0 2px 10px var(--shadow-color);
+}
+
+.trace-reference-controls.visible {
+  display: flex;
+}
+
+.trace-opacity-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trace-opacity-label {
+  font-size: 12px;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.trace-opacity-slider {
+  width: 100px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-color);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.trace-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  cursor: pointer;
+}
+
+.trace-opacity-value {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 30px;
+  text-align: center;
+}
+
+/* Floating References */
+.floating-references-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 12;
+}
+
+.floating-reference {
+  position: absolute;
+  transform-origin: center center;
+  cursor: move;
+  touch-action: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.floating-reference img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.floating-reference.resizing {
+  cursor: se-resize;
+}
+
+.floating-reference.selected {
+  filter: drop-shadow(0 0 0 2px var(--primary-color)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+/* Resize handles */
+.floating-reference .resize-handle {
+  position: absolute;
+  transition: background 0.3s;
+  background: transparent;
+  z-index: 21;
+  opacity: 0;
+}
+
+.floating-reference .resize-handle.nw {
+  top: -5px;
+  left: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: nw-resize;
+}
+
+.floating-reference .resize-handle.n {
+  top: -5px;
+  left: 15px;
+  right: 15px;
+  height: 10px;
+  cursor: n-resize;
+  width: auto;
+}
+
+.floating-reference .resize-handle.ne {
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: ne-resize;
+}
+
+.floating-reference .resize-handle.e {
+  right: -5px;
+  top: 15px;
+  bottom: 15px;
+  width: 10px;
+  cursor: e-resize;
+  height: auto;
+}
+
+.floating-reference .resize-handle.se {
+  bottom: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+}
+
+.floating-reference .resize-handle.s {
+  bottom: -5px;
+  left: 15px;
+  right: 15px;
+  height: 10px;
+  cursor: s-resize;
+  width: auto;
+}
+
+.floating-reference .resize-handle.sw {
+  bottom: -5px;
+  left: -5px;
+  width: 20px;
+  height: 20px;
+  cursor: sw-resize;
+}
+
+.floating-reference .resize-handle.w {
+  left: -5px;
+  top: 15px;
+  bottom: 15px;
+  width: 10px;
+  cursor: w-resize;
+  height: auto;
+}
+
+/* Visual indicator for handles on hover */
+.resize-handle:active {
+  background: var(--primary-color);
+}
+
 /*
   File Browser Styles 
 */
@@ -2761,54 +3007,6 @@ input:checked + .grid-toggle-slider:before {
   border-radius: 4px;
   color: white;
   cursor: pointer;
-}
-
-/* Palette Delete Zone */
-.palette-delete-zone {
-  position: fixed;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 60px;
-  display: flex;
-  background-color: var(--shadow-color);
-  border: 2px dashed var(--border-color);
-  border-radius: 50%;
-  justify-content: center;
-  align-items: center;
-  font-size: 24px;
-  cursor: default;
-  z-index: 1001;
-  box-shadow: 0 4px 20px var(--shadow-color);
-  transition: all 0.3s ease;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.palette-delete-zone.visible {
-  opacity: 1;
-  pointer-events: auto;
-  bottom: 80px;
-}
-
-.palette-delete-zone.drag-over {
-  background-color: rgba(255, 0, 0, 0.3);
-  border-color: #ff4444;
-  transform: translateX(-50%) scale(1.1);
-  animation: pulse-delete-zone 0.5s ease-in-out infinite;
-}
-
-.palette-delete-zone svg {
-  width: 24px;
-  height: 24px;
-  color: var(--text-color);
-  transition: all 0.3s ease;
-}
-
-.palette-delete-zone.drag-over svg {
-  color: #ff4444;
-  transform: scale(1.2);
 }
 
 @keyframes pulse-delete-zone {

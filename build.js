@@ -27,6 +27,7 @@ const jsFileOrder = [
   'js/SettingsManager.js',
   'js/SettingsUI.js',
   'js/GridManager.js',
+  'js/ReferenceManager.js',
   'js/SpritesheetLoader.js',
   'js/HistoryManager.js',
   'js/CollabManager.js',
@@ -44,6 +45,7 @@ const cssFileOrder = [
   "css/grids-panel.css",
   "css/popup.css",
   "css/spritesheet.css",
+  "css/references.css",
   "css/file-browser.css",
   "css/color-picker.css",
   "css/settings.css",
@@ -337,14 +339,24 @@ function copyLibFiles() {
   const libDest = path.join(config.distDir);
   ensureDir(libDest);
   
+  // Copy eruda.js for debugging
   if (config.flags.debug) {
-    // Copy eruda.js to lib folder
     const erudaSrc = path.join(config.libDir, 'eruda.js');
     const erudaDest = path.join(libDest, 'eruda.js');
     if (fs.existsSync(erudaSrc)) {
       fs.copyFileSync(erudaSrc, erudaDest);
       log('eruda.js copied', 'success');
     }
+  }
+  
+  // Copy ag-psd.js for PSD support (always, not just debug)
+  const agPsdSrc = path.join(config.libDir, 'ag-psd.js');
+  const agPsdDest = path.join(libDest, 'ag-psd.js');
+  if (fs.existsSync(agPsdSrc)) {
+    fs.copyFileSync(agPsdSrc, agPsdDest);
+    log('ag-psd.js copied', 'success');
+  } else {
+    log('ag-psd.js not found in lib directory', 'warning');
   }
 }
 

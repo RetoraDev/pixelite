@@ -33,9 +33,6 @@ class PixelArtEditor {
     this.touchCenterY = 0;
     this.minScale = 1;
     this.maxScale = 35;
-    this.menuPanelOpen = false;
-    this.layersPanelOpen = false;
-    this.animationPanelOpen = false;
     this.popupOpen = false;
     this.colorPickerOpen = false;
     this.toolDropdownOpen = false;
@@ -87,7 +84,6 @@ class PixelArtEditor {
       this.initSettings();
       this.initUI();
       this.initCollab();
-      this.initReferenceImageUI();
       this.initBrushUI();
       this.initCanvas();
       this.initTools();
@@ -99,6 +95,7 @@ class PixelArtEditor {
 
       this.gridManager = new GridManager(this);
       this.spritesheetLoader = new SpritesheetLoader(this);
+      this.referenceManager = new ReferenceManager(this);
 
       if (this.useCordova) {
         this.initCordova();
@@ -783,15 +780,15 @@ class PixelArtEditor {
     this.overlayLayer.appendChild(this.floatingColorsDeleteZone);
     
     setTimeout(() => {
-      this.floatingColorsDeleteZone.className = "palette-delete-zone";
-    
+      this.floatingColorsDeleteZone.className = "delete-zone";
+      
       this.floatingColorsDeleteZone.innerHTML = `
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
     });
-    
+      
     // Add event listeners
     this.floatingColorsDeleteZone.addEventListener("dragover", (e) => {
       e.preventDefault();
@@ -1052,58 +1049,6 @@ class PixelArtEditor {
 
     // Update colors
     this.updateColorIndicator();
-  }
-
-  initReferenceImageUI() {
-    // Reference image container
-    this.referenceControls = document.createElement("div");
-    this.referenceControls.className = "reference-controls";
-    this.referenceControls.style.display = "none";
-    this.uiLayer.appendChild(this.referenceControls);
-
-    // Opacity slider
-    const opacityContainer = document.createElement("div");
-    opacityContainer.className = "opacity-control";
-    this.referenceControls.appendChild(opacityContainer);
-
-    const opacityLabel = document.createElement("span");
-    opacityLabel.textContent = "Ref Opacity:";
-    opacityLabel.className = "opacity-label";
-    opacityContainer.appendChild(opacityLabel);
-
-    this.opacitySlider = document.createElement("input");
-    this.opacitySlider.type = "range";
-    this.opacitySlider.min = "0";
-    this.opacitySlider.max = "100";
-    this.opacitySlider.value = this.referenceOpacity * 100;
-    this.opacitySlider.className = "opacity-slider";
-    this.opacitySlider.addEventListener("input", e => {
-      this.referenceOpacity = parseInt(e.target.value) / 100;
-      this.render();
-    });
-    opacityContainer.appendChild(this.opacitySlider);
-
-    const opacityValue = document.createElement("span");
-    opacityValue.textContent = "50%";
-    opacityValue.className = "opacity-value";
-    opacityContainer.appendChild(opacityValue);
-
-    // Update opacity value display
-    this.opacitySlider.addEventListener("input", e => {
-      opacityValue.textContent = `${e.target.value}%`;
-    });
-  
-    // Top/bottom toggle button
-    this.toggleTopBottomReferenceButton = this.createButton("toggle-reference-layer", "icon-switch-tool", () => this.toggleReferenceTopBottom());
-    this.toggleTopBottomReferenceButton.title = "Toggle Top/Bottom";
-    this.referenceControls.appendChild(this.toggleTopBottomReferenceButton);
-
-    // Close button
-    this.closeReferenceButton = this.createButton("close-reference", "icon-close", () => this.removeReferenceImage());
-    this.closeReferenceButton.title = "Remove Reference";
-    this.referenceControls.appendChild(this.closeReferenceButton);
-
-    this.updateReferenceControlsPosition();
   }
 
   initBrushUI() {
@@ -1568,7 +1513,7 @@ class PixelArtEditor {
   
     // Create fixed delete zone
     this.deleteZone = document.createElement("div");
-    this.deleteZone.className = "palette-delete-zone";
+    this.deleteZone.className = "delete-zone palette-delete-zone";
     this.deleteZone.innerHTML = `
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -2764,7 +2709,6 @@ class PixelArtEditor {
 
   toggleMenu() {
     this.menuPanel.classList.toggle("visible");
-    this.menuPanelOpen = !this.menuPanelOpen;
   }
 
   togglePanel(panel) {
@@ -2774,16 +2718,15 @@ class PixelArtEditor {
       this.layersPanel.classList.remove("visible");
       this.layersButton.classList.remove("active");
       this.adjustTimelinePosition();
-      if (this.isPlaying) {
-        this.stopAnimation();
-      }
-      this.animationPanelOpen = !this.animationPanelOpen;
+      this.gridManager.hide();
+      this.menuPanel.classList.remove("visible");
     } else if (panel === "layers") {
       this.layersPanel.classList.toggle("visible");
       this.layersButton.classList.toggle("active");
       this.animationPanel.classList.remove("visible");
       this.animationButton.classList.remove("active");
-      this.layersPanelOpen = !this.layersPanelOpen;
+      this.menuPanel.classList.remove("visible");
+      this.gridManager.hide();
     }
   }
 
@@ -3180,7 +3123,6 @@ class PixelArtEditor {
   handleResize() {
     this.updateCanvasTransform();
     this.adjustTimelinePosition();
-    this.updateReferenceControlsPosition();
   }
 
   adjustTimelinePosition() {
@@ -3238,6 +3180,8 @@ class PixelArtEditor {
   }
   
   pan(clientX, clientY, zoomFactor = 1) {
+    if (!this.panStartCanvasPoint) return;
+    
     const newScale = this.panStartScale * zoomFactor;
         
     // Clamp scale
@@ -3787,13 +3731,11 @@ class PixelArtEditor {
       this.ctx.clearRect(0, 0, this.project.width, this.project.height);
     }
     
-    // Draw reference image if available
-    if (this.referenceImage && !this.renderReferenceImageOnTop) {
-      this.ctx.globalAlpha = this.referenceOpacity;
-      this.ctx.drawImage(this.referenceImage, 0, 0, this.project.width, this.project.height);
-      this.ctx.globalAlpha = 1.0;
+    // Draw trace reference (bottom layer)
+    if (this.referenceManager) {
+      this.referenceManager.renderBottom(this.ctx, this.project.width, this.project.height);
     }
-
+  
     // Draw layers
     for (let i = 0; i < frame.layers.length; i++) {
       const layer = frame.layers[i];
@@ -3801,14 +3743,12 @@ class PixelArtEditor {
         this.ctx.drawImage(layer.canvas, 0, 0);
       }
     }
-    
-    // Draw reference image if available
-    if (this.referenceImage && this.renderReferenceImageOnTop) {
-      this.ctx.globalAlpha = this.referenceOpacity;
-      this.ctx.drawImage(this.referenceImage, 0, 0, this.project.width, this.project.height);
-      this.ctx.globalAlpha = 1.0;
+      
+    // Draw trace reference (top layer)
+    if (this.referenceManager) {
+      this.referenceManager.renderTop(this.ctx, this.project.width, this.project.height);
     }
-
+    
     //  UI
     this.updateFramesUI();
     this.updateLayersUI();
@@ -3944,58 +3884,8 @@ class PixelArtEditor {
   }
 
   // Reference image methods
-  async loadReferenceImage() {
-    const fileBrowser = this.getFileBrowser({
-      title: __("Cargar referencia||Load reference image"),
-      mode: "open",
-      fileTypes: ["png", "jpg", "jpeg", "gif", "webp"],
-      onConfirm: async fileInfo => {
-        try {
-          const fileData = await this.readFile(fileInfo);
-          await this.setReferenceImage(fileData);
-          this.showToast(__("Referencia cargada||Reference image loaded"));
-        } catch (error) {
-          this.showToast(__(`(Error al cargar la referencia|Error loading reference): ${error.message}`), 5000);
-        }
-      }
-    });
-
-    fileBrowser.show();
-  }
-
-  async setReferenceImage(imageData) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        this.referenceImage = img;
-        this.referenceControls.style.display = "flex";
-        this.updateReferenceControlsPosition();
-        this.render();
-        resolve();
-      };
-      img.onerror = reject;
-      img.src = imageData;
-    });
-  }
-  
-  toggleReferenceTopBottom() {
-    this.renderReferenceImageOnTop = !this.renderReferenceImageOnTop;
-    this.render();
-  }
-
-  removeReferenceImage() {
-    this.referenceImage = null;
-    this.referenceControls.style.display = "none";
-    this.render();
-  }
-
-  updateReferenceControlsPosition() {
-    if (!this.referenceControls) return;
-
-    // Position reference controls in bottom left above the bottom bar
-    const bottomBarHeight = this.bottomBar.offsetHeight;
-    this.referenceControls.style.bottom = `${bottomBarHeight + 10}px`;
-    this.referenceControls.style.left = "10px";
+  loadReferenceImage() {
+    this.referenceManager.showReferenceTypeDialog();
   }
 
   // Drawing Operations
@@ -5005,9 +4895,9 @@ class PixelArtEditor {
     }, duration);
   }
 
-  showPopup(title, content, buttons = [{ text: "OK", action: () => this.hidePopup() }]) {
+  showPopup(title, content, buttons = [{ text: "OK", action: () => this.hidePopup() }], fullscreen = false) {
     this.popupContent.innerHTML = "";
-
+    
     const titleElement = document.createElement("div");
     titleElement.className = "popup-title";
     titleElement.textContent = title;
@@ -5037,6 +4927,12 @@ class PixelArtEditor {
     });
     
     this.popupOverlay.classList.add("visible");
+    
+    if (fullscreen) {
+      this.popupOverlay.classList.add("fullscreen");
+    } else {
+      this.popupOverlay.classList.remove("fullscreen");
+    }
 
     this.popupOpen = true;
   }
@@ -6461,7 +6357,7 @@ class PixelArtEditor {
       // Record operation
       const operation = {
         type: 'change_animation_fps',
-        description: 'Change Animation FPS',
+        description: __('Cambiar FPS||Change FPS'),
         oldFPS: oldFPS,
         newFPS: fps
       };
@@ -6475,14 +6371,6 @@ class PixelArtEditor {
         this.stopAnimation();
         this.startAnimation();
       }
-    }
-  }
-
-  togglePlayback() {
-    if (this.isPlaying) {
-      this.stopAnimation();
-    } else {
-      this.startAnimation();
     }
   }
 
@@ -6644,13 +6532,15 @@ class PixelArtEditor {
   openFile() {
     const fileBrowser = this.getFileBrowser({
       mode: "open",
-      fileTypes: ["pxl", "png", "jpg", "jpeg", "pal"],
+      fileTypes: ["pxl", "psd", "png", "jpg", "jpeg", "pal"],
       onConfirm: async fileInfo => {
         try {
           const fileData = await this.readFile(fileInfo);
 
           if (fileInfo.type === "pxl") {
             this.loadProject(fileData);
+          } else if (fileInfo.type === "psd") {
+            await this.importPSD(fileData, fileInfo.name);
           } else if (fileInfo.type === "pal") {
             this.parsePalFile(fileData);
             this.updatePaletteGrid();
@@ -6687,7 +6577,7 @@ class PixelArtEditor {
   saveAs() {
     const fileBrowser = this.getFileBrowser({
       mode: "saveAs",
-      fileTypes: ["pxl", "png"],
+      fileTypes: ["pxl", "psd", "png"],
       defaultType: "pxl",
       defaultName: this.project.name || "untitled",
       onConfirm: async fileInfo => {
@@ -6696,11 +6586,14 @@ class PixelArtEditor {
 
           if (fileInfo.type === "pxl") {
             await this.saveFile(fileInfo.name, "pxl", this.getProjectData());
+          } else if (fileInfo.type === "psd") {
+            const psdBlob = await this.exportAsPSD();
+            await this.saveFile(fileInfo.name, "psd", psdBlob);
           } else {
             const dataURL = this.canvas.toDataURL("image/png");
             await this.saveFile(fileInfo.name, "png", dataURL);
           }
-
+          
           this.showToast(__(`(Archivo guardado como|File saved as) ${fileInfo.name}`));
         } catch (error) {
           this.showToast(__(`(Error al guardar el archivo|Error saving file): ${error.message}`), 5000);
@@ -6922,6 +6815,50 @@ class PixelArtEditor {
     } catch (error) {
       console.error("Browser save failed:", error);
       this.showToast(__("Error al guardar||Failed to save file"), 3000);
+    }
+  }
+
+  async exportAsPSD() {
+    if (!this.project) return;
+  
+    try {
+      // Build PSD structure from current frame
+      const frame = this.project.frames[this.project.currentFrame];
+      
+      // Create PSD data structure
+      const psdData = {
+        width: this.project.width,
+        height: this.project.height,
+        children: []
+      };
+  
+      // Add all layers (PSD layers are ordered from bottom to top)
+      for (let i = 0; i < frame.layers.length; i++) {
+        const layer = frame.layers[i];
+        
+        // Create a new canvas with the exact content (including transparency)
+        const layerCanvas = document.createElement('canvas');
+        layerCanvas.width = this.project.width;
+        layerCanvas.height = this.project.height;
+        const ctx = layerCanvas.getContext('2d');
+        ctx.drawImage(layer.canvas, 0, 0);
+        
+        psdData.children.push({
+          name: layer.name,
+          canvas: layerCanvas,
+          visible: layer.visible,
+          opacity: 255, // Full opacity (PSD uses 0-255)
+          blendMode: 'normal'
+        });
+      }
+  
+      // Write PSD data to ArrayBuffer
+      const arrayBuffer = agPsd.writePsd(psdData);
+      return new Blob([arrayBuffer], { type: 'application/octet-stream' });
+      
+    } catch (error) {
+      console.error('Error exporting PSD:', error);
+      throw new Error('Failed to export PSD');
     }
   }
 
@@ -7227,6 +7164,162 @@ class PixelArtEditor {
       };
       img.src = imageData;
     });
+  }
+  
+  async importPSD(fileData, fileName) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Convert file data to ArrayBuffer if it's a string
+        let buffer;
+        if (typeof fileData === 'string') {
+          // Handle base64 or data URL
+          if (fileData.startsWith('data:')) {
+            // Convert data URL to ArrayBuffer
+            const base64 = fileData.split(',')[1];
+            const binary = atob(base64);
+            buffer = new ArrayBuffer(binary.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < binary.length; i++) {
+              view[i] = binary.charCodeAt(i);
+            }
+          } else {
+            // Assume it's binary data as string
+            buffer = new ArrayBuffer(fileData.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < fileData.length; i++) {
+              view[i] = fileData.charCodeAt(i);
+            }
+          }
+        } else if (fileData instanceof ArrayBuffer) {
+          buffer = fileData;
+        } else if (fileData instanceof Blob) {
+          // Handle blob by reading it
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.importPSDFromBuffer(e.target.result, fileName).then(resolve).catch(reject);
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(fileData);
+          return;
+        } else {
+          reject(new Error('Unsupported file format'));
+          return;
+        }
+  
+        // Parse the PSD
+        const psd = agPsd.readPsd(buffer);
+        
+        // Create new project with PSD dimensions
+        this.newProject(psd.width, psd.height);
+        
+        // Clear existing layers (newProject creates one default layer)
+        const frame = this.project.frames[0];
+        frame.layers = [];
+        
+        // Import PSD layers (they come in bottom-to-top order)
+        if (psd.children && psd.children.length > 0) {
+          for (let i = 0; i < psd.children.length; i++) {
+            const psdLayer = psd.children[i];
+            
+            // Create new layer
+            const layer = this.createBlankLayer(
+              psd.width, 
+              psd.height, 
+              psdLayer.name || `Layer ${i + 1}`
+            );
+            
+            // Set visibility
+            layer.visible = psdLayer.visible !== false;
+            
+            // If the layer has canvas data, draw it
+            if (psdLayer.canvas) {
+              layer.ctx.drawImage(psdLayer.canvas, 0, 0);
+            } else if (psdLayer.imageData) {
+              // Some PSD libraries provide imageData
+              const imageData = new ImageData(
+                new Uint8ClampedArray(psdLayer.imageData),
+                psd.width,
+                psd.height
+              );
+              layer.ctx.putImageData(imageData, 0, 0);
+            }
+            
+            frame.layers.push(layer);
+          }
+        } else {
+          // If no layers found, create a merged layer from the PSD
+          console.warn('PSD has no layer structure, creating merged layer');
+          const layer = this.createBlankLayer(psd.width, psd.height, 'Merged');
+          
+          // Try to get the merged image data
+          if (psd.canvas) {
+            layer.ctx.drawImage(psd.canvas, 0, 0);
+          }
+          
+          frame.layers.push(layer);
+        }
+        
+        // Set current layer to top layer
+        this.project.currentLayer = frame.layers.length - 1;
+        
+        // Update UI
+        this.updateLayersUI();
+        this.updateFramesUI();
+        this.render();
+        
+        this.showToast(this.__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+        resolve();
+        
+      } catch (error) {
+        console.error('Error importing PSD:', error);
+        reject(new Error('Failed to import PSD file'));
+      }
+    });
+  }
+  
+  async importPSDFromBuffer(buffer, fileName) {
+    try {
+      const psd = agPsd.readPsd(buffer);
+      
+      // Create new project with PSD dimensions
+      this.newProject(psd.width, psd.height);
+      
+      // Clear existing layers
+      const frame = this.project.frames[0];
+      frame.layers = [];
+      
+      // Import PSD layers
+      if (psd.children && psd.children.length > 0) {
+        for (let i = 0; i < psd.children.length; i++) {
+          const psdLayer = psd.children[i];
+          
+          const layer = this.createBlankLayer(
+            psd.width, 
+            psd.height, 
+            psdLayer.name || `Layer ${i + 1}`
+          );
+          
+          layer.visible = psdLayer.visible !== false;
+          
+          if (psdLayer.canvas) {
+            layer.ctx.drawImage(psdLayer.canvas, 0, 0);
+          }
+          
+          frame.layers.push(layer);
+        }
+      }
+      
+      this.project.currentLayer = frame.layers.length - 1;
+      this.updateLayersUI();
+      this.updateFramesUI();
+      this.render();
+      
+      this.showToast(this.__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+      
+    } catch (error) {
+      console.error('Error importing PSD from buffer:', error);
+      throw error;
+    }
   }
 
   getProjectData() {
