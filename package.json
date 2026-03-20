@@ -14,6 +14,8 @@
     "build:dev": "node build.js --none --debug",
     "build:release": "node build.js --all --minify --zipalign",
     "serve": "node index.js",
+    "serve:dist": "node index.js",
+    "serve:dev": "node index.js --src",
     "serve:src": "node index.js --src",
     "dev": "npm run build:dev && npm run serve:dist",
     "dev:fast": "npm run serve:src",

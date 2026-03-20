@@ -67,7 +67,7 @@ class SettingsUI {
     this.doneBtn.addEventListener('click', () => this.hide());
     this.footer.appendChild(this.doneBtn);
 
-    document.body.appendChild(this.overlay);
+    setTimeout(() => this.editor.editorElement.appendChild(this.overlay));
 
     // Build category list
     this.buildCategories();
@@ -343,21 +343,10 @@ class SettingsUI {
   }
 
   showRestartWarning() {
-    if (this.restartWarningShown) return;
-    
-    this.restartWarningShown = true;
-    
-    const warning = document.createElement('div');
-    warning.className = 'settings-restart-warning';
-    
-    const message = document.createElement('span');
-    message.textContent = __('Algunos cambios requieren reiniciar||Some changes require restart');
-    
-    const restartBtn = document.createElement('button');
-    restartBtn.className = 'settings-btn small';
-    restartBtn.textContent = __('Reiniciar||Restart');
-    restartBtn.addEventListener('click', () => {
-      if (this.editor) {
+    this.editor.showButtonToast(
+      __('Algunos cambios requieren reiniciar||Some changes require restart'),
+      __('Reiniciar||Restart'),
+      () => {
         this.editor.showPopup(
           __('Reiniciar aplicación||Restart app'),
           __('¿Reiniciar la app? Los cambios sin guardar se perderán||Restart the app? Unsaved changes will be lost'),
@@ -377,21 +366,8 @@ class SettingsUI {
             }
           ]
         );
-      } else {
-        window.location.reload();
       }
-    });
-    
-    warning.appendChild(message);
-    warning.appendChild(restartBtn);
-    this.container.appendChild(warning);
-    
-    setTimeout(() => {
-      if (warning.parentNode) {
-        warning.remove();
-        this.restartWarningShown = false;
-      }
-    }, 5000);
+    );
   }
 
   showResetConfirm() {

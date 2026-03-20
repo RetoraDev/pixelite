@@ -6,7 +6,6 @@
   right: 0;
   bottom: 0;
   background-color: var(--bg-color);
-  z-index: 10000;
   display: flex;
   animation: fadeIn 0.2s ease;
 }
@@ -32,7 +31,6 @@
   justify-content: space-between;
   padding: 0 10px;
   box-shadow: 0 2px 5px var(--shadow-color);
-  z-index: 30;
 }
 
 .settings-title {
@@ -326,7 +324,7 @@ input:checked + .slider:before {
   min-width: 100px;
 }
 
-/* Footer - Like app top bar */
+/* Footer */
 .settings-footer {
   height: 50px;
   background-color: var(--ui-color);
@@ -337,7 +335,6 @@ input:checked + .slider:before {
   gap: 10px;
   padding: 0 10px;
   box-shadow: 0 -2px 5px var(--shadow-color);
-  z-index: 30;
 }
 
 .settings-btn {
@@ -376,35 +373,6 @@ input:checked + .slider:before {
   height: 28px;
   padding: 0 12px;
   font-size: 12px;
-}
-
-/* Restart Warning - App style */
-.settings-restart-warning {
-  position: fixed;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--ui-color);
-  color: var(--text-color);
-  padding: 12px 20px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  box-shadow: 0 4px 12px var(--shadow-color);
-  animation: slideUp 0.3s ease;
-  z-index: 10001;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translate(-50%, 100%);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
 }
 
 /* Scrollbar styling */

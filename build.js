@@ -50,6 +50,7 @@ const cssFileOrder = [
   "css/color-picker.css",
   "css/settings.css",
   "css/collab.css",
+  "css/z-index.css",
   "css/keyframes.css"
 ];
 

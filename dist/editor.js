@@ -5,8 +5,8 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1
- * Built: 3/19/2026, 5:55:15 PM
- * Platform: Web
+ * Built: 3/20/2026, 11:37:23 AM
+ * Platform: Android (Cordova)
  * Debug: false
  * Minified: false
  */
@@ -326,7 +326,7 @@ class SettingsUI {
     this.doneBtn.addEventListener('click', () => this.hide());
     this.footer.appendChild(this.doneBtn);
 
-    document.body.appendChild(this.overlay);
+    setTimeout(() => this.editor.editorElement.appendChild(this.overlay));
 
     // Build category list
     this.buildCategories();
@@ -602,21 +602,10 @@ class SettingsUI {
   }
 
   showRestartWarning() {
-    if (this.restartWarningShown) return;
-    
-    this.restartWarningShown = true;
-    
-    const warning = document.createElement('div');
-    warning.className = 'settings-restart-warning';
-    
-    const message = document.createElement('span');
-    message.textContent = __('Algunos cambios requieren reiniciar||Some changes require restart');
-    
-    const restartBtn = document.createElement('button');
-    restartBtn.className = 'settings-btn small';
-    restartBtn.textContent = __('Reiniciar||Restart');
-    restartBtn.addEventListener('click', () => {
-      if (this.editor) {
+    this.editor.showButtonToast(
+      __('Algunos cambios requieren reiniciar||Some changes require restart'),
+      __('Reiniciar||Restart'),
+      () => {
         this.editor.showPopup(
           __('Reiniciar aplicación||Restart app'),
           __('¿Reiniciar la app? Los cambios sin guardar se perderán||Restart the app? Unsaved changes will be lost'),
@@ -636,21 +625,8 @@ class SettingsUI {
             }
           ]
         );
-      } else {
-        window.location.reload();
       }
-    });
-    
-    warning.appendChild(message);
-    warning.appendChild(restartBtn);
-    this.container.appendChild(warning);
-    
-    setTimeout(() => {
-      if (warning.parentNode) {
-        warning.remove();
-        this.restartWarningShown = false;
-      }
-    }, 5000);
+    );
   }
 
   showResetConfirm() {
@@ -718,12 +694,12 @@ class GridManager {
     if (!this.overlay) {
       this.overlay = document.createElement('div');
       this.overlay.className = 'grid-overlay';
-      this.editor.canvasContainer.appendChild(this.overlay);
+      this.editor.canvasWrapper.appendChild(this.overlay);
     }
   }
 
   initUI() {
-    // Grid panel (double height of animation panel)
+    // Grid panel
     this.panel = document.createElement('div');
     this.panel.className = 'grid-panel';
     
@@ -771,12 +747,11 @@ class GridManager {
   addGrid() {
     const newGrid = {
       id: 'grid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      name: __('Cuadrícula||Grid') + ' ' + (this.grids.length + 1),
-      size: 8,
+      width: 8,
+      height: 8,
       color: '#ff0000',
       opacity: 0.3,
-      enabled: true,
-      type: 'square'
+      enabled: true
     };
     
     this.grids.push(newGrid);
@@ -788,6 +763,46 @@ class GridManager {
     this.grids = this.grids.filter(g => g.id !== id);
     this.renderList();
     this.renderGrids();
+  }
+
+  duplicateGrid(id) {
+    const original = this.grids.find(g => g.id === id);
+    if (original) {
+      const newGrid = {
+        id: 'grid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        width: original.width,
+        height: original.height,
+        color: original.color,
+        opacity: original.opacity,
+        enabled: original.enabled
+      };
+      const index = this.grids.findIndex(g => g.id === id);
+      this.grids.splice(index + 1, 0, newGrid);
+      this.renderList();
+      this.renderGrids();
+    }
+  }
+
+  moveGridDown(id) {
+    const index = this.grids.findIndex(g => g.id === id);
+    if (index < this.grids.length - 1) {
+      const temp = this.grids[index];
+      this.grids[index] = this.grids[index + 1];
+      this.grids[index + 1] = temp;
+      this.renderList();
+      this.renderGrids();
+    }
+  }
+
+  moveGridUp(id) {
+    const index = this.grids.findIndex(g => g.id === id);
+    if (index > 0) {
+      const temp = this.grids[index];
+      this.grids[index] = this.grids[index - 1];
+      this.grids[index - 1] = temp;
+      this.renderList();
+      this.renderGrids();
+    }
   }
 
   updateGrid(id, updates) {
@@ -810,152 +825,166 @@ class GridManager {
       return;
     }
 
-    this.grids.forEach(grid => {
+    this.grids.forEach((grid, idx) => {
       const item = document.createElement('div');
       item.className = 'grid-item';
       item.dataset.id = grid.id;
+      if (idx === this.grids.length - 1) {
+        item.style.borderBottom = 'none';
+      }
 
-      // Preview
-      const preview = document.createElement('div');
-      preview.className = 'grid-preview';
-      preview.style.backgroundColor = grid.color + Math.floor(grid.opacity * 255).toString(16).padStart(2, '0');
-      
-      // Info
+      // Info container
       const info = document.createElement('div');
       info.className = 'grid-info';
       
-      const nameRow = document.createElement('div');
-      nameRow.className = 'grid-name-row';
+      // Title row with inline inputs
+      const titleRow = document.createElement('div');
+      titleRow.className = 'grid-title-row';
       
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.className = 'grid-name-input';
-      nameInput.value = grid.name;
-      nameInput.addEventListener('change', () => {
-        this.updateGrid(grid.id, { name: nameInput.value });
+      const widthInput = document.createElement('input');
+      widthInput.type = 'number';
+      widthInput.className = 'grid-dimension-input';
+      widthInput.value = grid.width;
+      widthInput.min = 1;
+      widthInput.max = 256;
+      widthInput.step = 1;
+      widthInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (isNaN(value)) value = grid.width;
+        value = Math.max(1, Math.min(256, value));
+        widthInput.value = value;
+        this.updateGrid(grid.id, { width: value });
       });
       
-      const enabledToggle = document.createElement('label');
-      enabledToggle.className = 'grid-toggle';
+      const xSpan = document.createElement('span');
+      xSpan.className = 'grid-dimension-sep';
+      xSpan.textContent = '×';
       
-      const enabledCheck = document.createElement('input');
-      enabledCheck.type = 'checkbox';
-      enabledCheck.checked = grid.enabled;
-      enabledCheck.addEventListener('change', () => {
-        this.updateGrid(grid.id, { enabled: enabledCheck.checked });
+      const heightInput = document.createElement('input');
+      heightInput.type = 'number';
+      heightInput.className = 'grid-dimension-input';
+      heightInput.value = grid.height;
+      heightInput.min = 1;
+      heightInput.max = 256;
+      heightInput.step = 1;
+      heightInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (isNaN(value)) value = grid.height;
+        value = Math.max(1, Math.min(256, value));
+        heightInput.value = value;
+        this.updateGrid(grid.id, { height: value });
       });
-      
-      const toggleSlider = document.createElement('span');
-      toggleSlider.className = 'grid-toggle-slider';
-      
-      enabledToggle.appendChild(enabledCheck);
-      enabledToggle.appendChild(toggleSlider);
-      
-      nameRow.appendChild(nameInput);
-      nameRow.appendChild(enabledToggle);
-      
-      // Controls
-      const controls = document.createElement('div');
-      controls.className = 'grid-controls';
-
-      // Size control with number input
-      const sizeControl = document.createElement('div');
-      sizeControl.className = 'grid-control';
-      
-      const sizeLabel = document.createElement('span');
-      sizeLabel.className = 'grid-control-label';
-      sizeLabel.textContent = __('Tamaño||Size') + ':';
-      
-      const sizeInput = document.createElement('input');
-      sizeInput.type = 'number';
-      sizeInput.className = 'grid-number-input';
-      sizeInput.min = 1;
-      sizeInput.max = 128;
-      sizeInput.step = 1;
-      sizeInput.value = grid.size;
-      sizeInput.addEventListener('change', () => {
-        let value = parseInt(sizeInput.value);
-        if (isNaN(value)) value = grid.size;
-        value = Math.max(1, Math.min(128, value));
-        sizeInput.value = value;
-        this.updateGrid(grid.id, { size: value });
-      });
-      
-      const sizeUnit = document.createElement('span');
-      sizeUnit.className = 'grid-unit';
-      sizeUnit.textContent = 'px';
-      
-      sizeControl.appendChild(sizeLabel);
-      sizeControl.appendChild(sizeInput);
-      sizeControl.appendChild(sizeUnit);
-
-      // Color control
-      const colorControl = document.createElement('div');
-      colorControl.className = 'grid-control';
-      
-      const colorLabel = document.createElement('span');
-      colorLabel.className = 'grid-control-label';
-      colorLabel.textContent = __('Color||Color') + ':';
       
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
-      colorInput.className = 'grid-color-input';
+      colorInput.className = 'grid-color-inline';
       colorInput.value = grid.color;
-      colorInput.addEventListener('change', () => {
-        this.updateGrid(grid.id, { color: colorInput.value });
+      colorInput.addEventListener('change', (e) => {
+        this.updateGrid(grid.id, { color: e.target.value });
       });
       
-      colorControl.appendChild(colorLabel);
-      colorControl.appendChild(colorInput);
-
-      // Opacity control with number input
+      titleRow.appendChild(widthInput);
+      titleRow.appendChild(xSpan);
+      titleRow.appendChild(heightInput);
+      titleRow.appendChild(colorInput);
+      
+      // Controls row
+      const controlsRow = document.createElement('div');
+      controlsRow.className = 'grid-controls-row';
+      
+      // Opacity control
       const opacityControl = document.createElement('div');
-      opacityControl.className = 'grid-control';
+      opacityControl.className = 'grid-opacity-control';
       
       const opacityLabel = document.createElement('span');
-      opacityLabel.className = 'grid-control-label';
+      opacityLabel.className = 'grid-opacity-label';
       opacityLabel.textContent = __('Opacidad||Opacity') + ':';
       
-      const opacityInput = document.createElement('input');
-      opacityInput.type = 'number';
-      opacityInput.className = 'grid-number-input';
-      opacityInput.min = 0;
-      opacityInput.max = 100;
-      opacityInput.step = 1;
-      opacityInput.value = Math.round(grid.opacity * 100);
-      opacityInput.addEventListener('change', () => {
-        let value = parseInt(opacityInput.value);
-        if (isNaN(value)) value = Math.round(grid.opacity * 100);
-        value = Math.max(0, Math.min(100, value));
-        opacityInput.value = value;
+      const opacitySlider = document.createElement('input');
+      opacitySlider.type = 'range';
+      opacitySlider.className = 'grid-opacity-slider';
+      opacitySlider.min = 0;
+      opacitySlider.max = 100;
+      opacitySlider.value = Math.round(grid.opacity * 100);
+      opacitySlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        opacityValue.textContent = value + '%';
         this.updateGrid(grid.id, { opacity: value / 100 });
       });
       
-      const opacityUnit = document.createElement('span');
-      opacityUnit.className = 'grid-unit';
-      opacityUnit.textContent = '%';
+      const opacityValue = document.createElement('span');
+      opacityValue.className = 'grid-opacity-value';
+      opacityValue.textContent = Math.round(grid.opacity * 100) + '%';
       
       opacityControl.appendChild(opacityLabel);
-      opacityControl.appendChild(opacityInput);
-      opacityControl.appendChild(opacityUnit);
-
+      opacityControl.appendChild(opacitySlider);
+      opacityControl.appendChild(opacityValue);
+      
+      controlsRow.appendChild(opacityControl);
+      
+      info.appendChild(titleRow);
+      info.appendChild(controlsRow);
+      
+      // Actions container
+      const actions = document.createElement('div');
+      actions.className = 'grid-actions';
+      
+      // Toggle visibility button
+      const visibilityBtn = document.createElement('button');
+      visibilityBtn.className = 'ui-button grid-action-btn';
+      visibilityBtn.innerHTML = grid.enabled ? 
+        '<div class="icon icon-visible"></div>' : 
+        '<div class="icon icon-hidden"></div>';
+      visibilityBtn.title = __('Visibilidad||Toggle Visibility');
+      visibilityBtn.addEventListener('click', () => {
+        this.updateGrid(grid.id, { enabled: !grid.enabled });
+      });
+      actions.appendChild(visibilityBtn);
+      
+      // Move up button
+      const moveUpBtn = document.createElement('button');
+      moveUpBtn.className = 'ui-button grid-action-btn';
+      moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
+      moveUpBtn.title = __('Subir||Move Up');
+      if (idx > 0) {
+        moveUpBtn.addEventListener('click', () => this.moveGridUp(grid.id));
+      } else {
+        moveUpBtn.disabled = true;
+        moveUpBtn.classList.add('disabled');
+      }
+      actions.appendChild(moveUpBtn);
+      
+      // Move down button
+      const moveDownBtn = document.createElement('button');
+      moveDownBtn.className = 'ui-button grid-action-btn';
+      moveDownBtn.innerHTML = '<div class="icon icon-down"></div>';
+      moveDownBtn.title = __('Bajar||Move Down');
+      if (idx < this.grids.length - 1) {
+        moveDownBtn.addEventListener('click', () => this.moveGridDown(grid.id));
+      } else {
+        moveDownBtn.disabled = true;
+        moveDownBtn.classList.add('disabled');
+      }
+      actions.appendChild(moveDownBtn);
+      
+      // Duplicate button
+      const duplicateBtn = document.createElement('button');
+      duplicateBtn.className = 'ui-button grid-action-btn';
+      duplicateBtn.innerHTML = '<div class="icon icon-copy"></div>';
+      duplicateBtn.title = __('Duplicar||Duplicate');
+      duplicateBtn.addEventListener('click', () => this.duplicateGrid(grid.id));
+      actions.appendChild(duplicateBtn);
+      
       // Remove button
       const removeBtn = document.createElement('button');
-      removeBtn.className = 'grid-remove-btn';
-      removeBtn.innerHTML = '&times;';
+      removeBtn.className = 'ui-button grid-action-btn';
+      removeBtn.innerHTML = '<div class="icon icon-close"></div>';
       removeBtn.title = __('Eliminar||Remove');
       removeBtn.addEventListener('click', () => this.removeGrid(grid.id));
-
-      controls.appendChild(sizeControl);
-      controls.appendChild(colorControl);
-      controls.appendChild(opacityControl);
+      actions.appendChild(removeBtn);
       
-      info.appendChild(nameRow);
-      info.appendChild(controls);
-      
-      item.appendChild(preview);
       item.appendChild(info);
-      item.appendChild(removeBtn);
+      item.appendChild(actions);
       
       this.listContainer.appendChild(item);
     });
@@ -966,21 +995,14 @@ class GridManager {
     this.overlay.innerHTML = '';
 
     // Get canvas transform
-    const rect = this.editor.canvasContainer.getBoundingClientRect();
-    const left = rect.width / 2 + this.editor.posX - (this.editor.project.width / 2) * this.editor.scale;
-    const top = rect.height / 2 + this.editor.posY - (this.editor.project.height / 2) * this.editor.scale;
-    const width = this.editor.project.width * this.editor.scale;
-    const height = this.editor.project.height * this.editor.scale;
+    const width = this.editor.project.width;
+    const height = this.editor.project.height;
 
-    // Set overlay position and size
+    // Set overlay size
     Object.assign(this.overlay.style, {
       position: 'absolute',
-      left: left + 'px',
-      top: top + 'px',
       width: width + 'px',
-      height: height + 'px',
-      pointerEvents: 'none',
-      zIndex: '5'
+      height: height + 'px'
     });
 
     // Render each enabled grid
@@ -1000,19 +1022,25 @@ class GridManager {
         ${grid.color} 1px, 
         transparent 1px
       )`;
+      
+      // We don't want to show grids at the same pixel size of canvas so reduce scale to have a thinner line
+      const scale = width / 4;
 
       // Calculate scaled grid size
-      const scaledSize = Math.max(1, grid.size * this.editor.scale);
+      const scaledWidth = Math.max(1, grid.width * scale);
+      const scaledHeight = Math.max(1, grid.height * scale);
 
       Object.assign(gridLayer.style, {
         position: 'absolute',
         top: '0',
         left: '0',
-        width: '100%',
-        height: '100%',
+        width: 100 * scale + '%',
+        height: 100 * scale + '%',
         backgroundImage: `${verticalGradient}, ${horizontalGradient}`,
-        backgroundSize: `${scaledSize}px ${scaledSize}px`,
-        backgroundPosition: '0 0',
+        backgroundSize: `${scaledWidth}px ${scaledHeight}px`,
+        transform: `scale(${1 / scale})`,
+        transformOrigin: '0 0',
+        backgroundPosition: `-1px -1px`,
         backgroundRepeat: 'repeat',
         opacity: grid.opacity,
         pointerEvents: 'none',
@@ -5145,12 +5173,11 @@ class FileBrowser {
   initUI() {
     // Overlay
     this.overlay = document.createElement("div");
-    this.overlay.className = "file-browser-overlay";
-    this.overlay.style.display = "none";
+    this.overlay.className = "popup-overlay";
 
     // Dialog
     this.dialog = document.createElement("div");
-    this.dialog.className = "file-browser-dialog";
+    this.dialog.className = "popup-content";
     this.overlay.appendChild(this.dialog);
 
     // Title
@@ -5207,6 +5234,9 @@ class FileBrowser {
   }
 
   initCordovaUI() {
+    // Set full screen
+    // this.overlay.classList.add("fullscreen");
+    
     // Clear existing content but preserve elements if they exist
     this.pathDisplay = this.pathDisplay || document.createElement("div");
     this.fileList = this.fileList || document.createElement("div");
@@ -5587,7 +5617,7 @@ class FileBrowser {
       this.initContentArea();
     }
 
-    this.overlay.style.display = "flex";
+    this.overlay.classList.add("visible");
     this.selectedFile = null;
     this.visible = true;
 
@@ -5607,7 +5637,7 @@ class FileBrowser {
   }
 
   hide() {
-    this.overlay.style.display = "none";
+    this.overlay.classList.remove("visible");
     this.visible = false;
   }
 
@@ -5733,7 +5763,6 @@ class PixelArtEditor {
     this.brushSize = localStorage.getItem("brushSize") ? parseInt(localStorage.getItem("brushSize")) : 1;
     this.maxBrushSize = 8;
     this.minBrushSize = 1;
-    this.lastBrushDistance = this.brushSize;
     this.defaultWidth = 32;
     this.defaultHeight = 32;
     this.startX = 0;
@@ -5774,11 +5803,7 @@ class PixelArtEditor {
     this.isFilePluginAvailable = false;
     this.fileBrowser = null;
     this.defaultFileBrowserPathUrl = null;
-    this.referenceImage = null;
-    this.referenceOpacity = 0.5;
-    this.renderReferenceImageOnTop = false;
     this.timelapseFPS = 30;
-    this.referenceGrids = [];
     this.floatingColors = new Map();
     this.registerLayerVisibilityChanges = false;
     this.isCanvasResizing = false;
@@ -6646,7 +6671,7 @@ class PixelArtEditor {
 
     // Animation panel
     this.animationPanel = document.createElement("div");
-    this.animationPanel.className = "animation-timeline";
+    this.animationPanel.className = "animation-panel";
     this.uiLayer.appendChild(this.animationPanel);
 
     // Timeline header with controls
@@ -6748,16 +6773,16 @@ class PixelArtEditor {
     // Notification system
     this.notificationElement = document.createElement("div");
     this.notificationElement.className = "notification";
-    document.body.appendChild(this.notificationElement);
+    this.uiLayer.appendChild(this.notificationElement);
     
     this.operationMessageElement = document.createElement("div");
     this.operationMessageElement.className = "operation-message";
-    document.body.appendChild(this.operationMessageElement);
+    this.uiLayer.appendChild(this.operationMessageElement);
 
     // Popup system
     this.popupOverlay = document.createElement("div");
     this.popupOverlay.className = "popup-overlay";
-    document.body.appendChild(this.popupOverlay);
+    this.uiLayer.appendChild(this.popupOverlay);
 
     this.popupContent = document.createElement("div");
     this.popupContent.className = "popup-content";
@@ -6800,15 +6825,6 @@ class PixelArtEditor {
     this.canvasContainer.insertBefore(this.canvasWrapper, this.canvas);
     this.canvasWrapper.appendChild(this.canvas);
 
-    // Create overlay container for grids
-    this.gridOverlay = document.createElement("div");
-    this.gridOverlay.classList.add("grid-overlay");
-    this.gridOverlay.style.position = "absolute";
-    this.gridOverlay.style.top = "0";
-    this.gridOverlay.style.left = "0";
-    this.gridOverlay.style.pointerEvents = "none";
-    this.canvasContainer.appendChild(this.gridOverlay);
-    
     // Create canvas resize controls
     this.canvasResizeControls = document.createElement("div");
     this.canvasResizeControls.className = "canvas-resize-controls";
@@ -7079,7 +7095,7 @@ class PixelArtEditor {
     this.colorPickerOverlay = document.createElement("div");
     this.colorPickerOverlay.className = "color-picker-overlay";
     this.colorPickerOverlay.style.display = "none";
-    document.body.appendChild(this.colorPickerOverlay);
+    this.uiLayer.appendChild(this.colorPickerOverlay);
     
     this.colorPicker = document.createElement("div");
     this.colorPicker.className = "color-picker";
@@ -7263,7 +7279,7 @@ class PixelArtEditor {
     this.colorPickLine = document.createElement("div");
     this.colorPickLine.className = "color-pick-line";
     this.colorPickLine.style.display = "none";
-    document.body.appendChild(this.colorPickLine);
+    this.uiLayer.appendChild(this.colorPickLine);
   
     // Mouse events
     this.colorIndicator.addEventListener("mousedown", (e) => this.handleColorPickStart(e));
@@ -9089,26 +9105,6 @@ class PixelArtEditor {
       translate(${- center.x * this.scale}px, ${- center.y * this.scale}px)
       scale(${this.scale})
     `;
-    
-    const containerRect = this.canvasContainer.getBoundingClientRect();
-
-    // Calculate left and top in pixels relative to container's top-left (0,0)
-    const left = (containerRect.width / 2) + this.posX - (center.x * this.scale);
-    const top = (containerRect.height / 2) + this.posY - (center.y * this.scale);
-  
-    Object.assign(this.gridOverlay.style, {
-      position: "absolute",
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${this.project.width * this.scale}px`,
-      height: `${this.project.height * this.scale}px`,
-      pointerEvents: "none",
-    });
-    
-    // Update grid overlay too
-    if (this.gridManager) {
-      this.gridManager.updateTransform();
-    }
   }
   
   // Project management
@@ -9500,7 +9496,7 @@ class PixelArtEditor {
       
       this.bottomConfirmation.appendChild(this.confirmAccept);
       this.bottomConfirmation.appendChild(this.confirmCancel);
-      document.body.appendChild(this.bottomConfirmation);
+      this.uiLayer.appendChild(this.bottomConfirmation);
     }
     
     this.confirmAccept.textContent = acceptText;
@@ -10506,7 +10502,7 @@ class PixelArtEditor {
     }
 
     // Check for reference image
-    if (includeReferenceImage && this.referenceImage) {
+    if (includeReferenceImage && this.referenceManager.traceImage) {
       if (pickFromCtx(this.ctx)) return;
     }
   }
@@ -12206,23 +12202,18 @@ class PixelArtEditor {
     }
   }  
   
-  showUndoToast(message, button, undoCallback) {
+  showButtonToast(message, button, undoCallback) {
     const toast = document.createElement("div");
-    toast.className = "undo-toast";
-    toast.innerHTML = `
-    <span>${message || ''}</span>
-    <button class="undo-button">${button || __("Deshacer||Undo")}</button>
-  `;
+    toast.className = "toast-with-button";
+      toast.innerHTML = `
+      <span>${message || ''}</span>
+      <button class="toast-button">${button || __("Deshacer||Undo")}</button>
+    `;
 
-    document.body.appendChild(toast);
-
-    // Position toast
-    toast.style.bottom = "80px";
-    toast.style.left = "50%";
-    toast.style.transform = "translateX(-50%)";
+    this.editorElement.appendChild(toast);
 
     // Add event listener
-    toast.querySelector(".undo-button").addEventListener("click", () => {
+    toast.querySelector(".toast-button").addEventListener("click", () => {
       undoCallback();
       toast.remove();
     });

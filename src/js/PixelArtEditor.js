@@ -14,7 +14,6 @@ class PixelArtEditor {
     this.brushSize = localStorage.getItem("brushSize") ? parseInt(localStorage.getItem("brushSize")) : 1;
     this.maxBrushSize = 8;
     this.minBrushSize = 1;
-    this.lastBrushDistance = this.brushSize;
     this.defaultWidth = 32;
     this.defaultHeight = 32;
     this.startX = 0;
@@ -55,11 +54,7 @@ class PixelArtEditor {
     this.isFilePluginAvailable = false;
     this.fileBrowser = null;
     this.defaultFileBrowserPathUrl = null;
-    this.referenceImage = null;
-    this.referenceOpacity = 0.5;
-    this.renderReferenceImageOnTop = false;
     this.timelapseFPS = 30;
-    this.referenceGrids = [];
     this.floatingColors = new Map();
     this.registerLayerVisibilityChanges = false;
     this.isCanvasResizing = false;
@@ -881,7 +876,7 @@ class PixelArtEditor {
     this.toolSwitcher = this.createButton("switch-tool", "icon-switch-tool", () => this.switchLastTool());
     this.toolSwitcher.title = __("Rotar herramientas (Espacio)||Switch tools (Space)");
     this.toolSelectionContainer.appendChild(this.toolSwitcher);
-
+    
     // Animation panel toggle
     this.animationButton = this.createButton("animation", "icon-animation", () => this.togglePanel("animation"));
     this.animationButton.title = __("(Animación|Animation) (Ctrl + A)");
@@ -891,6 +886,11 @@ class PixelArtEditor {
     this.layersButton = this.createButton("layers", "icon-layers", () => this.togglePanel("layers"));
     this.layersButton.title = __("(Capas|Layers) (Ctrl + L)");
     this.bottomBar.appendChild(this.layersButton);
+
+    // Grids panel toggle
+    this.gridsButton = this.createButton("grids", "icon-grids", () => this.gridManager.toggle());
+    this.gridsButton.title = __("(Cuadrículas|Grids)");
+    this.bottomBar.appendChild(this.gridsButton);
 
     // Undo/Redo buttons
     this.undoRedoButtons = document.createElement("div");
@@ -927,7 +927,7 @@ class PixelArtEditor {
 
     // Animation panel
     this.animationPanel = document.createElement("div");
-    this.animationPanel.className = "animation-timeline";
+    this.animationPanel.className = "animation-panel";
     this.uiLayer.appendChild(this.animationPanel);
 
     // Timeline header with controls
@@ -1029,16 +1029,16 @@ class PixelArtEditor {
     // Notification system
     this.notificationElement = document.createElement("div");
     this.notificationElement.className = "notification";
-    document.body.appendChild(this.notificationElement);
+    this.uiLayer.appendChild(this.notificationElement);
     
     this.operationMessageElement = document.createElement("div");
     this.operationMessageElement.className = "operation-message";
-    document.body.appendChild(this.operationMessageElement);
+    this.uiLayer.appendChild(this.operationMessageElement);
 
     // Popup system
     this.popupOverlay = document.createElement("div");
     this.popupOverlay.className = "popup-overlay";
-    document.body.appendChild(this.popupOverlay);
+    this.uiLayer.appendChild(this.popupOverlay);
 
     this.popupContent = document.createElement("div");
     this.popupContent.className = "popup-content";
@@ -1081,15 +1081,6 @@ class PixelArtEditor {
     this.canvasContainer.insertBefore(this.canvasWrapper, this.canvas);
     this.canvasWrapper.appendChild(this.canvas);
 
-    // Create overlay container for grids
-    this.gridOverlay = document.createElement("div");
-    this.gridOverlay.classList.add("grid-overlay");
-    this.gridOverlay.style.position = "absolute";
-    this.gridOverlay.style.top = "0";
-    this.gridOverlay.style.left = "0";
-    this.gridOverlay.style.pointerEvents = "none";
-    this.canvasContainer.appendChild(this.gridOverlay);
-    
     // Create canvas resize controls
     this.canvasResizeControls = document.createElement("div");
     this.canvasResizeControls.className = "canvas-resize-controls";
@@ -1360,7 +1351,7 @@ class PixelArtEditor {
     this.colorPickerOverlay = document.createElement("div");
     this.colorPickerOverlay.className = "color-picker-overlay";
     this.colorPickerOverlay.style.display = "none";
-    document.body.appendChild(this.colorPickerOverlay);
+    this.uiLayer.appendChild(this.colorPickerOverlay);
     
     this.colorPicker = document.createElement("div");
     this.colorPicker.className = "color-picker";
@@ -1544,7 +1535,7 @@ class PixelArtEditor {
     this.colorPickLine = document.createElement("div");
     this.colorPickLine.className = "color-pick-line";
     this.colorPickLine.style.display = "none";
-    document.body.appendChild(this.colorPickLine);
+    this.uiLayer.appendChild(this.colorPickLine);
   
     // Mouse events
     this.colorIndicator.addEventListener("mousedown", (e) => this.handleColorPickStart(e));
@@ -3371,25 +3362,13 @@ class PixelArtEditor {
       scale(${this.scale})
     `;
     
-    const containerRect = this.canvasContainer.getBoundingClientRect();
-
-    // Calculate left and top in pixels relative to container's top-left (0,0)
-    const left = (containerRect.width / 2) + this.posX - (center.x * this.scale);
-    const top = (containerRect.height / 2) + this.posY - (center.y * this.scale);
-  
-    Object.assign(this.gridOverlay.style, {
-      position: "absolute",
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${this.project.width * this.scale}px`,
-      height: `${this.project.height * this.scale}px`,
-      pointerEvents: "none",
-    });
+    // Reverse the scale on background size so it appears constant
+    // Base size is 16px, but we need to divide by scale to counteract the transform
+    const baseSize = 32;
+    const bgSize = Math.min(4, baseSize / this.scale);
     
-    // Update grid overlay too
-    if (this.gridManager) {
-      this.gridManager.updateTransform();
-    }
+    // Update canvas background style
+    this.canvas.style.backgroundSize = `${bgSize}px ${bgSize}px`;
   }
   
   // Project management
@@ -3781,7 +3760,7 @@ class PixelArtEditor {
       
       this.bottomConfirmation.appendChild(this.confirmAccept);
       this.bottomConfirmation.appendChild(this.confirmCancel);
-      document.body.appendChild(this.bottomConfirmation);
+      this.uiLayer.appendChild(this.bottomConfirmation);
     }
     
     this.confirmAccept.textContent = acceptText;
@@ -4787,7 +4766,7 @@ class PixelArtEditor {
     }
 
     // Check for reference image
-    if (includeReferenceImage && this.referenceImage) {
+    if (includeReferenceImage && this.referenceManager.traceImage) {
       if (pickFromCtx(this.ctx)) return;
     }
   }
@@ -6487,23 +6466,18 @@ class PixelArtEditor {
     }
   }  
   
-  showUndoToast(message, button, undoCallback) {
+  showButtonToast(message, button, undoCallback) {
     const toast = document.createElement("div");
-    toast.className = "undo-toast";
-    toast.innerHTML = `
-    <span>${message || ''}</span>
-    <button class="undo-button">${button || __("Deshacer||Undo")}</button>
-  `;
+    toast.className = "toast-with-button";
+      toast.innerHTML = `
+      <span>${message || ''}</span>
+      <button class="toast-button">${button || __("Deshacer||Undo")}</button>
+    `;
 
-    document.body.appendChild(toast);
-
-    // Position toast
-    toast.style.bottom = "80px";
-    toast.style.left = "50%";
-    toast.style.transform = "translateX(-50%)";
+    this.editorElement.appendChild(toast);
 
     // Add event listener
-    toast.querySelector(".undo-button").addEventListener("click", () => {
+    toast.querySelector(".toast-button").addEventListener("click", () => {
       undoCallback();
       toast.remove();
     });

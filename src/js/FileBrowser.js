@@ -47,12 +47,11 @@ class FileBrowser {
   initUI() {
     // Overlay
     this.overlay = document.createElement("div");
-    this.overlay.className = "file-browser-overlay";
-    this.overlay.style.display = "none";
+    this.overlay.className = "popup-overlay";
 
     // Dialog
     this.dialog = document.createElement("div");
-    this.dialog.className = "file-browser-dialog";
+    this.dialog.className = "popup-content";
     this.overlay.appendChild(this.dialog);
 
     // Title
@@ -109,6 +108,9 @@ class FileBrowser {
   }
 
   initCordovaUI() {
+    // Set full screen
+    // this.overlay.classList.add("fullscreen");
+    
     // Clear existing content but preserve elements if they exist
     this.pathDisplay = this.pathDisplay || document.createElement("div");
     this.fileList = this.fileList || document.createElement("div");
@@ -489,7 +491,7 @@ class FileBrowser {
       this.initContentArea();
     }
 
-    this.overlay.style.display = "flex";
+    this.overlay.classList.add("visible");
     this.selectedFile = null;
     this.visible = true;
 
@@ -509,7 +511,7 @@ class FileBrowser {
   }
 
   hide() {
-    this.overlay.style.display = "none";
+    this.overlay.classList.remove("visible");
     this.visible = false;
   }
 

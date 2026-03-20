@@ -1,7 +1,7 @@
 /*
   Animation panel 
 */
-.animation-timeline {
+.animation-panel {
   position: absolute;
   bottom: 50px;
   left: 0;
@@ -13,11 +13,11 @@
   border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  z-index: 15;
 }
 
-.animation-timeline.visible {
+.animation-panel.visible {
   transform: translateY(0);
+  box-shadow: 0 -4px 10px var(--shadow-color);
 }
 
 .timeline-header {

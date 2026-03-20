@@ -1,37 +1,10 @@
 /*
   File Browser Styles 
 */
-.file-browser-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.file-browser-dialog {
-  background-color: #3d3d3d;
-  border-radius: 8px;
-  padding: 20px;
-  width: 100%;
-  max-width: 500px;
-  max-height: calc(100vh - 40px); /* Account for padding */
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  overflow: hidden; /* Prevent content from overflowing rounded corners */
-}
-
 .file-browser-title {
   font-size: 18px;
   margin-bottom: 15px;
-  color: #ffffff;
+  color: var(--text-color);
   font-weight: bold;
   flex-shrink: 0;
 }
@@ -45,8 +18,8 @@
 }
 
 .file-browser-list {
-  border: 1px solid #1d1d1d;
-  background-color: #2d2d2d;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
   border-radius: 4px;
   overflow-y: auto;
   flex: 1;
@@ -57,8 +30,8 @@
 .file-item {
   padding: 10px;
   cursor: pointer;
-  color: #e0e0e0;
-  border-bottom: 1px solid #1d1d1d;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s;
   word-break: break-all;
 }
@@ -68,11 +41,11 @@
 }
 
 .file-item:hover {
-  background-color: #4d4d4d;
+  background-color: var(--ui-highlight);
 }
 
 .file-item.directory {
-  color: #4fc3f7;
+  color: var(--secondary-color);
 }
 
 .file-item .icon {
@@ -86,12 +59,12 @@
 }
 
 .cordova-path {
-  color: #a0a0a0;
+  color: var(--text-dim);
   font-size: 12px;
   margin-bottom: 10px;
   word-break: break-all;
   padding: 5px;
-  background-color: #2d2d2d;
+  background-color: var(--bg-color);
   border-radius: 3px;
   flex-shrink: 0;
 }
@@ -101,9 +74,9 @@
   padding: 10px;
   margin-top: 10px;
   margin-bottom: 10px;
-  background-color: #2d2d2d;
-  border: 1px solid #1d1d1d;
-  color: #e0e0e0;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
   border-radius: 4px;
   font-size: 14px;
   flex-shrink: 0;
@@ -113,9 +86,9 @@
   width: 100%;
   padding: 10px;
   margin-bottom: 15px;
-  background-color: #2d2d2d;
-  border: 1px solid #1d1d1d;
-  color: #e0e0e0;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
   border-radius: 4px;
   font-size: 14px;
   flex-shrink: 0;
@@ -132,9 +105,9 @@
 
 .file-browser-cancel {
   padding: 8px 15px;
-  background-color: #424242;
+  background-color: var(--ui-highlight);
   border: none;
-  color: #e0e0e0;
+  color: var(--text-color);
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
@@ -142,9 +115,9 @@
 
 .file-browser-confirm {
   padding: 8px 15px;
-  background-color: #ff5722;
+  background-color: var(--primary-color);
   border: none;
-  color: white;
+  color: var(--text-color);
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
@@ -153,9 +126,9 @@
 .file-browser-browse {
   width: 100%;
   padding: 12px;
-  background-color: #ff5722;
+  background-color: var(--primary-color);
   border: none;
-  color: white;
+  color: var(--text-color);
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
@@ -168,7 +141,7 @@
 .error {
   padding: 20px;
   text-align: center;
-  color: #a0a0a0;
+  color: var(--text-dim);
   flex: 1;
   display: flex;
   align-items: center;
@@ -176,7 +149,7 @@
 }
 
 .error {
-  color: #f44336;
+  color: var(--primary-color);
 }
 
 /* Scrollbar styling */
@@ -185,15 +158,15 @@
 }
 
 .file-browser-list::-webkit-scrollbar-track {
-  background: #2d2d2d;
+  background: var(--bg-color);
   border-radius: 0 4px 4px 0;
 }
 
 .file-browser-list::-webkit-scrollbar-thumb {
-  background: #4d4d4d;
+  background: var(--ui-color);
   border-radius: 4px;
 }
 
 .file-browser-list::-webkit-scrollbar-thumb:hover {
-  background: #5d5d5d;
+  background: var(--ui-highlight);
 }

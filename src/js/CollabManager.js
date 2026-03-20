@@ -618,19 +618,21 @@ class CollabManager {
     const toolObj = this.editor.tools[tool];
     if (!toolObj) return;
     
-    // Draw the trace using the tool's methods
+    // Need to temporarily set the current tool to draw properly
+    const originalTool = this.editor.currentTool;
+    this.editor.currentTool = toolObj;
+    
+    // Draw the trace using the tool's original methods
     if (points.length === 1) {
-      // Simulate pointer down
+      // Single point (click)
       if (toolObj.originalOnDown) {
         toolObj.originalOnDown.call(this.editor, points[0].x, points[0].y);
       }
-      
-      // Single click, release pointer
       if (toolObj.originalOnUp) {
         toolObj.originalOnUp.call(this.editor, points[0].x, points[0].y);
       }
     } else {
-      // Simulate pointer down
+      // Stroke with multiple points
       if (toolObj.originalOnDown) {
         toolObj.originalOnDown.call(this.editor, points[0].x, points[0].y);
       }
@@ -642,7 +644,6 @@ class CollabManager {
         }
       }
       
-      // Release pointer
       if (toolObj.originalOnUp) {
         toolObj.originalOnUp.call(this.editor, points[points.length - 1].x, points[points.length - 1].y);
       }
@@ -652,10 +653,12 @@ class CollabManager {
     this.editor.brushSize = originalBrushSize;
     this.editor.selectedColor = originalSelectedColor;
     this.editor.primaryColor = originalPrimaryColor;
+    this.editor.currentTool = originalTool;
     
+    // Force a render to show the drawing
     this.editor.render();
   }
-
+  
   handleRemoteCursor(message) {
     const { memberId, x, y, active } = message;
     const member = this.members.get(memberId);
@@ -703,7 +706,7 @@ class CollabManager {
   handleFullState(message) {
     if (message.memberId === this.memberId) return;
     this.applyFullState(message.state);
-    this.editor.showNotification(__('Proyecto sincronizado||Project synchronized'), 1000);
+    this.editor.showOperationMessage(__('Proyecto sincronizado||Project synchronized'), 1000);
   }
 
   handleSessionEnded(reason) {
@@ -851,7 +854,7 @@ class CollabManager {
     }
     
     this.editor.project = project;
-    this.editor.resizeCanvas();
+    this.editor.resetCanvasSize();
     this.editor.render();
   }
 

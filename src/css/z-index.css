@@ -1,0 +1,159 @@
+Here's the cleaned and organized z-index.css:
+
+```css
+/*
+  z-index order - Organized by layer stack
+  ===========================================
+  Higher numbers = closer to user
+*/
+
+/* ========== Base Layer (0-9) ========== */
+/* Base canvas and containers */
+.editor-canvas-container {
+  z-index: 1;
+}
+
+/* Reference controls */
+.reference-controls {
+  z-index: 5;
+}
+
+.grid-overlay {
+  z-index: 5;
+}
+
+/* ========== UI Elements (10-19) ========== */
+.editor-ui {
+  z-index: 10;
+}
+
+/* Floating references container */
+.floating-references-container {
+  z-index: 12;
+}
+
+/* Animation and layers panels */
+.layers-panel {
+  z-index: 14;
+}
+
+.animation-panel {
+  z-index: 15;
+}
+
+/* Collaboration cursors */
+.collab-cursor-container {
+  z-index: 15;
+}
+
+.collab-cursor-item {
+  z-index: 15;
+}
+
+/* Grid panel */
+.grid-panel {
+  z-index: 20;
+}
+
+.floating-reference {
+  z-index: 20; /* dynamically updated by javascript */
+}
+
+/* Trace reference controls */
+.trace-reference-controls {
+  z-index: 21;
+}
+
+/* Brush size indicator */
+.brush-size-indicator {
+  z-index: 25;
+}
+
+.menu-panel {
+  z-index: 25;
+}
+
+.collab-ping-indicator {
+  z-index: 25;
+}
+
+/* ========== Top Bars & Dropdowns (30-99) ========== */
+.ui-top-bar,
+.ui-bottom-bar,
+.settings-header,
+.settings-footer {
+  z-index: 30;
+}
+
+.tool-dropdown {
+  z-index: 30;
+}
+
+/* Tool settings popup */
+.tool-settings-popup {
+  z-index: 100;
+}
+
+/* Color picker overlay */
+.color-picker-overlay {
+  z-index: 100;
+}
+
+/* ========== Overlays (200-999) ========== */
+.canvas-resize-controls {
+  z-index: 200;
+}
+
+/* Color pick line and bottom confirmation */
+.color-pick-line,
+.bottom-confirmation {
+  z-index: 1000;
+}
+
+/* Editor overlay layer */
+.editor-overlay-layer {
+  z-index: 1001;
+}
+
+.delete-zone {
+  z-index: 1001;
+}
+
+/* ========== Popups & Dialogs (2000-9999) ========== */
+.editor-loading,
+.editor-error,
+.popup-overlay {
+  z-index: 2000;
+}
+
+/* Collaboration session overlay */
+.collab-session-overlay {
+  z-index: 10000;
+}
+
+.settings-overlay {
+  z-index: 10000;
+}
+
+/* ========== Notifications & Debug (10000+) ========== */
+.operation-message {
+  z-index: 10001;
+}
+
+.notification {
+  z-index: 10002;
+}
+
+.toast-with-button {
+  z-index: 10003;
+}
+
+/* Loading overlay (highest during load) */
+.loading-overlay {
+  z-index: 10004;
+}
+
+/* Debug canvas (only visible during development) */
+#debug-canvas {
+  z-index: 9999;
+}
