@@ -800,12 +800,6 @@ class ColorPicker {
     colorElement.className = "palette-color floating";
     colorElement.style.backgroundColor = color;
     colorElement.style.cursor = "grab";
-    colorElement.style.position = "fixed";
-    colorElement.style.width = "30px";
-    colorElement.style.height = "30px";
-    colorElement.style.borderRadius = "4px";
-    colorElement.style.boxShadow = "0 0 5px rgba(0, 0, 0, 0.5)";
-    colorElement.style.transition = "all 0.1s";
     
     const id = `color_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -822,7 +816,7 @@ class ColorPicker {
     // Click to select color
     colorElement.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.editor.updateColorSlidersFromHex(color);
+      this.editor.setColor(color);
     });
     
     // Pointer event handlers for smooth dragging

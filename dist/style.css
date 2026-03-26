@@ -4,9 +4,9 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.1
- * Built: 3/26/2026, 3:01:42 AM
- * Platform: Android (Cordova)
+ * Version: v1.0.1 dev
+ * Built: 3/26/2026, 3:41:58 AM
+ * Platform: Development
  * Debug: false
  * Minified: false
  */
@@ -940,6 +940,31 @@ button:active {
 /*
   Menu Panel
 */
+.menu-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.menu-panel-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.menu-panel-overlay.visible .menu-panel {
+  transform: translateX(0);
+  box-shadow: 2px 0 5px var(--shadow-color);
+}
+
 .menu-panel {
   position: absolute;
   top: 40px;
@@ -954,11 +979,6 @@ button:active {
   flex-direction: column;
   padding: 10px;
   overflow-y: auto;
-}
-
-.menu-panel.visible {
-  transform: translateX(0);
-  box-shadow: 2px 0 5px var(--shadow-color);
 }
 
 .menu-tabs {
@@ -3876,7 +3896,7 @@ input:checked + .slider:before {
   z-index: 25;
 }
 
-.menu-panel {
+.menu-panel-overlay {
   z-index: 25;
 }
 

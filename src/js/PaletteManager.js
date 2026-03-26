@@ -391,7 +391,12 @@ class PaletteManager {
             }
             
             try {
+              this.editor.showLoadingScreen("Importing Lospec Palette...");
+                    
               const paletteData = await this.importFromLospec(slug);
+              
+              this.editor.hideLoadingScreen();
+              
               const existing = this.palettes.find(p => p.name.toLowerCase() === paletteData.name.toLowerCase());
               
               if (existing) {
@@ -422,6 +427,7 @@ class PaletteManager {
                 this.editor.hidePopup();
               }
             } catch (error) {
+              this.editor.hideLoadingScreen();
               this.editor.showToast(error.message, 3000);
             }
           }
@@ -448,10 +454,6 @@ class PaletteManager {
         
         const item = document.createElement("div");
         item.className = `palette-manager-item ${isActice ? 'active' : ''}`;
-        
-        if (isActice) {
-          activeItem = item;
-        }
         
         const preview = document.createElement("div");
         preview.className = "palette-manager-preview";
@@ -487,16 +489,6 @@ class PaletteManager {
           this.showPaletteEditor(palette.id);
         });
         actions.appendChild(editBtn);
-        
-        const exportBtn = document.createElement("button");
-        exportBtn.className = "ui-button palette-manager-btn";
-        exportBtn.innerHTML = '<div class="icon icon-download"></div>';
-        exportBtn.title = __("Exportar||Export");
-        exportBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.exportPaletteToFile(palette.id);
-        });
-        actions.appendChild(exportBtn);
         
         if (this.palettes.length > 1) {
           const deleteBtn = document.createElement("button");
@@ -568,9 +560,9 @@ class PaletteManager {
     
     const importBtn = document.createElement("button");
     importBtn.className = "ui-button highlight palette-manager-action-btn";
-    importBtn.innerHTML = "JSON";
+    importBtn.innerHTML = "JASC-PAL";
     importBtn.addEventListener("click", () => {
-      this.showImportJsonDialog();
+      this.editor.loadPalette();
     });
     actionRow.appendChild(importBtn);
     
@@ -745,63 +737,5 @@ class PaletteManager {
         }
       ]
     );
-  }
-  
-  exportPaletteToFile(paletteId) {
-    const palette = this.palettes.find(p => p.id === paletteId);
-    if (!palette) return;
-    
-    const jsonData = JSON.stringify({
-      name: palette.name,
-      colors: palette.colors,
-      exportedAt: new Date().toISOString()
-    }, null, 2);
-    
-    const blob = new Blob([jsonData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${palette.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    this.editor.showToast(__(`Paleta "${palette.name}" exportada||Palette "${palette.name}" exported`));
-  }
-
-  showImportJsonDialog() {
-    const fileBrowser = this.editor.getFileBrowser({
-      title: __("Importar paleta JSON||Import JSON palette"),
-      mode: "open",
-      fileTypes: ["json"],
-      onConfirm: async (fileInfo) => {
-        try {
-          const fileData = await this.editor.readFile(fileInfo);
-          const data = JSON.parse(fileData);
-          
-          if (!data.name || !data.colors || !Array.isArray(data.colors)) {
-            throw new Error(__('Formato inválido||Invalid format'));
-          }
-          
-          const existing = this.palettes.find(p => p.name === data.name);
-          if (existing) {
-            const newName = `${data.name} (${__('copia||copy')})`;
-            this.addPalette(newName, data.colors);
-            this.editor.showToast(__(`Paleta importada como "${newName}"||Palette imported as "${newName}"`));
-          } else {
-            this.addPalette(data.name, data.colors);
-            this.editor.showToast(__(`Paleta "${data.name}" importada||Palette "${data.name}" imported`));
-          }
-          
-          this.editor.colorPicker?.updatePaletteGrid();
-          this.editor.hidePopup();
-        } catch (error) {
-          this.editor.showToast(error.message, 3000);
-        }
-      }
-    });
-    fileBrowser.show();
   }
 }

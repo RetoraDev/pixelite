@@ -229,6 +229,9 @@ class PixelArtEditor {
       defaultValue: false,
       onInit: (value, editor) => {
         editor.usePerProjectFloatingColors = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.usePerProjectFloatingColors = value;
       }
     });
     
@@ -514,7 +517,7 @@ class PixelArtEditor {
       }
     } else if (this.colorPickerOpen) {
       this.hideColorPicker();
-    } else if (this.menuPanel.classList.contains("visible")) {
+    } else if (this.menuPanelOverlay.classList.contains("visible")) {
       this.toggleMenu();
     } else if (this.animationPanel.classList.contains("visible")) {
       this.togglePanel("animation");
@@ -890,9 +893,15 @@ class PixelArtEditor {
     this.undoRedoButtons.appendChild(this.redoButton);
 
     // Menu panel
+    this.menuPanelOverlay = document.createElement("div");
+    this.menuPanelOverlay.className = "menu-panel-overlay";
+    this.uiLayer.appendChild(this.menuPanelOverlay);
+    
+    this.menuPanelOverlay.addEventListener("click", () => this.toggleMenu());
+    
     this.menuPanel = document.createElement("div");
     this.menuPanel.className = "menu-panel";
-    this.uiLayer.appendChild(this.menuPanel);
+    this.menuPanelOverlay.appendChild(this.menuPanel);
     
     this.menuTabs = document.createElement("div");
     this.menuTabs.className = "menu-tabs";
@@ -1685,7 +1694,7 @@ class PixelArtEditor {
   }
 
   toggleMenu() {
-    this.menuPanel.classList.toggle("visible");
+    this.menuPanelOverlay.classList.toggle("visible");
   }
 
   togglePanel(panel) {
@@ -1696,13 +1705,13 @@ class PixelArtEditor {
       this.layersButton.classList.remove("active");
       this.adjustTimelinePosition();
       this.gridManager.hide();
-      this.menuPanel.classList.remove("visible");
+      this.menuPanelOverlay.classList.remove("visible");
     } else if (panel === "layers") {
       this.layersPanel.classList.toggle("visible");
       this.layersButton.classList.toggle("active");
       this.animationPanel.classList.remove("visible");
       this.animationButton.classList.remove("active");
-      this.menuPanel.classList.remove("visible");
+      this.menuPanelOverlay.classList.remove("visible");
       this.gridManager.hide();
     }
   }
@@ -1714,7 +1723,7 @@ class PixelArtEditor {
 
   shouldBlockInput() {
     // Block touch if some panels are visible
-    if (this.menuPanel.classList.contains("visible")) {
+    if (this.menuPanelOverlay.classList.contains("visible")) {
       this.toggleMenu();
       return true;
     } else if (this.layersPanel.classList.contains("visible")) {
@@ -1792,6 +1801,7 @@ class PixelArtEditor {
       } else {
         this.zoom(0.8, e.clientX, e.clientY);
       }
+      this.cancelDrawing();
     }
   }
   
@@ -1831,8 +1841,9 @@ class PixelArtEditor {
         }
         this._touchTimer = null;
       }, 50);
-      
     } else if (e.touches.length === 2) {
+      this.cancelDrawing();
+            
       // Two fingers - pan and zoom
       this.isPanning = true;
       this.isDrawing = false;
@@ -2628,7 +2639,7 @@ class PixelArtEditor {
   enterImmersive() {
     this.topBar.style.display = "none";
     this.bottomBar.style.display = "none";
-    this.menuPanel.style.display = "none";
+    this.menuPanelOverlay.style.display = "none";
     this.animationPanel.style.display = "none";
     this.layersPanel.style.display = "none";
     if (this.gridManager) this.gridManager.panel.style.display = "none";
@@ -2637,7 +2648,7 @@ class PixelArtEditor {
   exitImmersive() {
     this.topBar.style.display = "flex";
     this.bottomBar.style.display = "flex";
-    this.menuPanel.style.display = "flex";
+    this.menuPanelOverlay.style.display = "flex";
     this.animationPanel.style.display = "flex";
     this.layersPanel.style.display = "flex";
     if (this.gridManager) this.gridManager.panel.style.display = "flex";
@@ -2853,6 +2864,13 @@ class PixelArtEditor {
     if (redid) {
       this.render();
       this.showOperationMessage(redid.message);
+    }
+  }
+  
+  cancelDrawing() {
+    if (this.isDrawing) {
+      this.historyManager.endBatch();
+      this.historyManager.undo();
     }
   }
 
@@ -5719,7 +5737,7 @@ class PixelArtEditor {
           }
 
           this.showToast(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
-          this.menuPanel.classList.remove("visible");
+          this.menuPanelOverlay.classList.remove("visible");
         } catch (error) {
           this.showToast(__(`(Error al abrir el archivo|Error opening file): ${error.message}`), 5000);
           console.error(error);
@@ -6194,6 +6212,7 @@ class PixelArtEditor {
       this.transparentBackground = projectData.backgroundColor === "transparent";
       if (!this.transparentBackground) {
         this.secondaryColor = projectData.backgroundColor;
+        this.updateColorIndicator();
       }
     }
 
@@ -6256,7 +6275,7 @@ class PixelArtEditor {
     
     // Load floating colors
     if (projectData.floatingColors && this.usePerProjectFloatingColors) {
-      this.removeAllFloatingPaletteColors();
+      this.colorPicker.removeAllFloatingPaletteColors();
       this.colorPicker.loadFloatingColors(JSON.parse(projectData.floatingColors));
     }
 
@@ -6322,7 +6341,7 @@ class PixelArtEditor {
         let buffer;
         if (typeof fileData === 'string') {
           // Handle base64 or data URL
-          if (fileData.startsWith('data:')) {
+          if (fileData.starsWith('data:')) {
             // Convert data URL to ArrayBuffer
             const base64 = fileData.split(',')[1];
             const binary = atob(base64);

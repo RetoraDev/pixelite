@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.1
- * Built: 3/26/2026, 3:01:41 AM
- * Platform: Android (Cordova)
+ * Version: v1.0.1 dev
+ * Built: 3/26/2026, 3:41:58 AM
+ * Platform: Development
  * Debug: false
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.1";
+const VERSION = "v1.0.1 dev";
 const HOST = "wss://pixelite.onrender.com";
 const DEBUG = false;
 
@@ -5562,7 +5562,12 @@ class PaletteManager {
             }
             
             try {
+              this.editor.showLoadingScreen("Importing Lospec Palette...");
+                    
               const paletteData = await this.importFromLospec(slug);
+              
+              this.editor.hideLoadingScreen();
+              
               const existing = this.palettes.find(p => p.name.toLowerCase() === paletteData.name.toLowerCase());
               
               if (existing) {
@@ -5593,6 +5598,7 @@ class PaletteManager {
                 this.editor.hidePopup();
               }
             } catch (error) {
+              this.editor.hideLoadingScreen();
               this.editor.showToast(error.message, 3000);
             }
           }
@@ -5619,10 +5625,6 @@ class PaletteManager {
         
         const item = document.createElement("div");
         item.className = `palette-manager-item ${isActice ? 'active' : ''}`;
-        
-        if (isActice) {
-          activeItem = item;
-        }
         
         const preview = document.createElement("div");
         preview.className = "palette-manager-preview";
@@ -5658,16 +5660,6 @@ class PaletteManager {
           this.showPaletteEditor(palette.id);
         });
         actions.appendChild(editBtn);
-        
-        const exportBtn = document.createElement("button");
-        exportBtn.className = "ui-button palette-manager-btn";
-        exportBtn.innerHTML = '<div class="icon icon-download"></div>';
-        exportBtn.title = __("Exportar||Export");
-        exportBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.exportPaletteToFile(palette.id);
-        });
-        actions.appendChild(exportBtn);
         
         if (this.palettes.length > 1) {
           const deleteBtn = document.createElement("button");
@@ -5739,9 +5731,9 @@ class PaletteManager {
     
     const importBtn = document.createElement("button");
     importBtn.className = "ui-button highlight palette-manager-action-btn";
-    importBtn.innerHTML = "JSON";
+    importBtn.innerHTML = "JASC-PAL";
     importBtn.addEventListener("click", () => {
-      this.showImportJsonDialog();
+      this.editor.loadPalette();
     });
     actionRow.appendChild(importBtn);
     
@@ -5916,64 +5908,6 @@ class PaletteManager {
         }
       ]
     );
-  }
-  
-  exportPaletteToFile(paletteId) {
-    const palette = this.palettes.find(p => p.id === paletteId);
-    if (!palette) return;
-    
-    const jsonData = JSON.stringify({
-      name: palette.name,
-      colors: palette.colors,
-      exportedAt: new Date().toISOString()
-    }, null, 2);
-    
-    const blob = new Blob([jsonData], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${palette.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    this.editor.showToast(__(`Paleta "${palette.name}" exportada||Palette "${palette.name}" exported`));
-  }
-
-  showImportJsonDialog() {
-    const fileBrowser = this.editor.getFileBrowser({
-      title: __("Importar paleta JSON||Import JSON palette"),
-      mode: "open",
-      fileTypes: ["json"],
-      onConfirm: async (fileInfo) => {
-        try {
-          const fileData = await this.editor.readFile(fileInfo);
-          const data = JSON.parse(fileData);
-          
-          if (!data.name || !data.colors || !Array.isArray(data.colors)) {
-            throw new Error(__('Formato inválido||Invalid format'));
-          }
-          
-          const existing = this.palettes.find(p => p.name === data.name);
-          if (existing) {
-            const newName = `${data.name} (${__('copia||copy')})`;
-            this.addPalette(newName, data.colors);
-            this.editor.showToast(__(`Paleta importada como "${newName}"||Palette imported as "${newName}"`));
-          } else {
-            this.addPalette(data.name, data.colors);
-            this.editor.showToast(__(`Paleta "${data.name}" importada||Palette "${data.name}" imported`));
-          }
-          
-          this.editor.colorPicker?.updatePaletteGrid();
-          this.editor.hidePopup();
-        } catch (error) {
-          this.editor.showToast(error.message, 3000);
-        }
-      }
-    });
-    fileBrowser.show();
   }
 }
 
@@ -6779,12 +6713,6 @@ class ColorPicker {
     colorElement.className = "palette-color floating";
     colorElement.style.backgroundColor = color;
     colorElement.style.cursor = "grab";
-    colorElement.style.position = "fixed";
-    colorElement.style.width = "30px";
-    colorElement.style.height = "30px";
-    colorElement.style.borderRadius = "4px";
-    colorElement.style.boxShadow = "0 0 5px rgba(0, 0, 0, 0.5)";
-    colorElement.style.transition = "all 0.1s";
     
     const id = `color_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -6801,7 +6729,7 @@ class ColorPicker {
     // Click to select color
     colorElement.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.editor.updateColorSlidersFromHex(color);
+      this.editor.setColor(color);
     });
     
     // Pointer event handlers for smooth dragging
@@ -7852,6 +7780,9 @@ class PixelArtEditor {
       defaultValue: false,
       onInit: (value, editor) => {
         editor.usePerProjectFloatingColors = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.usePerProjectFloatingColors = value;
       }
     });
     
@@ -8137,7 +8068,7 @@ class PixelArtEditor {
       }
     } else if (this.colorPickerOpen) {
       this.hideColorPicker();
-    } else if (this.menuPanel.classList.contains("visible")) {
+    } else if (this.menuPanelOverlay.classList.contains("visible")) {
       this.toggleMenu();
     } else if (this.animationPanel.classList.contains("visible")) {
       this.togglePanel("animation");
@@ -8513,9 +8444,15 @@ class PixelArtEditor {
     this.undoRedoButtons.appendChild(this.redoButton);
 
     // Menu panel
+    this.menuPanelOverlay = document.createElement("div");
+    this.menuPanelOverlay.className = "menu-panel-overlay";
+    this.uiLayer.appendChild(this.menuPanelOverlay);
+    
+    this.menuPanelOverlay.addEventListener("click", () => this.toggleMenu());
+    
     this.menuPanel = document.createElement("div");
     this.menuPanel.className = "menu-panel";
-    this.uiLayer.appendChild(this.menuPanel);
+    this.menuPanelOverlay.appendChild(this.menuPanel);
     
     this.menuTabs = document.createElement("div");
     this.menuTabs.className = "menu-tabs";
@@ -9308,7 +9245,7 @@ class PixelArtEditor {
   }
 
   toggleMenu() {
-    this.menuPanel.classList.toggle("visible");
+    this.menuPanelOverlay.classList.toggle("visible");
   }
 
   togglePanel(panel) {
@@ -9319,13 +9256,13 @@ class PixelArtEditor {
       this.layersButton.classList.remove("active");
       this.adjustTimelinePosition();
       this.gridManager.hide();
-      this.menuPanel.classList.remove("visible");
+      this.menuPanelOverlay.classList.remove("visible");
     } else if (panel === "layers") {
       this.layersPanel.classList.toggle("visible");
       this.layersButton.classList.toggle("active");
       this.animationPanel.classList.remove("visible");
       this.animationButton.classList.remove("active");
-      this.menuPanel.classList.remove("visible");
+      this.menuPanelOverlay.classList.remove("visible");
       this.gridManager.hide();
     }
   }
@@ -9337,7 +9274,7 @@ class PixelArtEditor {
 
   shouldBlockInput() {
     // Block touch if some panels are visible
-    if (this.menuPanel.classList.contains("visible")) {
+    if (this.menuPanelOverlay.classList.contains("visible")) {
       this.toggleMenu();
       return true;
     } else if (this.layersPanel.classList.contains("visible")) {
@@ -9415,6 +9352,7 @@ class PixelArtEditor {
       } else {
         this.zoom(0.8, e.clientX, e.clientY);
       }
+      this.cancelDrawing();
     }
   }
   
@@ -9454,8 +9392,9 @@ class PixelArtEditor {
         }
         this._touchTimer = null;
       }, 50);
-      
     } else if (e.touches.length === 2) {
+      this.cancelDrawing();
+            
       // Two fingers - pan and zoom
       this.isPanning = true;
       this.isDrawing = false;
@@ -10251,7 +10190,7 @@ class PixelArtEditor {
   enterImmersive() {
     this.topBar.style.display = "none";
     this.bottomBar.style.display = "none";
-    this.menuPanel.style.display = "none";
+    this.menuPanelOverlay.style.display = "none";
     this.animationPanel.style.display = "none";
     this.layersPanel.style.display = "none";
     if (this.gridManager) this.gridManager.panel.style.display = "none";
@@ -10260,7 +10199,7 @@ class PixelArtEditor {
   exitImmersive() {
     this.topBar.style.display = "flex";
     this.bottomBar.style.display = "flex";
-    this.menuPanel.style.display = "flex";
+    this.menuPanelOverlay.style.display = "flex";
     this.animationPanel.style.display = "flex";
     this.layersPanel.style.display = "flex";
     if (this.gridManager) this.gridManager.panel.style.display = "flex";
@@ -10476,6 +10415,13 @@ class PixelArtEditor {
     if (redid) {
       this.render();
       this.showOperationMessage(redid.message);
+    }
+  }
+  
+  cancelDrawing() {
+    if (this.isDrawing) {
+      this.historyManager.endBatch();
+      this.historyManager.undo();
     }
   }
 
@@ -13342,7 +13288,7 @@ class PixelArtEditor {
           }
 
           this.showToast(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
-          this.menuPanel.classList.remove("visible");
+          this.menuPanelOverlay.classList.remove("visible");
         } catch (error) {
           this.showToast(__(`(Error al abrir el archivo|Error opening file): ${error.message}`), 5000);
           console.error(error);
@@ -13817,6 +13763,7 @@ class PixelArtEditor {
       this.transparentBackground = projectData.backgroundColor === "transparent";
       if (!this.transparentBackground) {
         this.secondaryColor = projectData.backgroundColor;
+        this.updateColorIndicator();
       }
     }
 
@@ -13879,7 +13826,7 @@ class PixelArtEditor {
     
     // Load floating colors
     if (projectData.floatingColors && this.usePerProjectFloatingColors) {
-      this.removeAllFloatingPaletteColors();
+      this.colorPicker.removeAllFloatingPaletteColors();
       this.colorPicker.loadFloatingColors(JSON.parse(projectData.floatingColors));
     }
 
@@ -13945,7 +13892,7 @@ class PixelArtEditor {
         let buffer;
         if (typeof fileData === 'string') {
           // Handle base64 or data URL
-          if (fileData.startsWith('data:')) {
+          if (fileData.starsWith('data:')) {
             // Convert data URL to ArrayBuffer
             const base64 = fileData.split(',')[1];
             const binary = atob(base64);
