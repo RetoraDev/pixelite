@@ -5,10 +5,14423 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1
- * Built: 3/26/2026, 1:40:24 AM
- * Platform: Web
+ * Built: 3/26/2026, 3:01:41 AM
+ * Platform: Android (Cordova)
  * Debug: false
- * Minified: true
+ * Minified: false
  */
 
-const COPYRIGHT="(C) RETORA 2026",VERSION="v1.0.1",HOST="wss://pixelite.onrender.com",DEBUG=!1;window.__=function(e){if("string"!=typeof e)return e;const t=window.settings?.getLanguage?.()||0;return e=(e=e.replace(/\(([^|)]+)\|([^)]+)\)/g,(e,i,s)=>0===t?s:i)).replace(/([^|(]+\|\|[^|)]+)/g,e=>{const i=e.split("||");return i[t]||i[0]})},window.openExternalUrl=e=>{const t=encodeURI(e);if(null!=typeof window.cordova)navigator.app.loadUrl(t,{openExternal:!0});else{const e=document.createElement("a");e.href=t,e.target="_blank",e.click()}},function(){"use strict";if("file:"!==window.location.protocol)return;const e=window.fetch;window.fetch=async function(t,i={}){let s,a=t,r={...i};t instanceof Request&&(a=t.url,r={method:t.method,headers:t.headers,body:t.body,mode:t.mode,credentials:t.credentials,cache:t.cache,redirect:t.redirect,referrer:t.referrer,integrity:t.integrity,...i});try{s=new URL(a,window.location.href)}catch(e){s=new URL(a)}return"file:"!==s.protocol&&"about:"!==s.protocol&&e?e(t,i):(s.href.replace(/^file:\/\//,"").replace(/^\//,""),new Promise((e,t)=>{const i=new XMLHttpRequest,a=(r.method||"GET").toUpperCase();i.open(a,s.href,!0),r.headers&&(r.headers instanceof Headers?r.headers.forEach((e,t)=>{i.setRequestHeader(t,e)}):Array.isArray(r.headers)?r.headers.forEach(([e,t])=>{i.setRequestHeader(e,t)}):"object"==typeof r.headers&&Object.entries(r.headers).forEach(([e,t])=>{i.setRequestHeader(e,t)})),r.responseType&&(i.responseType=r.responseType),i.withCredentials="include"===r.credentials,r.timeout&&(i.timeout=r.timeout),i.onload=()=>{i.status>=200&&i.status<300?e(function(e){const t=new Headers;e.getAllResponseHeaders().split("\r\n").forEach(e=>{const[i,s]=e.split(": ");i&&s&&t.append(i,s)});let i=e.response;""!==e.responseType&&"text"!==e.responseType||(i=e.responseText);const s={status:e.status,statusText:e.statusText,headers:t};return new Response(i,s)}(i)):t(new TypeError(`Failed to fetch: ${i.status} ${i.statusText}`))},i.onerror=()=>{t(new TypeError("Failed to fetch: Network error"))},i.ontimeout=()=>{t(new TypeError("Failed to fetch: Timeout"))},r.body?i.send(r.body):i.send()}))},window.Promise||console.warn("Promise polyfill required for fetch polyfill")}();class SettingsManager{constructor(e){this.editor=e,this.categories=[],this.settings=new Map,this.values=new Map,this.listeners=new Map,this.initialized=!1,this.language=0,this.load()}addCategory(e){const t={id:e.id||`category-${this.categories.length}`,title:e.title||"Category",icon:e.icon||"icon-settings",settings:[],addSetting:t=>this.addSetting(e.id,t)};return this.categories.push(t),t}addSetting(e,t){const i=this.categories.find(t=>t.id===e);if(!i)throw new Error(`Category ${e} not found`);const s={id:t.id||`setting-${Date.now()}-${Math.random()}`,label:t.label||"Setting",description:t.description||"",type:t.type||"boolean",defaultValue:t.defaultValue,value:t.defaultValue,options:t.options||[],min:t.min,max:t.max,step:t.step,needsReload:t.needsReload||!1,onInit:t.onInit||null,onUpdate:t.onUpdate||null,visible:!1!==t.visible,disabled:t.disabled||!1};i.settings.push(s),this.settings.set(s.id,s);const a=this.values.get(s.id);return void 0!==a?s.value=a:this.values.set(s.id,s.defaultValue),s}get(e){return this.values.get(e)}getLanguage(){return this.language}set(e,t,i=!1){const s=this.settings.get(e);if(!s)return!1;const a=this.values.get(e);return a!==t&&(this.values.set(e,t),s.value=t,s.onUpdate&&s.onUpdate(t,a,this.editor),this.listeners.has(e)&&this.listeners.get(e).forEach(e=>e(t,a)),i||this.save(),s.needsReload&&(this.pendingReload=!0),!0)}subscribe(e,t){return this.listeners.has(e)||this.listeners.set(e,[]),this.listeners.get(e).push(t),()=>{const i=this.listeners.get(e),s=i.indexOf(t);s>-1&&i.splice(s,1)}}init(){this.initialized||(this.settings.forEach(e=>{e.onInit&&e.onInit(this.get(e.id),this.editor)}),this.initialized=!0)}save(){const e={language:this.language,values:{}};this.values.forEach((t,i)=>{e.values[i]=t}),localStorage.setItem("app_settings",JSON.stringify(e))}load(){try{const e=localStorage.getItem("app_settings");if(e){const t=JSON.parse(e);this.language=t.language||0,t.values&&Object.entries(t.values).forEach(([e,t])=>{this.values.set(e,t)})}}catch(e){console.warn("Failed to load settings:",e)}}reset(e){const t=this.settings.get(e);t&&this.set(e,t.defaultValue)}resetAll(){this.settings.forEach(e=>{this.set(e.id,e.defaultValue,!0)}),this.save()}isRestartNeeded(){return this.pendingReload||!1}}class SettingsUI{constructor(e,t){this.settings=e,this.editor=t,this.visible=!1,this.initUI()}initUI(){this.overlay=document.createElement("div"),this.overlay.className="settings-overlay",this.overlay.style.display="none",this.container=document.createElement("div"),this.container.className="settings-container",this.overlay.appendChild(this.container),this.header=document.createElement("div"),this.header.className="settings-header",this.container.appendChild(this.header),this.title=document.createElement("div"),this.title.className="settings-title",this.title.textContent=__("Ajustes||Settings"),this.header.appendChild(this.title),this.closeBtn=document.createElement("button"),this.closeBtn.className="settings-close",this.closeBtn.innerHTML="&times;",this.closeBtn.addEventListener("click",()=>this.hide()),this.header.appendChild(this.closeBtn),this.mainContent=document.createElement("div"),this.mainContent.className="settings-main",this.container.appendChild(this.mainContent),this.sidebar=document.createElement("div"),this.sidebar.className="settings-sidebar",this.mainContent.appendChild(this.sidebar),this.content=document.createElement("div"),this.content.className="settings-content",this.mainContent.appendChild(this.content),this.footer=document.createElement("div"),this.footer.className="settings-footer",this.container.appendChild(this.footer),this.resetAllBtn=document.createElement("button"),this.resetAllBtn.className="settings-btn secondary",this.resetAllBtn.textContent=__("Restablecer todo||Reset all"),this.resetAllBtn.addEventListener("click",()=>this.showResetConfirm()),this.footer.appendChild(this.resetAllBtn),this.doneBtn=document.createElement("button"),this.doneBtn.className="settings-btn primary",this.doneBtn.textContent=__("Hecho||Done"),this.doneBtn.addEventListener("click",()=>this.hide()),this.footer.appendChild(this.doneBtn),setTimeout(()=>this.editor.editorElement.appendChild(this.overlay)),this.buildCategories(),this.settings.categories.length>0&&this.showCategory(this.settings.categories[0].id)}buildCategories(){this.sidebar.innerHTML="",this.settings.categories.forEach(e=>{const t=document.createElement("div");t.className="settings-category-item",t.dataset.category=e.id;const i=document.createElement("span");i.className=`icon ${e.icon}`;const s=document.createElement("span");s.textContent=__(e.title),t.appendChild(i),t.appendChild(s),t.addEventListener("click",()=>this.showCategory(e.id)),this.sidebar.appendChild(t)})}showCategory(e){document.querySelectorAll(".settings-category-item").forEach(t=>{t.classList.toggle("active",t.dataset.category===e)});const t=this.settings.categories.find(t=>t.id===e);if(!t)return;this.content.innerHTML="";const i=document.createElement("h3");i.className="settings-category-title",i.textContent=__(t.title),this.content.appendChild(i),t.settings.forEach(e=>{if(!e.visible)return;const t=this.createSettingElement(e);this.content.appendChild(t)})}createSettingElement(e){const t=document.createElement("div");t.className="setting-item "+(e.disabled?"disabled":""),t.dataset.setting=e.id;const i=document.createElement("div");i.className="setting-info";const s=document.createElement("div");s.className="setting-label",s.textContent=__(e.label);const a=document.createElement("div");a.className="setting-description",a.textContent=__(e.description),i.appendChild(s),i.appendChild(a);const r=document.createElement("div");switch(r.className="setting-control",e.type){case"boolean":this.createBooleanControl(r,e);break;case"number":case"range":this.createRangeControl(r,e);break;case"select":this.createSelectControl(r,e);break;case"text":this.createTextControl(r,e);break;case"color":this.createColorControl(r,e)}return t.appendChild(i),t.appendChild(r),t}createBooleanControl(e,t){const i=document.createElement("label");i.className="switch";const s=document.createElement("input");s.type="checkbox",s.checked=this.settings.get(t.id),s.disabled=t.disabled;const a=document.createElement("span");a.className="slider",i.appendChild(s),i.appendChild(a),e.appendChild(i),s.addEventListener("change",e=>{this.settings.set(t.id,e.target.checked),t.needsReload&&this.showRestartWarning()}),this.settings.subscribe(t.id,e=>{s.checked=e})}createRangeControl(e,t){const i=document.createElement("div");i.className="range-wrapper";const s=document.createElement("input");s.type="range",s.min=t.min||0,s.max=t.max||100,s.step=t.step||1,s.value=this.settings.get(t.id),s.disabled=t.disabled;const a=document.createElement("input");a.className="range-value",a.type="number",a.min=t.min||0,a.max=t.max||100,a.value=s.value,a.disabled=t.disabled,i.appendChild(s),i.appendChild(a),e.appendChild(i),s.addEventListener("input",e=>{a.value=e.target.value}),a.addEventListener("input",e=>{s.value=e.target.value});const r=e=>{this.settings.set(t.id,parseInt(e.target.value)),t.needsReload&&this.showRestartWarning()};s.addEventListener("change",e=>r(e)),a.addEventListener("change",e=>r(e)),this.settings.subscribe(t.id,e=>{s.value=e,a.value=e})}createSelectControl(e,t){const i=document.createElement("select");i.disabled=t.disabled,t.options.forEach(e=>{const s=document.createElement("option");s.value=e.value,s.textContent=__(e.label),s.selected=e.value===this.settings.get(t.id),i.appendChild(s)}),e.appendChild(i),i.addEventListener("change",e=>{this.settings.set(t.id,e.target.value),t.needsReload&&this.showRestartWarning()}),this.settings.subscribe(t.id,e=>{i.value=e})}createTextControl(e,t){const i=document.createElement("input");i.type="text",i.value=this.settings.get(t.id),i.disabled=t.disabled,i.placeholder=t.placeholder||"",e.appendChild(i),i.addEventListener("change",e=>{this.settings.set(t.id,e.target.value),t.needsReload&&this.showRestartWarning()}),this.settings.subscribe(t.id,e=>{i.value=e})}createColorControl(e,t){const i=document.createElement("div");i.className="color-wrapper";const s=document.createElement("input");s.type="color",s.value=this.settings.get(t.id),s.disabled=t.disabled;const a=document.createElement("input");a.type="text",a.value=this.settings.get(t.id),a.disabled=t.disabled,i.appendChild(s),i.appendChild(a),e.appendChild(i),s.addEventListener("input",e=>{a.value=e.target.value}),a.addEventListener("input",e=>{/^#[0-9A-F]{6}$/i.test(e.target.value)&&(s.value=e.target.value)}),s.addEventListener("change",e=>{this.settings.set(t.id,e.target.value),t.needsReload&&this.showRestartWarning()}),a.addEventListener("change",e=>{/^#[0-9A-F]{6}$/i.test(e.target.value)&&this.settings.set(t.id,e.target.value)}),this.settings.subscribe(t.id,e=>{s.value=e,a.value=e})}showRestartWarning(){this.editor.showButtonToast(__("Algunos cambios requieren reiniciar||Some changes require restart"),__("Reiniciar||Restart"),()=>{this.editor.showPopup(__("Reiniciar aplicación||Restart app"),__("¿Reiniciar la app? Los cambios sin guardar se perderán||Restart the app? Unsaved changes will be lost"),[{text:__("No||No"),class:"cancel",action:()=>{this.editor.hidePopup()}},{text:__("Sí||Yes"),action:()=>{window.location.reload()}}])})}showResetConfirm(){this.editor&&this.editor.showPopup(__("Restablecer ajustes||Reset settings"),__("¿Estás seguro?||Are you sure?"),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Restablecer||Reset"),action:()=>{this.settings.resetAll(),this.showCategory(this.settings.categories[0].id),this.editor.hidePopup()}}])}show(){this.overlay.style.display="flex",this.visible=!0,this.buildCategories(),this.settings.categories.length>0&&this.showCategory(this.settings.categories[0].id)}hide(){this.overlay.style.display="none",this.visible=!1}toggle(){this.visible?this.hide():this.show()}}class GridManager{constructor(e){this.editor=e,this.grids=[],this.panelVisible=!1,this.initOverlay(),this.initUI()}initOverlay(){this.overlay=document.querySelector(".grid-overlay"),this.overlay||(this.overlay=document.createElement("div"),this.overlay.className="grid-overlay",this.editor.canvasWrapper.appendChild(this.overlay))}initUI(){this.panel=document.createElement("div"),this.panel.className="grid-panel";const e=document.createElement("div");e.className="grid-panel-header";const t=document.createElement("div");t.className="grid-panel-title",t.textContent=__("Cuadrículas||Grids");const i=document.createElement("button");i.className="grid-panel-close",i.innerHTML="&times;",i.addEventListener("click",()=>this.hide()),e.appendChild(t),e.appendChild(i),this.panel.appendChild(e);const s=document.createElement("div");s.className="grid-toolbar";const a=document.createElement("button");a.className="grid-btn primary",a.innerHTML=`\n      <span class="icon icon-add"></span>\n      <span>${__("Añadir cuadrícula||Add grid")}</span>\n    `,a.addEventListener("click",()=>this.addGrid()),s.appendChild(a),this.panel.appendChild(s),this.listContainer=document.createElement("div"),this.listContainer.className="grid-list",this.panel.appendChild(this.listContainer),this.editor.uiLayer.appendChild(this.panel)}addGrid(){const e={id:"grid_"+Date.now()+"_"+Math.random().toString(36).substr(2,9),width:8,height:8,color:"#ff0000",opacity:.3,enabled:!0};this.grids.push(e),this.renderList(),this.renderGrids()}removeGrid(e){this.grids=this.grids.filter(t=>t.id!==e),this.renderList(),this.renderGrids()}duplicateGrid(e){const t=this.grids.find(t=>t.id===e);if(t){const i={id:"grid_"+Date.now()+"_"+Math.random().toString(36).substr(2,9),width:t.width,height:t.height,color:t.color,opacity:t.opacity,enabled:t.enabled},s=this.grids.findIndex(t=>t.id===e);this.grids.splice(s+1,0,i),this.renderList(),this.renderGrids()}}moveGridDown(e){const t=this.grids.findIndex(t=>t.id===e);if(t<this.grids.length-1){const e=this.grids[t];this.grids[t]=this.grids[t+1],this.grids[t+1]=e,this.renderList(),this.renderGrids()}}moveGridUp(e){const t=this.grids.findIndex(t=>t.id===e);if(t>0){const e=this.grids[t];this.grids[t]=this.grids[t-1],this.grids[t-1]=e,this.renderList(),this.renderGrids()}}updateGrid(e,t){const i=this.grids.find(t=>t.id===e);i&&(Object.assign(i,t),this.renderList(),this.renderGrids())}renderList(){if(this.listContainer.innerHTML="",0===this.grids.length){const e=document.createElement("div");return e.className="grid-empty",e.textContent=__("Sin cuadrículas||No grids"),void this.listContainer.appendChild(e)}this.grids.forEach((e,t)=>{const i=document.createElement("div");i.className="grid-item",i.dataset.id=e.id,t===this.grids.length-1&&(i.style.borderBottom="none");const s=document.createElement("div");s.className="grid-info";const a=document.createElement("div");a.className="grid-title-row";const r=document.createElement("input");r.type="number",r.className="grid-dimension-input",r.value=e.width,r.min=1,r.max=256,r.step=1,r.addEventListener("change",t=>{let i=parseInt(t.target.value);isNaN(i)&&(i=e.width),i=Math.max(1,Math.min(256,i)),r.value=i,this.updateGrid(e.id,{width:i})});const n=document.createElement("span");n.className="grid-dimension-sep",n.textContent="×";const o=document.createElement("input");o.type="number",o.className="grid-dimension-input",o.value=e.height,o.min=1,o.max=256,o.step=1,o.addEventListener("change",t=>{let i=parseInt(t.target.value);isNaN(i)&&(i=e.height),i=Math.max(1,Math.min(256,i)),o.value=i,this.updateGrid(e.id,{height:i})});const l=document.createElement("input");l.type="color",l.className="grid-color-inline",l.value=e.color,l.addEventListener("change",t=>{this.updateGrid(e.id,{color:t.target.value})}),a.appendChild(r),a.appendChild(n),a.appendChild(o),a.appendChild(l);const c=document.createElement("div");c.className="grid-controls-row";const h=document.createElement("div");h.className="grid-opacity-control";const d=document.createElement("span");d.className="grid-opacity-label",d.textContent=__("Opacidad||Opacity")+":";const p=document.createElement("input");p.type="range",p.className="grid-opacity-slider",p.min=0,p.max=100,p.value=Math.round(100*e.opacity),p.addEventListener("input",t=>{const i=parseInt(t.target.value);m.textContent=i+"%",this.updateGrid(e.id,{opacity:i/100})});const m=document.createElement("span");m.className="grid-opacity-value",m.textContent=Math.round(100*e.opacity)+"%",h.appendChild(d),h.appendChild(p),h.appendChild(m),c.appendChild(h),s.appendChild(a),s.appendChild(c);const u=document.createElement("div");u.className="grid-actions";const g=document.createElement("button");g.className="ui-button grid-action-btn",g.innerHTML=e.enabled?'<div class="icon icon-visible"></div>':'<div class="icon icon-hidden"></div>',g.title=__("Visibilidad||Toggle Visibility"),g.addEventListener("click",()=>{this.updateGrid(e.id,{enabled:!e.enabled})}),u.appendChild(g);const v=document.createElement("button");v.className="ui-button grid-action-btn",v.innerHTML='<div class="icon icon-up"></div>',v.title=__("Subir||Move Up"),t>0?v.addEventListener("click",()=>this.moveGridUp(e.id)):(v.disabled=!0,v.classList.add("disabled")),u.appendChild(v);const y=document.createElement("button");y.className="ui-button grid-action-btn",y.innerHTML='<div class="icon icon-down"></div>',y.title=__("Bajar||Move Down"),t<this.grids.length-1?y.addEventListener("click",()=>this.moveGridDown(e.id)):(y.disabled=!0,y.classList.add("disabled")),u.appendChild(y);const f=document.createElement("button");f.className="ui-button grid-action-btn",f.innerHTML='<div class="icon icon-copy"></div>',f.title=__("Duplicar||Duplicate"),f.addEventListener("click",()=>this.duplicateGrid(e.id)),u.appendChild(f);const C=document.createElement("button");C.className="ui-button grid-action-btn",C.innerHTML='<div class="icon icon-close"></div>',C.title=__("Eliminar||Remove"),C.addEventListener("click",()=>this.removeGrid(e.id)),u.appendChild(C),i.appendChild(s),i.appendChild(u),this.listContainer.appendChild(i)})}renderGrids(){this.overlay.innerHTML="";const e=this.editor.project.width,t=this.editor.project.height;Object.assign(this.overlay.style,{position:"absolute",width:e+"px",height:t+"px"}),this.grids.forEach(e=>{if(!e.enabled)return;const t=document.createElement("div");t.className="grid-layer";const i=`linear-gradient(to bottom, \n        ${e.color} 1px, \n        transparent 1px\n      )`,s=`linear-gradient(to right, \n        ${e.color} 1px, \n        transparent 1px\n      )`,a=Math.max(1,8*e.width),r=Math.max(1,8*e.height);Object.assign(t.style,{position:"absolute",top:"0",left:"0",width:"800%",height:"800%",backgroundImage:`${s}, ${i}`,backgroundSize:`${a}px ${r}px`,transform:"scale(0.125)",transformOrigin:"0 0",backgroundPosition:"-1px -1px",backgroundRepeat:"repeat",opacity:e.opacity,pointerEvents:"none",zIndex:"10"}),this.overlay.appendChild(t)})}show(){this.editor.menuPanel.classList.remove("visible"),this.editor.animationPanel.classList.remove("visible"),this.editor.layersPanel.classList.remove("visible"),this.editor.animationButton.classList.remove("active"),this.editor.layersButton.classList.remove("active"),this.panel.classList.add("visible"),this.editor.gridsButton.classList.add("active"),this.panelVisible=!0,this.renderList(),this.renderGrids()}hide(){this.panel.classList.remove("visible"),this.editor.menuPanel.classList.remove("visible"),this.editor.gridsButton.classList.remove("active"),this.panelVisible=!1}toggle(){this.panelVisible?this.hide():this.show()}updateTransform(){this.renderGrids()}}class ReferenceManager{constructor(e){this.editor=e,this.traceImage=null,this.traceOpacity=.5,this.traceOnTop=!1,this.floatingRefs=[],this.nextId=1,this.selectedRef=null,this.dragState=null,this.resizeState=null,this.traceControls=null,this.floatingContainer=null,this.deleteZone=null,this.init()}init(){this.createTraceControls(),this.createFloatingContainer(),this.setupDeleteZone(),this.setupEventListeners()}createTraceControls(){this.traceControls=document.createElement("div"),this.traceControls.className="trace-reference-controls";const e=document.createElement("div");e.className="trace-opacity-control",this.traceOpacityValue=document.createElement("span"),this.traceOpacityValue.className="trace-opacity-value",this.traceOpacityValue.textContent=100*this.traceOpacity+"%",e.appendChild(this.traceOpacityValue),this.traceOpacitySlider=document.createElement("input"),this.traceOpacitySlider.type="range",this.traceOpacitySlider.min="0",this.traceOpacitySlider.max="100",this.traceOpacitySlider.value=100*this.traceOpacity,this.traceOpacitySlider.className="trace-opacity-slider",this.traceOpacitySlider.addEventListener("input",e=>{this.traceOpacity=parseInt(e.target.value)/100,this.updateOpacityValue(e.target.value+"%"),this.editor.render()}),e.appendChild(this.traceOpacitySlider),this.traceControls.appendChild(e),this.traceToggleBtn=this.editor.createButton("trace-toggle","icon-switch-tool",()=>{this.traceOnTop=!this.traceOnTop,this.editor.render()}),this.traceToggleBtn.title=__("Alternar capa||Toggle Layer"),this.traceControls.appendChild(this.traceToggleBtn),this.traceRemoveBtn=this.editor.createButton("trace-remove","icon-close",()=>{this.removeTraceReference()}),this.traceRemoveBtn.title=__("Eliminar||Remove"),this.traceControls.appendChild(this.traceRemoveBtn),this.editor.uiLayer.appendChild(this.traceControls)}createFloatingContainer(){this.floatingContainer=document.createElement("div"),this.floatingContainer.className="floating-references-container",this.editor.overlayLayer.appendChild(this.floatingContainer)}setupDeleteZone(){this.deleteZone=document.createElement("div"),this.deleteZone.className="delete-zone",this.deleteZone.innerHTML='\n      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>\n      </svg>\n    ',this.editor.overlayLayer.appendChild(this.deleteZone)}setupEventListeners(){document.addEventListener("mousemove",e=>this.handleDragMove(e)),document.addEventListener("mouseup",e=>this.handleDragEnd(e)),document.addEventListener("touchmove",e=>this.handleDragMove(e),{passive:!1}),document.addEventListener("touchend",e=>this.handleDragEnd(e)),document.addEventListener("touchcancel",e=>this.handleDragEnd(e)),this.deleteZone.addEventListener("dragover",e=>{e.preventDefault(),this.deleteZone.classList.add("drag-over")}),this.deleteZone.addEventListener("dragleave",()=>{this.deleteZone.classList.remove("drag-over")}),this.deleteZone.addEventListener("drop",e=>{e.preventDefault(),this.deleteZone.classList.remove("drag-over"),this.selectedRef&&(this.removeFloatingReference(this.selectedRef.id),this.selectedRef=null)})}showReferenceTypeDialog(){this.editor.showPopup(__("Cargar Referencia||Load Reference"),__("¿Qué tipo de referencia quieres cargar?||What type of reference do you want to load?"),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Traza||Trace"),action:()=>{this.editor.hidePopup(),this.loadReference("trace")}},{text:__("Flotante||Floating"),action:()=>{this.editor.hidePopup(),this.loadReference("floating")}}])}loadReference(e){this.editor.getFileBrowser({title:__("Cargar imagen||Load image"),mode:"open",fileTypes:["png","jpg","jpeg","gif","webp"],onConfirm:async t=>{try{const i=await this.editor.readFile(t);await this.createReference(e,i)}catch(e){this.editor.showToast(__(`Error al cargar imagen: ${e.message}||Error loading image: ${e.message}`),5e3)}}}).show()}async createReference(e,t){return new Promise((i,s)=>{const a=new Image;a.onload=()=>{"trace"===e?this.setTraceReference(a):this.addFloatingReference(a),i()},a.onerror=s,a.src=t})}setTraceReference(e){this.traceImage=e,this.traceControls.classList.add("visible");const t=this.editor.canvasContainer.getBoundingClientRect(),i=Math.min(t.width/e.width*.8,t.height/e.height*.8);this.traceImageData={img:e,scale:i,x:0,y:0},this.editor.render(),this.editor.showToast(__("Referencia de traza cargada||Trace reference loaded"))}addFloatingReference(e){const t="ref_"+this.nextId++,i=this.editor.canvasContainer.getBoundingClientRect(),s=Math.min(200/e.width,200/e.height,1),a=e.width*s,r=e.height*s,n={id:t,img:e,x:(i.width-a)/2,y:(i.height-r)/2,width:a,height:r,scale:s,rotation:0};this.floatingRefs.push(n),this.renderFloatingReference(n),this.editor.showToast(__("Referencia flotante añadida||Floating reference added"))}startDrag(e,t){e.preventDefault(),e.stopPropagation(),this.selectedRef=t,this.updateSelection();const i=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,s=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY;this.dragState={ref:t,startX:i,startY:s,startLeft:t.x,startTop:t.y},this.bringToTop(t),this.deleteZone.classList.add("visible"),this.deleteZone.classList.remove("drag-over")}startResize(e,t){e.preventDefault(),e.stopPropagation(),this.selectedRef=t,this.updateSelection();const i=document.getElementById(t.id),s=i.getBoundingClientRect(),a=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,r=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY;let n="se";if(this.bringToTop(t),e.type.startsWith("touch")&&2===e.touches.length){const i=e.touches[0],s=e.touches[1],a=Math.hypot(s.clientX-i.clientX,s.clientY-i.clientY);this.resizeState={ref:t,type:"pinch",startDistance:a,startWidth:t.width,startHeight:t.height,startScale:t.scale,startX:t.x,startY:t.y,centerX:(i.clientX+s.clientX)/2,centerY:(i.clientY+s.clientY)/2}}else{const e=a-s.left,o=r-s.top;e<20?n="w":e>s.width-20&&(n="e"),o<20?n="w"===n?"nw":"e"===n?"ne":"n":o>s.height-20&&(n="w"===n?"sw":"e"===n?"se":"s"),this.resizeState={ref:t,type:"edge",direction:n,startX:a,startY:r,startLeft:t.x,startTop:t.y,startWidth:t.width,startHeight:t.height,aspect:t.width/t.height},i.style.cursor=n+"-resize",i.classList.add("resizing")}}handleDragMove(e){(this.dragState||this.resizeState)&&(e.preventDefault(),this.dragState?this.handleDrag(e):this.resizeState&&this.handleResize(e))}handleDrag(e){const t=this.dragState,i=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,s=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY,a=i-t.startX,r=s-t.startY;t.ref.x=t.startLeft+a,t.ref.y=t.startTop+r;const n=document.getElementById(t.ref.id);if(n){n.style.left=t.ref.x+"px",n.style.top=t.ref.y+"px";const e=this.deleteZone.getBoundingClientRect();i>=e.left&&i<=e.right&&s>=e.top&&s<=e.bottom?n.classList.add("over-delete"):n.classList.remove("over-delete")}}handleDragEnd(e){if(this.dragState){const t=e.type.startsWith("touchend")?e.changedTouches[0].clientX:e.clientX,i=e.type.startsWith("touchend")?e.changedTouches[0].clientY:e.clientY,s=this.deleteZone.getBoundingClientRect();t>=s.left&&t<=s.right&&i>=s.top&&i<=s.bottom&&(this.removeFloatingReference(this.dragState.ref.id),this.selectedRef=null);const a=document.getElementById(this.dragState.ref.id);a&&a.classList.remove("grabbing"),this.dragState=null}if(this.resizeState){const e=document.getElementById(this.resizeState.ref.id);e&&(e.classList.remove("resizing"),e.classList.remove("grabbing"),e.classList.remove("over-delete")),this.resizeState=null}this.deleteZone.classList.remove("visible","drag-over")}handleResize(e){const t=this.resizeState;if(!t)return;if(e.preventDefault(),"pinch"===t.type&&2===e.touches?.length){const i=e.touches[0],s=e.touches[1],a=Math.hypot(s.clientX-i.clientX,s.clientY-i.clientY)/t.startDistance,r=Math.max(20,t.startWidth*a),n=Math.max(20,t.startHeight*a);t.ref.width=r,t.ref.height=n,t.ref.scale=t.startScale*a;const o=(i.clientX+s.clientX)/2,l=(i.clientY+s.clientY)/2;if(t.centerX&&t.centerY){const e=o-t.centerX,i=l-t.centerY;t.ref.x=t.startX+e,t.ref.y=t.startY+i}t.centerX=o,t.centerY=l}else if("edge"===t.type){const i=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,s=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY,a=i-t.startX,r=s-t.startY;let n=t.startWidth,o=t.startHeight,l=t.startLeft,c=t.startTop;const h=t.direction,d=e.shiftKey||"se"==h;if(h.includes("e")&&(n=Math.max(20,t.startWidth+a),d&&(o=n/t.aspect)),h.includes("w")){const e=Math.min(a,t.startWidth-20);n=Math.max(20,t.startWidth-e),l=t.startLeft+(t.startWidth-n),d&&(o=n/t.aspect,c=t.startTop+(t.startHeight-o)/2)}if(h.includes("s")&&(o=Math.max(20,t.startHeight+r),d&&(n=o*t.aspect)),h.includes("n")){const e=Math.min(r,t.startHeight-20);o=Math.max(20,t.startHeight-e),c=t.startTop+(t.startHeight-o),d&&(n=o*t.aspect,l=t.startLeft+(t.startWidth-n)/2)}t.ref.width=n,t.ref.height=o,t.ref.x=l,t.ref.y=c}const i=document.getElementById(t.ref.id);i&&(i.style.width=t.ref.width+"px",i.style.height=t.ref.height+"px",i.style.left=t.ref.x+"px",i.style.top=t.ref.y+"px")}handleDragMove(e){if(this.dragState||this.resizeState)if(e.preventDefault(),this.dragState){this.handleDrag(e);const t=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,i=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY,s=this.deleteZone.getBoundingClientRect();t>=s.left&&t<=s.right&&i>=s.top&&i<=s.bottom?this.deleteZone.classList.add("drag-over"):this.deleteZone.classList.remove("drag-over")}else this.resizeState&&this.handleResize(e)}bringToTop(e){const t=this.floatingContainer.children;let i=20;for(let e=0;e<t.length;e++){const s=parseInt(window.getComputedStyle(t[e]).zIndex)||20;s>i&&(i=s)}const s=document.getElementById(e.id);s&&(s.style.zIndex=(i+1).toString()),this.selectedRef=e,this.updateSelection()}updateSelection(){const e=this.floatingContainer.children;for(let t=0;t<e.length;t++)e[t].classList.remove("selected");if(this.selectedRef){const e=document.getElementById(this.selectedRef.id);e&&e.classList.add("selected")}}renderFloatingReference(e){const t=document.getElementById(e.id);t&&t.remove();const i=document.createElement("div");i.id=e.id,i.className="floating-reference",this.selectedRef&&this.selectedRef.id===e.id&&i.classList.add("selected"),i.style.left=e.x+"px",i.style.top=e.y+"px",i.style.width=e.width+"px",i.style.height=e.height+"px",i.style.transform=`rotate(${e.rotation}deg)`;const s=document.createElement("img");s.src=e.img.src,s.draggable=!1,i.appendChild(s);["nw","n","ne","e","se","s","sw","w"].forEach(t=>{const s=document.createElement("div");s.className=`resize-handle ${t}`,s.setAttribute("data-direction",t),s.addEventListener("mousedown",t=>{t.stopPropagation(),this.startResize(t,e)}),s.addEventListener("touchstart",t=>{t.stopPropagation(),1===t.touches.length&&this.startResize(t,e)},{passive:!1}),i.appendChild(s)}),i.addEventListener("click",t=>{t.stopPropagation(),this.bringToTop(e)}),i.addEventListener("mousedown",t=>{t.target.classList.contains("resize-handle")||(this.startDrag(t,e),i.classList.add("grabbing"))}),i.addEventListener("touchstart",t=>{t.target.classList.contains("resize-handle")?2===t.touches.length&&this.startResize(t,e):(this.startDrag(t,e),i.classList.add("grabbing"))},{passive:!1}),this.floatingContainer.appendChild(i)}removeTraceReference(){this.traceImage=null,this.traceImageData=null,this.traceControls.classList.remove("visible"),this.editor.render(),this.editor.showToast(__("Referencia de traza eliminada||Trace reference removed"))}removeFloatingReference(e){const t=this.floatingRefs.findIndex(t=>t.id===e);if(-1===t)return;this.floatingRefs.splice(t,1);const i=document.getElementById(e);i&&i.remove(),this.selectedRef&&this.selectedRef.id===e&&(this.selectedRef=null),this.editor.showToast(__("Referencia eliminada||Reference removed"))}updateOpacityValue(e){this.traceOpacityValue&&(this.traceOpacityValue.textContent=e)}renderBottom(e,t,i){this.traceImage&&!this.traceOnTop&&this.drawTraceReference(e,t,i)}renderTop(e,t,i){this.traceImage&&this.traceOnTop&&this.drawTraceReference(e,t,i)}drawTraceReference(e,t,i){this.traceImage&&(e.globalAlpha=this.traceOpacity,e.drawImage(this.traceImage,0,0,t,i),e.globalAlpha=1)}destroy(){this.floatingRefs.forEach(e=>{const t=document.getElementById(e.id);t&&t.remove()}),this.floatingRefs=[],this.traceControls&&this.traceControls.remove(),this.floatingContainer&&this.floatingContainer.remove()}}class SpritesheetLoader{constructor(e){this.editor=e,this.image=null,this.imageData=null,this.imageUrl=null,this.frameWidth=16,this.frameHeight=16,this.offsetX=0,this.offsetY=0,this.frames=[],this.totalFrames=0,this.cols=0,this.rows=0,this.fullCanvas=null,this.previewContainer=null,this.widthInput=null,this.heightInput=null,this.offsetXInput=null,this.offsetYInput=null,this.frameCountSpan=null,this.thumbnailCanvases=[],this.thumbnailWidth=60,this.thumbnailHeight=60,this.scrollTimeout=null,this.selectedFrames=new Set,this.popupButtons=[]}show(){this.frames=[],this.selectedFrames.clear(),this.offsetX=0,this.offsetY=0,this.frameWidth=16,this.frameHeight=16,this.showFileBrowser()}showFileBrowser(){this.editor.getFileBrowser({title:__("Cargar Spritesheet||Load Spritesheet"),mode:"open",fileTypes:["png","jpg","jpeg","gif","webp"],onConfirm:async e=>{try{const t=await this.editor.readFile(e);this.showSpritesheetDialog(),await this.loadImage(t),this.updateGrid()}catch(e){this.editor.showToast(__(`Error al cargar imagen: ${e.message}||Error loading image: ${e.message}`),5e3)}}}).show()}showSpritesheetDialog(){const e=this.createPopupContent();this.editor.showPopup(__("Cargar Spritesheet||Load Spritesheet"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>{this.cleanup(),this.editor.hidePopup()}},{text:__("Cargar seleccionados||Load selected"),action:()=>{this.loadSelectedFrames()}}],!0),this.popupButtons=this.editor.popupButtons}createPopupContent(){const e=document.createElement("div");e.className="spritesheet-loader-container";const t=document.createElement("div");t.className="spritesheet-main-content",e.appendChild(t);const i=document.createElement("div");i.className="spritesheet-left-side",t.appendChild(i);const s=document.createElement("div");s.className="spritesheet-section-label",s.textContent=__("Spritesheet Completo||Full Spritesheet"),i.appendChild(s);const a=document.createElement("div");a.className="spritesheet-canvas-container",i.appendChild(a),this.fullCanvas=document.createElement("canvas"),this.fullCanvas.className="spritesheet-full-canvas",a.appendChild(this.fullCanvas),this.fullCanvas.addEventListener("click",e=>this.handleCanvasClick(e));const r=document.createElement("div");r.className="spritesheet-right-side",t.appendChild(r);const n=document.createElement("div");n.className="spritesheet-section-label",n.textContent=__("Frames Individuales||Individual Frames"),r.appendChild(n),this.previewContainer=document.createElement("div"),this.previewContainer.className="spritesheet-preview-container",r.appendChild(this.previewContainer),this.frameCountSpan=document.createElement("div"),this.frameCountSpan.className="spritesheet-frame-count",this.frameCountSpan.textContent=__("0 frames||0 frames"),r.appendChild(this.frameCountSpan);const o=document.createElement("div");o.className="spritesheet-controls",r.appendChild(o);const l=document.createElement("div");l.className="spritesheet-input-row",o.appendChild(l);const c=document.createElement("span");c.className="spritesheet-input-label",c.textContent=__("Ancho||Width")+":",l.appendChild(c),this.widthInput=document.createElement("input"),this.widthInput.type="number",this.widthInput.value=this.frameWidth,this.widthInput.className="spritesheet-number-input",this.widthInput.addEventListener("change",()=>this.updateGrid()),l.appendChild(this.widthInput);const h=document.createElement("span");h.className="spritesheet-x-label",h.textContent="x",l.appendChild(h),this.heightInput=document.createElement("input"),this.heightInput.type="number",this.heightInput.value=this.frameHeight,this.heightInput.className="spritesheet-number-input",this.heightInput.addEventListener("change",()=>this.updateGrid()),l.appendChild(this.heightInput);const d=document.createElement("div");d.className="spritesheet-input-row",o.appendChild(d);const p=document.createElement("span");p.className="spritesheet-input-label",p.textContent=__("Offset X||Offset X")+":",d.appendChild(p),this.offsetXInput=document.createElement("input"),this.offsetXInput.type="number",this.offsetXInput.value=this.offsetX,this.offsetXInput.className="spritesheet-number-input",this.offsetXInput.addEventListener("change",()=>this.updateGrid()),d.appendChild(this.offsetXInput);const m=document.createElement("div");m.className="spritesheet-input-row",o.appendChild(m);const u=document.createElement("span");u.className="spritesheet-input-label",u.textContent=__("Offset Y||Offset Y")+":",m.appendChild(u),this.offsetYInput=document.createElement("input"),this.offsetYInput.type="number",this.offsetYInput.value=this.offsetY,this.offsetYInput.className="spritesheet-number-input",this.offsetYInput.addEventListener("change",()=>this.updateGrid()),m.appendChild(this.offsetYInput);const g=document.createElement("div");g.className="spritesheet-selection-row",o.appendChild(g);const v=document.createElement("button");v.className="ui-button spritesheet-select-btn",v.textContent=__("Seleccionar todo||Select All"),v.addEventListener("click",()=>this.selectAllFrames()),g.appendChild(v);const y=document.createElement("button");return y.className="ui-button spritesheet-select-btn",y.textContent=__("Deseleccionar todo||Deselect All"),y.addEventListener("click",()=>this.deselectAllFrames()),g.appendChild(y),this.previewContainer.addEventListener("scroll",()=>{this.scrollTimeout&&clearTimeout(this.scrollTimeout),this.scrollTimeout=setTimeout(()=>{this.updateVisibleThumbnails()},100)}),e}handleCanvasClick(e){if(!this.image||!this.frames.length)return;const t=this.fullCanvas.getBoundingClientRect(),i=this.fullCanvas.width/t.width,s=this.fullCanvas.height/t.height,a=Math.floor((e.clientX-t.left)*i),r=Math.floor((e.clientY-t.top)*s);if(a<this.offsetX||r<this.offsetY)return;if(a>=this.offsetX+this.cols*this.frameWidth)return;if(r>=this.offsetY+this.rows*this.frameHeight)return;const n=Math.floor((a-this.offsetX)/this.frameWidth),o=Math.floor((r-this.offsetY)/this.frameHeight)*this.cols+n;if(o>=0&&o<this.frames.length){const e=this.previewContainer.children;e[o]&&this.toggleFrameSelection(o,e[o])}}async loadImage(e){return new Promise((t,i)=>{const s=new Image;s.onload=()=>{this.image=s,this.imageUrl=e,this.fullCanvas.width=s.width,this.fullCanvas.height=s.height;const i=this.fullCanvas.getContext("2d");i.imageSmoothingEnabled=!1,i.drawImage(s,0,0),this.imageData=i.getImageData(0,0,s.width,s.height),this.autoDetectFrameSize(),t()},s.onerror=i,s.src=e})}autoDetectFrameSize(){if(!this.image)return;const e=this.image.width,t=this.image.height,i=[8,12,16,20,24,28,32,48,64];for(const s of i.reverse())if(e%s===0&&t%s===0){this.frameWidth=s,this.frameHeight=s;break}16===this.frameWidth&&e%16!=0&&(this.frameWidth=16,this.frameHeight=16),this.widthInput&&(this.widthInput.value=this.frameWidth,this.heightInput.value=this.frameHeight)}updateGrid(){if(this.frameWidth=parseInt(this.widthInput.value)||16,this.frameHeight=parseInt(this.heightInput.value)||16,this.offsetX=parseInt(this.offsetXInput.value)||0,this.offsetY=parseInt(this.offsetYInput.value)||0,!this.image)return;const e=this.image.width-this.offsetX,t=this.image.height-this.offsetY;this.cols=Math.floor(e/this.frameWidth),this.rows=Math.floor(t/this.frameHeight),this.totalFrames=this.cols*this.rows,this.frameCountSpan.textContent=__(`${this.totalFrames} frames||${this.totalFrames} frames`),this.popupButtons&&this.popupButtons.length>1&&(this.popupButtons[1].disabled=0===this.totalFrames),this.frames=[],this.thumbnailCanvases=[],this.previewContainer.innerHTML="",this.selectedFrames.clear();for(let e=0;e<this.rows;e++)for(let t=0;t<this.cols;t++){const i=e*this.cols+t;this.createFramePreview(i,t,e)}this.drawGridOverlay(),this.updateVisibleThumbnails()}createFramePreview(e,t,i){const s=this.offsetX+t*this.frameWidth,a=this.offsetY+i*this.frameHeight;this.frames[e]={index:e,x:s,y:a,width:this.frameWidth,height:this.frameHeight,col:t,row:i};const r=document.createElement("div");r.className="frame-preview-item",this.selectedFrames.has(e)&&r.classList.add("selected"),r.dataset.index=e,r.addEventListener("click",t=>{t.stopPropagation(),this.toggleFrameSelection(e,r)});const n=document.createElement("canvas");n.width=this.thumbnailWidth,n.height=this.thumbnailHeight,n.className="frame-thumbnail-canvas",this.thumbnailCanvases[e]={canvas:n,item:r,x:s,y:a,loaded:!1};const o=document.createElement("div");o.className="frame-info",o.textContent=`${e+1}: ${t},${i}`,r.appendChild(n),r.appendChild(o),this.previewContainer.appendChild(r)}updateVisibleThumbnails(){if(!this.previewContainer)return;const e=this.previewContainer.getBoundingClientRect(),t=this.previewContainer.children;for(let i=0;i<t.length;i++){const s=t[i].getBoundingClientRect();s.top<e.bottom&&s.bottom>e.top&&this.thumbnailCanvases[i]&&!this.thumbnailCanvases[i].loaded&&this.renderThumbnail(i)}}renderThumbnail(e){const t=this.thumbnailCanvases[e];if(!t||t.loaded||!this.imageData)return;const i=this.frames[e];if(!i)return;const s=t.canvas.getContext("2d");s.imageSmoothingEnabled=!1,s.clearRect(0,0,t.canvas.width,t.canvas.height);const a=document.createElement("canvas");a.width=this.frameWidth,a.height=this.frameHeight;const r=a.getContext("2d");r.imageSmoothingEnabled=!1;const n=this.editor.ctx.createImageData(this.frameWidth,this.frameHeight);for(let e=0;e<this.frameHeight;e++)for(let t=0;t<this.frameWidth;t++){const s=i.x+t,a=4*((i.y+e)*this.image.width+s),r=4*(e*this.frameWidth+t);n.data[r]=this.imageData.data[a],n.data[r+1]=this.imageData.data[a+1],n.data[r+2]=this.imageData.data[a+2],n.data[r+3]=this.imageData.data[a+3]}r.putImageData(n,0,0),s.drawImage(a,0,0,this.frameWidth,this.frameHeight,0,0,t.canvas.width,t.canvas.height),t.loaded=!0}drawGridOverlay(){const e=this.fullCanvas.getContext("2d");e.clearRect(0,0,this.fullCanvas.width,this.fullCanvas.height),e.drawImage(this.image,0,0),e.strokeStyle="rgba(255, 0, 0, 0.5)",e.lineWidth=1;for(let t=0;t<=this.cols;t++){const i=this.offsetX+t*this.frameWidth;e.beginPath(),e.moveTo(i,this.offsetY),e.lineTo(i,this.offsetY+this.rows*this.frameHeight),e.stroke()}for(let t=0;t<=this.rows;t++){const i=this.offsetY+t*this.frameHeight;e.beginPath(),e.moveTo(this.offsetX,i),e.lineTo(this.offsetX+this.cols*this.frameWidth,i),e.stroke()}e.fillStyle="rgba(255, 255, 0, 0.2)",this.selectedFrames.forEach(t=>{const i=this.frames[t];i&&e.fillRect(i.x,i.y,i.width,i.height)})}toggleFrameSelection(e,t){this.selectedFrames.has(e)?(this.selectedFrames.delete(e),t.classList.remove("selected")):(this.selectedFrames.add(e),t.classList.add("selected")),this.drawGridOverlay()}selectAllFrames(){for(let e=0;e<this.frames.length;e++)this.selectedFrames.add(e);const e=this.previewContainer.children;for(let t=0;t<e.length;t++)e[t].classList.add("selected");this.drawGridOverlay()}deselectAllFrames(){this.selectedFrames.clear();const e=this.previewContainer.children;for(let t=0;t<e.length;t++)e[t].classList.remove("selected");this.drawGridOverlay()}loadSelectedFrames(){0!==this.selectedFrames.size?this.showLoadOptionDialog():this.editor.showToast(__("Selecciona al menos un frame||Select at least one frame"),2e3)}showLoadOptionDialog(){this.editor.showPopup(__("Cargar Frames||Load Frames"),__("¿Cómo quieres cargar los frames?||How do you want to load the frames?"),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Nuevo Proyecto||New Project"),action:()=>{this.editor.hidePopup(),this.createNewProjectFromFrames()}},{text:__("Añadir al proyecto||Add to project"),action:()=>{this.editor.hidePopup(),this.addFramesToProject()}}])}createNewProjectFromFrames(){if(0===this.selectedFrames.size)return;const e=Array.from(this.selectedFrames).sort((e,t)=>e-t),t=this.frames[e[0]];this.editor.newProject(t.width,t.height),e.forEach(e=>{const t=this.frames[e];this.addFrameToProject(t)}),this.editor.removeFrame(0,!0),this.editor.project.currentFrame=0,this.editor.updateFramesUI(),this.editor.render(),this.editor.showToast(__(`${e.length} frames cargados||${e.length} frames loaded`)),this.cleanup(),this.editor.hidePopup()}addFramesToProject(){if(0===this.selectedFrames.size)return;const e=this.frames[Array.from(this.selectedFrames)[0]];e.width!==this.editor.project.width||e.height!==this.editor.project.height?this.editor.showPopup(__("Dimensiones diferentes||Different dimensions"),__(`Los frames tienen tamaño ${e.width}x${e.height} pero el proyecto actual es ${this.editor.project.width}x${this.editor.project.height}. ¿Redimensionar proyecto?||Frames are ${e.width}x${e.height} but current project is ${this.editor.project.width}x${this.editor.project.height}. Resize project?`),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Redimensionar||Resize"),action:()=>{this.editor.hidePopup(),this.editor.resizeCanvas(0,0,e.width,e.height,!0),this.performAddFrames()}},{text:__("Mantener tamaño||Keep size"),action:()=>{this.editor.hidePopup(),this.performAddFrames()}}]):this.performAddFrames()}performAddFrames(){const e=Array.from(this.selectedFrames).sort((e,t)=>e-t);e.forEach(e=>{const t=this.frames[e];this.addFrameToProject(t)}),this.editor.updateFramesUI(),this.editor.render(),this.editor.showToast(__(`${e.length} frames añadidos||${e.length} frames added`)),this.cleanup(),this.editor.hidePopup()}addFrameToProject(e){const t={layers:[]},i=this.editor.project.frames[this.editor.project.currentFrame];for(let e=0;e<i.layers.length;e++){const s=i.layers[e],a=this.editor.createBlankLayer(this.editor.project.width,this.editor.project.height,s.name);a.visible=s.visible,t.layers.push(a)}const s=t.layers[0].ctx,a=this.editor.ctx.createImageData(this.frameWidth,this.frameHeight);for(let t=0;t<this.frameHeight;t++)for(let i=0;i<this.frameWidth;i++){const s=e.x+i,r=4*((e.y+t)*this.image.width+s),n=4*(t*this.frameWidth+i);for(let e=0;e<4;e++)a.data[n+e]=this.imageData.data[r+e]}if(this.frameWidth!==this.editor.project.width||this.frameHeight!==this.editor.project.height){const e=document.createElement("canvas");e.width=this.frameWidth,e.height=this.frameHeight;const t=e.getContext("2d");t.imageSmoothingEnabled=!1,t.putImageData(a,0,0);const i=Math.floor((this.editor.project.width-this.frameWidth)/2),r=Math.floor((this.editor.project.height-this.frameHeight)/2);s.clearRect(0,0,s.canvas.width,s.canvas.height),s.drawImage(e,i,r)}else s.putImageData(a,0,0);this.editor.project.frames.push(t),this.editor.project.frameTimes.push(this.editor.defaultFrameTime)}cleanup(){this.image=null,this.imageData=null,this.frames=[],this.selectedFrames.clear(),this.thumbnailCanvases=[]}}class HistoryManager{constructor(e){this.editor=e,this.history=[],this.historyIndex=-1,this.maxHistoryLength=1/0,this.currentBatch=null}startBatch(e,t){this.currentBatch&&this.endBatch(),this.currentBatch={type:e,description:t,timestamp:Date.now(),operations:[]}}endBatch(){this.currentBatch&&this.currentBatch.operations.length>0&&this.addToHistory(this.currentBatch),this.currentBatch=null}addChange(e){this.currentBatch?this.currentBatch.operations.push(e):this.addToHistory({type:e.type,description:e.description,timestamp:Date.now(),operations:[e]})}addToHistory(e){this.history=this.history.slice(0,this.historyIndex+1),this.history.push(e),this.historyIndex++,this.history.length>this.maxHistoryLength&&(this.history.shift(),this.historyIndex--)}undo(){if(this.historyIndex<0)return null;const e=this.history[this.historyIndex];return this.applyHistoryEntry(e,!0),this.historyIndex--,{entry:e,message:__(`(Deshacer|Undo) '${e.description}'`)}}redo(){if(this.historyIndex>=this.history.length-1)return null;this.historyIndex++;const e=this.history[this.historyIndex];return this.applyHistoryEntry(e,!1),{entry:e,message:__(`(Rehacer|Redo) '${e.description}'`)}}applyHistoryEntry(e,t,i){const s=t?[...e.operations].reverse():e.operations;i||(i=this.editor.project),s.forEach(e=>{switch(e.type){case"draw":this.applyDrawOperation(i,e,t);break;case"add_frame":this.applyAddFrameOperation(i,e,t);break;case"remove_frame":this.applyRemoveFrameOperation(i,e,t);break;case"duplicate_frame":this.applyDuplicateFrameOperation(i,e,t);break;case"edit_frame":this.applyEditFrameOperation(i,e,t);break;case"move_frame":this.applyMoveFrameOperation(i,e,t);break;case"change_animation_fps":this.applyChangeFPSOperation(i,e,t);break;case"add_layer":this.applyAddLayerOperation(i,e,t);break;case"remove_layer":this.applyRemoveLayerOperation(i,e,t);break;case"duplicate_layer":this.applyDuplicateLayerOperation(i,e,t);break;case"rename_layer":this.applyRenameLayerOperation(i,e,t);break;case"merge_layers":this.applyMergeLayersOperation(i,e,t);break;case"change_layer_visibility":this.applyLayerVisibilityOperation(i,e,t);break;case"move_layer":this.applyMoveLayerOperation(i,e,t);break;case"transform":this.applyTransformOperation(i,e,t);break;case"color_adjustment":this.applyColorAdjustmentOperation(i,e,t);break;case"resize_canvas":this.applyResizeCanvasOperation(i,e,t)}}),this.editor.updateFramesUI(),this.editor.updateLayersUI(),this.editor.render()}applyDrawOperation(e,t,i){const{frameIndex:s,layerIndex:a,pixels:r}=t,n=e.frames[s].layers[a].ctx;r.forEach(e=>{const{x:t,y:s,oldColor:a,newColor:r}=e,o=i?a:r;"transparent"===o?n.clearRect(t,s,1,1):(n.fillStyle=o,n.fillRect(t,s,1,1))})}applyAddFrameOperation(e,t,i){if(i)e.frames.splice(t.index,1),e.frameTimes.splice(t.index,1),e.currentFrame=Math.min(t.index,e.frames.length-1);else{const i={layers:t.layers.map(t=>{const i=this.editor.createBlankLayer(e.width,e.height,t.name);if(i.visible=t.visible,t.imageData){const s=i.ctx,a=new ImageData(new Uint8ClampedArray(t.imageData),e.width,e.height);s.putImageData(a,0,0)}return i})};e.frames.splice(t.index,0,i),e.frameTimes.splice(t.index,0,t.frameTime),e.currentFrame=t.index}}applyRemoveFrameOperation(e,t,i){this.applyAddFrameOperation(e,t,!i)}applyDuplicateFrameOperation(e,t,i){if(i)e.frames.splice(t.index,1),e.frameTimes.splice(t.index,1),e.currentFrame=Math.min(t.index,this.editor.project.frames.length-1);else{const i={layers:t.layers.map(t=>{const i=this.editor.createBlankLayer(e.width,e.height,t.name);if(i.visible=t.visible,t.imageData){const s=i.ctx,a=new ImageData(new Uint8ClampedArray(t.imageData),e.width,e.height);s.putImageData(a,0,0)}return i})};e.frames.splice(t.index,0,i),e.frameTimes.splice(t.index,0,t.frameTime),e.currentFrame=t.index}}applyEditFrameOperation(e,t,i){const{frameIndex:s,property:a,oldValue:r,newValue:n}=t;"time"===a&&(e.frameTimes[s]=i?r:n)}applyMoveFrameOperation(e,t,i){const{fromIndex:s,toIndex:a}=t;if(i){const t=e.frames.splice(a,1)[0],i=e.frameTimes.splice(a,1)[0];e.frames.splice(s,0,t),e.frameTimes.splice(s,0,i)}else{const t=e.frames.splice(s,1)[0],i=e.frameTimes.splice(s,1)[0];e.frames.splice(a,0,t),e.frameTimes.splice(a,0,i)}}applyChangeFPSOperation(e,t,i){e.frameTimes=i?t.oldFrameTimes:t.newFrameTimes;const s=i?t.oldFPS:t.newFPS;e.currentFrameTime=1e3/t.newFPS,this.editor.fpsInput.value=s}applyAddLayerOperation(e,t,i){const{frameIndex:s,layerIndex:a,layerData:r}=t,n=e.frames[s];if(i)n.layers.splice(a,1),e.currentLayer=Math.min(a,n.layers.length-1);else{const t=this.editor.createBlankLayer(e.width,e.height,r.name);if(t.visible=r.visible,r.imageData){const i=t.ctx,s=new ImageData(new Uint8ClampedArray(r.imageData),e.width,e.height);i.putImageData(s,0,0)}n.layers.splice(a,0,t),e.currentLayer=a}}applyRemoveLayerOperation(e,t,i){this.applyAddLayerOperation(e,t,!i)}applyDuplicateLayerOperation(e,t,i){const{frameIndex:s,layerIndex:a,layerData:r}=t,n=this.editor.project.frames[s];if(i)n.layers.splice(a,1),this.editor.project.currentLayer=Math.min(a,n.layers.length-1);else{const e=this.editor.createBlankLayer(this.editor.project.width,this.editor.project.height,r.name);if(e.visible=r.visible,r.imageData){const t=e.ctx,i=new ImageData(new Uint8ClampedArray(r.imageData),this.editor.project.width,this.editor.project.height);t.putImageData(i,0,0)}n.layers.splice(a,0,e),this.editor.project.currentLayer=a}}applyRenameLayerOperation(e,t,i){const{layerIndex:s,previousName:a,newName:r}=t;e.frames.forEach(e=>{e.layers[s].name=i?a:r})}applyMergeLayersOperation(e,t,i){const{frameIndex:s,sourceIndex:a,targetIndex:r,sourceData:n,targetData:o}=t,l=projectframes[s];if(i){const t=this.editor.createBlankLayer(e.width,e.height,n.name);t.visible=n.visible;const i=new ImageData(new Uint8ClampedArray(n.imageData),e.width,e.height);t.ctx.putImageData(i,0,0);const s=l.layers[r];s.ctx.clearRect(0,0,e.width,e.height);const c=new ImageData(new Uint8ClampedArray(o.imageData),e.width,e.height);s.ctx.putImageData(c,0,0),l.layers.splice(a,0,t),a<=e.currentLayer&&e.currentLayer++}else{const t=l.layers[a];l.layers[r].ctx.drawImage(t.canvas,0,0),l.layers.splice(a,1),a<e.currentLayer?e.currentLayer--:a===e.currentLayer&&(e.currentLayer=r)}}applyLayerVisibilityOperation(e,t,i){const{frameIndex:s,layerIndex:a,visible:r}=t;e.frames[s].layers[a].visible=i?!r:r}applyMoveLayerOperation(e,t,i){const{frameIndex:s,fromIndex:a,toIndex:r}=t,n=e.frames[s];if(i){const e=n.layers.splice(r,1)[0];n.layers.splice(a,0,e)}else{const e=n.layers.splice(a,1)[0];n.layers.splice(r,0,e)}}applyTransformOperation(e,t,i){const{frameIndex:s,layerIndex:a,transformType:r,transformData:n}=t,o=e.frames[s].layers[a].ctx;o.clearRect(0,0,e.width,e.height);const l=new ImageData(new Uint8ClampedArray(i?n.oldImageData:n.newImageData),e.width,e.height);o.putImageData(l,0,0)}applyColorAdjustmentOperation(e,t,i){const{frameIndex:s,layerIndex:a,adjustmentType:r,adjustmentData:n}=t,o=e.frames[s].layers[a].ctx,l=new ImageData(new Uint8ClampedArray(i?n.oldImageData:n.newImageData),e.width,e.height);o.putImageData(l,0,0)}applyResizeCanvasOperation(e,t,i){const{oldWidth:s,oldHeight:a,newWidth:r,newHeight:n,cropX:o,cropY:l,framesData:c}=t,h=e.currentFrame,d=e.currentLayer,p=i?s:r,m=i?a:n;e.width=p,e.height=m,this.editor.resetCanvasSize(),e.frames.forEach((e,t)=>{const h=c&&c[t];h&&e.layers.forEach((e,t)=>{const c=h.layers&&h.layers[t];if(!c)return;const d=4*s*a;let p=c.imageData;if(p&&p.length===d||(p=new Array(d).fill(0)),i){const t=new ImageData(new Uint8ClampedArray(p),s,a),i=document.createElement("canvas");i.width=s,i.height=a;i.getContext("2d").putImageData(t,0,0),e.canvas.width=s,e.canvas.height=a,e.ctx.clearRect(0,0,s,a),e.ctx.drawImage(i,0,0)}else{const t=new ImageData(new Uint8ClampedArray(p),s,a),i=document.createElement("canvas");i.width=s,i.height=a;i.getContext("2d").putImageData(t,0,0),e.canvas.width=r,e.canvas.height=n,e.ctx.clearRect(0,0,r,n),e.ctx.drawImage(i,-o,-l)}})}),e.currentFrame=Math.min(h,e.frames.length-1),e.currentLayer=Math.min(d,e.frames[e.currentFrame].layers.length-1),this.editor.updateCanvasTransform(),this.editor.render()}async generateTimelapse(e,t,i){const s=this.editor.getNewProjectData(this.editor.project.width,this.editor.project.height),a=[...this.editor.project.frameTimes],{canvas:r,ctx:n}=this.editor.getTempCanvas(s.width*t,s.height*t),o=r.captureStream(),l=new MediaRecorder(o,{mimeType:"video/webm;codecs=vp9",videoBitsPerSecond:8e6}),c=[];return l.ondataavailable=e=>{e.data.size>0&&c.push(e.data)},new Promise(o=>{l.onstop=()=>{const e=new Blob(c,{type:"video/webm"});o(e)},l.start(),this.replayHistoryForTimelapse(s,a,r,n,t,e,i,()=>{setTimeout(()=>l.stop(),1e3/e)})})}async replayHistoryForTimelapse(e,t,i,s,a,r,n,o){const l=1e3/r;let c=0,h=e.currentFrame||0;const d=async()=>{if(c>=this.history.length)return void o();const a=this.history[c];this.applyHistoryEntryToProject(a,e,t,!1);const r=e.currentFrame||0;h=r,s.clearRect(0,0,i.width,i.height),this.editor.transparentBackground?(s.fillStyle="#ffffff",s.fillRect(0,0,i.width,i.height)):(s.fillStyle=this.editor.secondaryColor,s.fillRect(0,0,i.width,i.height));const p=document.createElement("canvas");p.width=e.width,p.height=e.height;const m=this.editor.getCanvasContext(p),u=e.frames[r];for(let t=0;t<u.layers.length;t++){const a=u.layers[t];if(a.visible){if(m.clearRect(0,0,e.width,e.height),a.imageData){const t=new ImageData(new Uint8ClampedArray(a.imageData),e.width,e.height);m.putImageData(t,0,0)}else a.canvas&&m.drawImage(a.canvas,0,0);s.imageSmoothingEnabled=!1,s.drawImage(p,0,0,e.width,e.height,0,0,i.width,i.height)}}n(Math.floor(c/this.history.length*100),i.toDataURL()),c++,c<this.history.length?setTimeout(d,l):setTimeout(()=>{o()},l)};d()}applyHistoryEntryToProject(e,t,i,s){(s?[...e.operations].reverse():e.operations).forEach(e=>{switch(e.type){case"add_frame":this.applyAddFrameToProject(e,t,i,s);break;case"remove_frame":this.applyRemoveFrameToProject(e,t,i,s);break;case"edit_frame":"time"===e.property&&(i[e.frameIndex]=s?e.oldValue:e.newValue);break;case"move_frame":this.applyMoveFrameToProject(e,t,i,s);break;case"change_animation_fps":break;case"add_layer":this.applyAddLayerToProject(e,t,s);break;case"remove_layer":this.applyRemoveLayerToProject(e,t,s);break;case"change_layer_visibility":const a=t.frames[e.frameIndex];a&&a.layers[e.layerIndex]&&(a.layers[e.layerIndex].visible=s?!e.visible:e.visible);break;case"move_layer":this.applyMoveLayerToProject(e,t,s);break;case"transform":this.applyTransformToProject(e,t,s);break;case"color_adjustment":this.applyColorAdjustmentToProject(e,t,s);break;case"draw":this.applyDrawToProject(e,t,s)}})}applyAddFrameToProject(e,t,i,s){if(s)t.frames.splice(e.index,1),i.splice(e.index,1);else{const s={layers:e.layers.map(e=>{const i=document.createElement("canvas"),s={canvas:i,ctx:this.editor.getCanvasContext(i),visible:e.visible,name:e.name};if(s.canvas.width=t.width,s.canvas.height=t.height,e.imageData){const i=s.ctx,a=new ImageData(new Uint8ClampedArray(e.imageData),t.width,t.height);i.putImageData(a,0,0)}return s})};t.frames.splice(e.index,0,s),i.splice(e.index,0,e.frameTime)}}applyRemoveFrameToProject(e,t,i,s){if(s){const s={layers:e.layers.map(e=>{const i=document.createElement("canvas"),s={canvas:i,ctx:this.editor.getCanvasContext(i),visible:e.visible,name:e.name};if(s.canvas.width=t.width,s.canvas.height=t.height,e.imageData){s.ctx.putImageData(new ImageData(new Uint8ClampedArray(e.imageData),t.width,t.height),0,0)}return s})};t.frames.splice(e.index,0,s),i.splice(e.index,0,e.frameTime)}else t.frames.splice(e.index,1),i.splice(e.index,1)}applyMoveFrameToProject(e,t,i,s){const{fromIndex:a,toIndex:r}=e;if(s){const e=t.frames.splice(r,1)[0],s=i.splice(r,1)[0];t.frames.splice(a,0,e),i.splice(a,0,s)}else{const e=t.frames.splice(a,1)[0],s=i.splice(a,1)[0];t.frames.splice(r,0,e),i.splice(r,0,s)}}applyAddLayerToProject(e,t,i){const{frameIndex:s,layerIndex:a,layerData:r}=e,n=t.frames[s];if(i)n.layers.splice(a,1);else{const e=document.createElement("canvas"),i={canvas:e,ctx:this.editor.getCanvasContext(e),visible:r.visible,name:r.name};if(i.canvas.width=t.width,i.canvas.height=t.height,r.imageData){const e=i.ctx,s=new ImageData(new Uint8ClampedArray(r.imageData),t.width,t.height);e.putImageData(s,0,0)}n.layers.splice(a,0,i)}}applyRemoveLayerToProject(e,t,i){const{frameIndex:s,layerIndex:a,layerData:r}=e,n=t.frames[s];if(i){const e=document.createElement("canvas"),i={canvas:e,ctx:this.editor.getCanvasContext(e),visible:r.visible,name:r.name};if(i.canvas.width=t.width,i.canvas.height=t.height,r.imageData){i.ctx.putImageData(new ImageData(new Uint8ClampedArray(r.imageData),t.width,t.height),0,0)}n.layers.splice(a,0,i)}else n.layers.splice(a,1)}applyMoveLayerToProject(e,t,i){const{frameIndex:s,fromIndex:a,toIndex:r}=e,n=t.frames[s];if(i){const e=n.layers.splice(r,1)[0];n.layers.splice(a,0,e)}else{const e=n.layers.splice(a,1)[0];n.layers.splice(r,0,e)}}applyTransformToProject(e,t,i){const{frameIndex:s,layerIndex:a,transformData:r}=e,n=t.frames[s].layers[a];n.canvas||(n.canvas=document.createElement("canvas"),n.canvas.width=t.width,n.canvas.height=t.height);const o=n.ctx,l=new ImageData(new Uint8ClampedArray(i?r.oldImageData:r.newImageData),r.oldWidth||t.width,r.oldHeight||t.height);o.putImageData(l,0,0),r.newWidth&&r.newHeight&&(n.canvas.width=i?r.oldWidth:r.newWidth,n.canvas.height=i?r.oldHeight:r.newHeight)}applyColorAdjustmentToProject(e,t,i){const{frameIndex:s,layerIndex:a,adjustmentData:r}=e,n=t.frames[s].layers[a];n.canvas||(n.canvas=document.createElement("canvas"),n.canvas.width=t.width,n.canvas.height=t.height);const o=n.ctx,l=new ImageData(new Uint8ClampedArray(i?r.oldImageData:r.newImageData),t.width,t.height);o.putImageData(l,0,0)}applyDrawToProject(e,t,i){const{frameIndex:s,layerIndex:a,pixels:r}=e,n=t.frames[s].layers[a];t.currentFrame=s,t.currentLayer=a,n.canvas||(n.canvas=document.createElement("canvas"),n.canvas.width=t.width,n.canvas.height=t.height);const o=n.ctx;r.forEach(e=>{const{x:t,y:s,oldColor:a,newColor:r}=e,n=i?a:r;"transparent"===n?o.clearRect(t,s,1,1):(o.fillStyle=n,o.fillRect(t,s,1,1))})}serialize(){return JSON.stringify({history:this.history,historyIndex:this.historyIndex})}deserialize(e){try{const t=JSON.parse(e);return this.history=t.history||[],this.historyIndex=t.historyIndex||-1,!0}catch(e){return console.error("Error deserializing history:",e),!1}}clear(){this.history=[],this.historyIndex=-1,this.currentBatch=null}}class CollabManager{constructor(e){this.editor=e,this.ws=null,this.host=HOST,this.sessionId=null,this.sessionName="",this.memberId=null,this.memberName=this.editor.collabMemberName,this.memberColor=this.editor.collabMemberColor,this.isHost=!1,this.isConnected=!1,this.manualDisconnect=!1,this.chatVisible=!1,this.members=new Map,this.permissions={undoRedo:"host",addRemoveFrames:"everyone",addRemoveLayers:"everyone",draw:"everyone",chat:"everyone"},this.cursors=new Map,this.cursorContainer=null,this.currentTrace=null,this.tracePoints=[],this.chatMessages=[],this.lastCursorSend=0,this.CURSOR_THROTTLE=50,this.initUI()}getColorHex(e){return{red:"#ff4444",blue:"#4444ff",green:"#44ff44",yellow:"#ffff44",orange:"#ff5722",purple:"#aa44ff",pink:"#ff44aa",cyan:"#44ffff",brown:"#8b4513",gray:"#888888",lime:"#aaff44",indigo:"#4b0082"}[e]||"#ffffff"}wrapMemberName(e,t){return`<span style="color:${this.getColorHex(e.color)}">${t||e.name}</span>`}initUI(){this.cursorContainer=document.createElement("div"),this.cursorContainer.className="collab-cursor-container",this.editor.uiLayer.appendChild(this.cursorContainer),this.chatButton=document.createElement("button"),this.chatButton.className="collab-chat-button",this.chatButton.textContent="Chat",this.chatButton.addEventListener("click",()=>this.openChat()),this.editor.animationPanel.appendChild(this.chatButton),this.chatContainer=document.createElement("div"),this.chatContainer.className="collab-chat-container",this.chatMessagesDiv=document.createElement("div"),this.chatMessagesDiv.className="collab-chat-messages",this.chatContainer.appendChild(this.chatMessagesDiv);const e=document.createElement("div");e.className="panel-close collab-chat-close",e.innerHTML="&times;",e.addEventListener("click",()=>this.closeChat()),this.chatContainer.appendChild(e);const t=document.createElement("div");t.className="collab-chat-input-container",this.chatInput=document.createElement("input"),this.chatInput.type="text",this.chatInput.placeholder=__("Escribe un mensaje...||Type a message..."),this.chatInput.className="collab-chat-input",this.chatInput.addEventListener("keydown",e=>{"Enter"===e.key&&this.chatInput.value.trim()&&(this.sendChatMessage(this.chatInput.value.trim()),this.chatInput.value="")});const i=document.createElement("button");i.innerHTML='\n      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">\n        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"/>\n      </svg>\n    ',i.className="collab-chat-send",i.addEventListener("click",()=>{this.chatInput.value.trim()&&(this.sendChatMessage(this.chatInput.value.trim()),this.chatInput.value="")}),t.appendChild(this.chatInput),t.appendChild(i),this.chatContainer.appendChild(t),this.editor.animationPanel.appendChild(this.chatContainer),this.pingIndicator=document.createElement("div"),this.pingIndicator.className="collab-ping-indicator",this.pingIndicator.innerHTML='\n      <span class="ping-dot" style="background-color: #44ff44;"></span>\n      <span class="ping-value">---</span>\n    ',this.editor.uiLayer.appendChild(this.pingIndicator),this.createSessionOverlay()}createSessionOverlay(){this.sessionOverlay=document.createElement("div"),this.sessionOverlay.className="collab-session-overlay";const e=document.createElement("div");e.className="collab-session-header";const t=document.createElement("h2");t.className="collab-session-title",t.textContent=__("Sesión Colaborativa||Collaborative Session");const i=document.createElement("button");i.className="collab-close-btn",i.innerHTML="&times;",i.addEventListener("click",()=>{this.sessionOverlay.style.display="none"}),e.appendChild(t),e.appendChild(i),this.sessionContent=document.createElement("div"),this.sessionContent.className="collab-session-content",this.sessionOverlay.appendChild(e),this.sessionOverlay.appendChild(this.sessionContent),document.body.appendChild(this.sessionOverlay)}hookEditorMethods(){const e=this,t=this.editor.addFrame,i=this.editor.removeFrame,s=this.editor.moveFrame,a=this.editor.addLayer,r=this.editor.removeLayer,n=this.editor.moveLayer,o=this.editor.setLayerVisibility,l=this.editor.undo,c=this.editor.redo;this.editor._originalAddFrame=t,this.editor._originalRemoveFrame=i,this.editor._originalMoveFrame=s,this.editor._originalAddLayer=a,this.editor._originalRemoveLayer=r,this.editor._originalMoveLayer=n,this.editor._originalSetLayerVisibility=o,this.editor._originalUndo=l,this.editor._originalRedo=c,this.hookToolMethods(),this.editor.addFrame=function(...i){const s=t.call(this,...i);return e.isConnected&&e.canPerformAction("addRemoveFrames")&&e.sendFullState(),s},this.editor.removeFrame=function(...t){const s=i.call(this,...t);return e.isConnected&&e.canPerformAction("addRemoveFrames")&&e.sendFullState(),s},this.editor.moveFrame=function(...t){const i=s.call(this,...t);return e.isConnected&&e.canPerformAction("addRemoveFrames")&&e.sendFullState(),i},this.editor.addLayer=function(...t){const i=a.call(this,...t);return e.isConnected&&e.canPerformAction("addRemoveLayers")&&e.sendFullState(),i},this.editor.removeLayer=function(...t){const i=r.call(this,...t);return e.isConnected&&e.canPerformAction("addRemoveLayers")&&e.sendFullState(),i},this.editor.moveLayer=function(...t){const i=n.call(this,...t);return e.isConnected&&e.canPerformAction("addRemoveLayers")&&e.sendFullState(),i},this.editor.setLayerVisibility=function(...t){const i=o.call(this,...t);return e.isConnected&&e.canPerformAction("addRemoveLayers")&&e.sendFullState(),i},this.editor.undo=function(){if(e.isConnected&&!e.isHost&&!e.canPerformAction("undoRedo"))return void e.editor.showToast(__("No tienes permiso para deshacer"),1e3);const t=l.call(this);return e.isConnected&&e.isHost&&e.sendFullState(),t},this.editor.redo=function(){if(e.isConnected&&!e.isHost&&!e.canPerformAction("undoRedo"))return void e.editor.showToast(__("No tienes permiso para rehacer"),1e3);const t=c.call(this);return e.isConnected&&e.isHost&&e.sendFullState(),t}}hookToolMethods(){const e=this,t=this.editor.tools;Object.keys(t).forEach(i=>{const s=t[i],a=s.onDown,r=s.onMove,n=s.onUp;s.originalOnDown=a,s.originalOnMove=r,s.originalOnUp=n,s.onDown=function(t,s){e.isConnected&&e.canPerformAction("draw")&&(e.currentTrace={tool:i,brushSize:e.editor.brushSize,color:e.editor.getColor(),points:[{x:t,y:s}],frame:e.editor.project.currentFrame,layer:e.editor.project.currentLayer},e.tracePoints=[{x:t,y:s}]),a&&a.call(e.editor,t,s)},s.onMove=function(t,i){e.isConnected&&e.canPerformAction("draw")&&e.currentTrace&&(e.currentTrace.points.push({x:t,y:i}),e.sendCursorUpdate(t,i,!0)),r&&r.call(e.editor,t,i)},s.onUp=function(t,i,s,a){if(e.isConnected&&e.canPerformAction("draw")&&e.currentTrace){const s=e.currentTrace.points[e.currentTrace.points.length-1];s.x===t&&s.y===i||e.currentTrace.points.push({x:t,y:i}),e.sendTraceComplete(e.currentTrace),e.currentTrace=null,e.sendCursorUpdate(0,0,!1)}n&&n.call(e.editor,t,i,s,a)}})}restoreEditorMethods(){this.editor.addFrame=this.editor._originalAddFrame,this.editor.removeFrame=this.editor._originalRemoveFrame,this.editor.moveFrame=this.editor._originalMoveFrame,this.editor.addLayer=this.editor._originalAddLayer,this.editor.removeLayer=this.editor._originalRemoveLayer,this.editor.moveLayer=this.editor._originalMoveLayer,this.editor.setLayerVisibility=this.editor._originalSetLayerVisibility,this.editor.undo=this.editor._originalUndo,this.editor.redo=this.editor._originalRedo;const e=this.editor.tools;Object.keys(e).forEach(t=>{const i=e[t];i.onDown=i.originalOnDown,i.onMove=i.originalOnMove,i.onUp=i.originalOnUp})}updateMemberName(e){this.sendMessage({type:"name_update",oldName:this.memberName,newName:e}),this.memberName=e}updateMemberColor(e){this.sendMessage({type:"color_update",oldColor:this.memberColor,newColor:e}),this.memberColor=e}connectWebSocket(){this.ws&&this.ws.readyState===WebSocket.OPEN||(this.editor.showLoadingScreen(__("Conectando...||Connecting...")),this.ws=new WebSocket(this.host),this.ws.onopen=()=>{console.log("WebSocket connected"),this.editor.hideLoadingScreen(),this.manualDisconnect=!1,this.startPingInterval()},this.ws.onmessage=e=>{try{const t=JSON.parse(e.data);this.handleMessage(t)}catch(e){console.error("Error parsing message:",e)}},this.ws.onclose=()=>{console.log("WebSocket disconnected"),this.handleDisconnect()},this.ws.onerror=e=>{console.error("WebSocket error:",e),this.editor.hideLoadingScreen(),this.editor.showToast(__("Error de conexión||Connection error"),3e3)})}sendMessage(e){this.ws&&this.ws.readyState===WebSocket.OPEN&&this.ws.send(JSON.stringify(e))}handleMessage(e){switch(e.type){case"session_created":this.handleSessionCreated(e);break;case"session_joined":this.handleSessionJoined(e);break;case"member_joined":this.handleMemberJoined(e.member);break;case"member_left":this.handleMemberLeft(e.memberId,e.memberName);break;case"member_kicked":this.handleMemberKicked(e.memberId,e.memberName);break;case"you_were_kicked":this.handleYouWereKicked();break;case"trace_complete":this.handleTraceComplete(e);break;case"cursor_update":this.handleRemoteCursor(e);break;case"name_update":this.handleNameUpdate(e);break;case"color_update":this.handleColorUpdate(e);break;case"chat_message":this.handleChatMessage(e);break;case"full_state":this.handleFullState(e);break;case"session_ended":this.handleSessionEnded(e.reason);break;case"pong":this.handlePong(e.timestamp)}}handleSessionCreated(e){this.sessionId=e.sessionId,this.sessionName=e.sessionName,this.memberId=e.memberId,this.isHost=!0,this.isConnected=!0,this.clearChatMessages(),this.members.clear(),this.members.set(this.memberId,{id:this.memberId,name:this.memberName,color:this.memberColor,isHost:!0}),this.chatButton.style.display="flex",this.pingIndicator.style.display="flex",this.sendFullState(),this.renderSessionMenu(),this.sessionOverlay.style.display="flex",this.hookEditorMethods(),this.editor.showToast(__("Sesión creada||Session created"),2e3)}handleSessionJoined(e){this.sessionId=e.sessionId,this.sessionName=e.sessionName,this.memberId=e.memberId,this.isHost=e.isHost,this.isConnected=!0,this.members.clear(),e.members.forEach(e=>{this.members.set(e.id,e)}),this.clearChatMessages(),e.projectData&&this.applyFullState(e.projectData),this.chatButton.style.display="flex",this.pingIndicator.style.display="flex",this.renderSessionMenu(),this.sessionOverlay.style.display="flex",this.hookEditorMethods(),this.editor.showToast(__("Conectado a la sesión||Connected to the session"),2e3)}handleMemberJoined(e){e.id!==this.memberId&&(this.members.set(e.id,e),this.editor.showToast(`${this.wrapMemberName(e)} ${__("se unió||joined")}`,2e3),this.isHost&&this.sendFullState(e.id),this.renderSessionMenu())}handleMemberLeft(e,t){const i=this.members.get(e);i&&(this.members.delete(e),this.removeUserCursor(e),this.editor.showToast(`${this.wrapMemberName(i,i.name||t)} ${__("salió||left")}`,2e3),this.renderSessionMenu())}handleMemberKicked(e,t){const i=this.members.get(e);i&&(this.members.delete(e),this.removeUserCursor(e),this.editor.showToast(`${i.name||t} ${__("fue expulsado")}`,3e3),this.renderSessionMenu())}handleYouWereKicked(){this.manualDisconnect=!1,this.disconnect(),this.editor.showToast(__("Has sido expulsado de la sesión"),4e3)}handleTraceComplete(e){const{memberId:t,data:i}=e,s=this.members.get(t);if(!s||t===this.memberId)return;const a=i.points[i.points.length-1];this.showCursor(t,s.name,s.color,a.x,a.y),this.applyTrace(i)}applyTrace(e){const{tool:t,brushSize:i,color:s,points:a,frame:r,layer:n}=e,o=this.editor.project?.frames[r];if(!o)return;const l=o.layers[n];if(!l)return;l.ctx;const c=this.editor.brushSize,h=this.editor.selectedColor,d=this.editor.primaryColor;this.editor.brushSize=i,this.editor.selectedColor="primary",this.editor.primaryColor=s;const p=this.editor.tools[t];if(!p)return;const m=this.editor.currentTool;if(this.editor.currentTool=p,1===a.length)p.originalOnDown&&p.originalOnDown.call(this.editor,a[0].x,a[0].y),p.originalOnUp&&p.originalOnUp.call(this.editor,a[0].x,a[0].y);else{p.originalOnDown&&p.originalOnDown.call(this.editor,a[0].x,a[0].y);for(let e=1;e<a.length;e++)p.originalOnMove&&p.originalOnMove.call(this.editor,a[e].x,a[e].y);p.originalOnUp&&p.originalOnUp.call(this.editor,a[a.length-1].x,a[a.length-1].y)}this.editor.brushSize=c,this.editor.selectedColor=h,this.editor.primaryColor=d,this.editor.currentTool=m,this.editor.render()}handleRemoteCursor(e){const{memberId:t,x:i,y:s,active:a}=e,r=this.members.get(t);r&&t!==this.memberId&&(a?this.showCursor(t,r.name,r.color,i,s):this.hideCursor(t))}handleNameUpdate(e){const{memberId:t,oldName:i,newName:s}=e,a=this.members.get(t);a&&t!==this.memberId&&(a.name=s,this.editor.showToast(`${this.wrapMemberName(a,i)}</span> ${__("(ha cambiado su nombre a|has changed name to)")} ${this.wrapMemberName(a,s)}`))}handleColorUpdate(e){const{memberId:t,oldColor:i,newColor:s}=e,a=this.members.get(t);a&&t!==this.memberId&&(a.color=s,this.editor.showToast(`${this.wrapMemberName(a)}</span> ${__("(ha cambiado su color|has changed color)")}`))}handleChatMessage(e){this.chatMessages.push(e),this.addMessageHtml(e),this.chatVisible||this.chatButton.classList.add("new-message"),this.scrollMessagesToBottom()}handleFullState(e){e.memberId!==this.memberId&&(this.applyFullState(e.state),this.editor.showOperationMessage(__("Proyecto sincronizado||Project synchronized"),1e3))}handleSessionEnded(e){this.disconnect(!1),this.editor.showToast(e||__("La sesión ha terminado"),3e3)}handlePong(e){const t=Date.now()-e;this.updatePingIndicator(t)}handleDisconnect(){this.isConnected=!1,this.stopPingInterval(),this.cleanupDisconnect()}cleanupDisconnect(){this.isConnected=!1,this.sessionId=null,this.sessionName="",this.isHost=!1,this.members.clear(),this.removeAllCursors(),this.currentTrace=null,this.chatButton.style.display="none",this.chatContainer.style.display="none",this.pingIndicator.style.display="none",this.sessionOverlay.style.display="none",this.restoreEditorMethods(),this.manualDisconnect||this.editor.showToast(__("Desconectado"),2e3)}sendTraceComplete(e){this.sendMessage({type:"trace_complete",data:e})}sendCursorUpdate(e,t,i){const s=Date.now();s-this.lastCursorSend<this.CURSOR_THROTTLE||(this.lastCursorSend=s,this.sendMessage({type:"cursor_update",x:Math.round(e),y:Math.round(t),active:i}))}sendChatMessage(e){this.sendMessage({type:"chat_message",message:e})}sendFullState(e){if(!this.isHost||!this.isConnected)return;const t=this.getFullState();this.sendMessage({type:"full_state",state:t,toMemberId:e||null})}getFullState(){const e={width:this.editor.project.width,height:this.editor.project.height,frames:[],currentFrame:this.editor.project.currentFrame,currentLayer:this.editor.project.currentLayer};for(let t=0;t<this.editor.project.frames.length;t++){const i=this.editor.project.frames[t],s={layers:[]};for(let t=0;t<i.layers.length;t++){const a=i.layers[t],r=a.ctx.getImageData(0,0,e.width,e.height);s.layers.push({name:a.name,visible:a.visible,imageData:Array.from(r.data)})}e.frames.push(s)}return e}applyFullState(e){const t={width:e.width,height:e.height,frames:[],currentFrame:e.currentFrame,currentLayer:e.currentLayer};for(let i=0;i<e.frames.length;i++){const s=e.frames[i],a={layers:[]};for(let t=0;t<s.layers.length;t++){const i=s.layers[t],r=document.createElement("canvas");r.width=e.width,r.height=e.height;const n=r.getContext("2d");if(i.imageData){const t=new ImageData(new Uint8ClampedArray(i.imageData),e.width,e.height);n.putImageData(t,0,0)}a.layers.push({canvas:r,ctx:n,name:i.name,visible:i.visible})}t.frames.push(a)}this.editor.project=t,this.editor.resetCanvasSize(),this.editor.render()}createSession(e,t){this.memberName=this.editor.collabMemberName,this.memberColor=this.editor.collabMemberColor,this.connectWebSocket();const i=setInterval(()=>{this.ws&&this.ws.readyState===WebSocket.OPEN&&(clearInterval(i),this.sendMessage({type:"create_session",sessionName:e,password:t||void 0,userName:this.memberName,userColor:this.memberColor}))},100)}joinSession(e,t){this.memberName=this.editor.collabMemberName,this.memberColor=this.editor.collabMemberColor,this.connectWebSocket();const i=setInterval(()=>{this.ws&&this.ws.readyState===WebSocket.OPEN&&(clearInterval(i),this.sendMessage({type:"join_session",sessionId:e,password:t||void 0,userName:this.memberName,userColor:this.memberColor}))},100)}disconnect(e=!0){this.manualDisconnect=e,this.ws&&(this.sendMessage({type:"leave_session"}),this.ws.close()),this.cleanupDisconnect()}kickMember(e){this.isHost&&this.sendMessage({type:"kick_member",memberId:e})}showCursor(e,t,i,s,a){const r=this.canvasToScreen(s,a);if(!r)return;let n=this.cursors.get(e);n||(n=document.createElement("div"),n.className="collab-cursor-item",n.innerHTML='\n        <div class="collab-cursor-ping"></div>\n        <div class="collab-cursor-name"></div>\n      ',this.cursorContainer.appendChild(n),this.cursors.set(e,n)),n.style.left=`${r.x}px`,n.style.top=`${r.y}px`,n.querySelector("div:first-child").style.borderColor=this.getColorHex(i),n.querySelector("div:last-child").textContent=t,n.querySelector("div:last-child").style.backgroundColor=this.getColorHex(i),n.style.opacity="1",n.isVisible=!0,n.lastUpdate=Date.now(),n._interval||(n._interval=setInterval(()=>{n.isVisible&&Date.now()-n.lastUpdate>=2e3&&this.hideCursor(e)},200))}hideCursor(e){const t=this.cursors.get(e);t&&(t.style.opacity="0",t.lastUpdate=Date.now(),t.isVisible=!1)}removeUserCursor(e){const t=this.cursors.get(e);t&&(t.remove(),clearInterval(t._interval),this.cursors.delete(e))}removeAllCursors(){this.cursors.forEach(e=>e.remove()),this.cursors.clear()}openChat(){this.chatButton.style.display="none",this.chatButton.classList.remove("new-message"),this.chatContainer.style.display="flex",this.chatVisible=!0}closeChat(){this.chatButton.style.display="block",this.chatContainer.style.display="none",this.chatVisible=!1}canvasToScreen(e,t){if(!this.editor.project)return null;const i=this.editor.canvasContainer.getBoundingClientRect();return{x:i.left+i.width/2+(e-this.editor.project.width/2)*this.editor.scale+this.editor.posX,y:i.top+i.height/2+(t-this.editor.project.height/2)*this.editor.scale+this.editor.posY}}renderSessionMenu(){this.sessionContent.innerHTML="";const e=document.createElement("div");e.style.cssText="\n      background-color: var(--ui-color);\n      border-radius: 8px;\n      padding: 16px;\n      margin-bottom: 20px;\n    ",e.innerHTML=`\n      <div style="margin-bottom: 12px;">\n        <span style="color: var(--text-dim);">${__("Sala||Room")}:</span>\n        <span style="color: var(--text-color); font-weight: bold; margin-left: 8px;">${this.sessionName||__("Sala sin nombre||Unnamed room")}</span>\n      </div>\n      <div style="margin-bottom: 12px;">\n        <span style="color: var(--text-dim);">${__("Miembros||Members")}:</span>\n        <span style="color: var(--text-color); font-weight: bold; margin-left: 8px;">${this.members.size}</span>\n      </div>\n      <div style="display: flex; align-items: center; gap: 8px;">\n        <span style="color: var(--text-dim);">${__("ID||ID")}:</span>\n        <span style="color: var(--text-color); font-family: monospace; background: var(--bg-color); padding: 4px 8px; border-radius: 4px; flex: 1; font-size: 12px;">${this.sessionId||"Unknown"}</span>\n        <button id="copyIdBtn" style="background: var(--ui-highlight); border: none; border-radius: 4px; color: var(--text-color); padding: 4px 8px; cursor: pointer;">\n          ${__("Copiar||Copy")}\n        </button>\n      </div>\n    `;e.querySelector("#copyIdBtn").addEventListener("click",()=>{navigator.clipboard.writeText(this.sessionId),this.editor.showToast(__("ID copiado||ID copied"),1e3)}),this.sessionContent.appendChild(e);const t=document.createElement("div");t.style.cssText="\n      background-color: var(--ui-color);\n      border-radius: 8px;\n      padding: 16px;\n      margin-bottom: 20px;\n    ",t.innerHTML=`<h3 style="margin: 0 0 12px 0;">${__("Miembros||Members")}</h3>`;const i=document.createElement("div");i.style.cssText="display: flex; flex-direction: column; gap: 8px;",this.members.forEach(e=>{const t=document.createElement("div");t.style.cssText=`\n        display: flex;\n        align-items: center;\n        justify-content: space-between;\n        padding: 10px;\n        background-color: ${e.id===this.memberId?"var(--primary-color)":"var(--bg-color)"};\n        border-radius: 6px;\n        color: ${e.id===this.memberId?"white":"var(--text-color)"};\n      `;const s=document.createElement("span");s.style.cssText="font-weight: bold; display: flex; align-items: center; gap: 8px;",s.style.color=e.id===this.memberId?"white":this.getColorHex(e.color);const a=document.createElement("span");if(a.textContent=e.name,s.appendChild(a),e.isHost){const e=document.createElement("span");e.style.cssText="\n          background-color: gold;\n          color: black;\n          font-size: 10px;\n          font-weight: bold;\n          padding: 2px 6px;\n          border-radius: 3px;\n        ",e.textContent="HOST",s.appendChild(e)}if(e.id===this.memberId){const e=document.createElement("span");e.style.cssText="\n          background-color: rgba(255,255,255,0.3);\n          color: white;\n          font-size: 10px;\n          font-weight: bold;\n          padding: 2px 6px;\n          border-radius: 3px;\n        ",e.textContent=__("TÚ||YOU"),s.appendChild(e)}if(t.appendChild(s),this.isHost&&e.id!==this.memberId){const i=document.createElement("button");i.textContent=__("Expulsar||Kick"),i.style.cssText="\n          background-color: #ff4444;\n          border: none;\n          border-radius: 4px;\n          color: white;\n          padding: 6px 12px;\n          font-size: 12px;\n          font-weight: bold;\n          cursor: pointer;\n          transition: filter 0.2s;\n        ",i.addEventListener("mouseenter",()=>{i.style.filter="brightness(1.2)"}),i.addEventListener("mouseleave",()=>{i.style.filter="none"}),i.addEventListener("click",t=>{t.stopPropagation(),this.confirmKickMember(e)}),t.appendChild(i)}i.appendChild(t)}),t.appendChild(i),this.sessionContent.appendChild(t);const s=document.createElement("button");s.style.cssText=`\n      width: 100%;\n      padding: 12px;\n      background-color: ${this.isHost?"#ff4444":"var(--ui-highlight)"};\n      border: none;\n      border-radius: 6px;\n      color: white;\n      font-size: 14px;\n      font-weight: bold;\n      cursor: pointer;\n      transition: filter 0.2s;\n    `,s.textContent=this.isHost?__("Terminar sesión||End Session"):__("Desconectar||Disconnect"),s.addEventListener("mouseenter",()=>{s.style.filter="brightness(1.2)"}),s.addEventListener("mouseleave",()=>{s.style.filter="none"}),s.addEventListener("click",()=>{this.editor.showPopup(this.isHost?__("Terminar sesión||End Session"):__("Desconectar||Disconnect"),this.isHost?__("¿Terminar la sesión para todos?||End session for everyone?"):__("¿Desconectarse de la sesión?||Disconnect from session?"),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Sí||Yes"),action:()=>{this.disconnect(),this.sessionOverlay.style.display="none",this.editor.hidePopup()}}])}),this.sessionContent.appendChild(s)}renderSessionMenu(){this.sessionContent.innerHTML="";const e=document.createElement("div");e.className="collab-info-card",e.innerHTML=`\n      <div class="collab-info-item">\n        <span class="collab-info-label">${__("Sala||Room")}:</span>\n        <span class="collab-info-value">${this.sessionName||__("Sala sin nombre||Unnamed room")}</span>\n      </div>\n      <div class="collab-info-item">\n        <span class="collab-info-label">${__("Miembros||Members")}:</span>\n        <span class="collab-info-value">${this.members.size}</span>\n      </div>\n      <div class="collab-info-item">\n        <span style="collab-info-label">${__("ID||ID")}:</span>\n        <span class="collab-info-value token">${this.sessionId||"Unknown"}</span>\n        <button id="copyIdBtn" class="collab-copy-btn">\n          ${__("Copiar||Copy")}\n        </button>\n      </div>\n    `;e.querySelector("#copyIdBtn").addEventListener("click",()=>{navigator.clipboard.writeText(this.sessionId),this.editor.showToast(__("ID copiado||ID copied"),1e3)}),this.sessionContent.appendChild(e);const t=document.createElement("div");t.className="collab-members-section",t.innerHTML=`<h3>${__("Miembros||Members")}</h3>`;const i=document.createElement("div");i.className="collab-members-list",this.members.forEach(e=>{const t=document.createElement("div");t.className=e.id===this.memberId?"collab-member-item current-user":"collab-member-item";const s=document.createElement("span");s.className="collab-member-name",s.style.color=e.id===this.memberId?"white":this.getColorHex(e.color);const a=document.createElement("span");if(a.textContent=e.name,s.appendChild(a),e.isHost){const e=document.createElement("span");e.className="collab-host-badge",e.textContent="HOST",s.appendChild(e)}if(e.id===this.memberId){const e=document.createElement("span");e.className="collab-you-badge",e.textContent=__("TÚ||YOU"),s.appendChild(e)}if(t.appendChild(s),this.isHost&&e.id!==this.memberId){const i=document.createElement("button");i.textContent=__("Expulsar||Kick"),i.className="collab-kick-button",i.addEventListener("click",t=>{t.stopPropagation(),this.confirmKickMember(e)}),t.appendChild(i)}i.appendChild(t)}),t.appendChild(i),this.sessionContent.appendChild(t);const s=document.createElement("button");s.className=this.isHost?"collab-disconnect-btn danger":"collab-disconnect-btn",s.textContent=this.isHost?__("Terminar sesión||End Session"):__("Desconectar||Disconnect"),s.addEventListener("click",()=>{this.editor.showPopup(this.isHost?__("Terminar sesión||End Session"):__("Desconectar||Disconnect"),this.isHost?__("¿Terminar la sesión para todos?||End session for everyone?"):__("¿Desconectarse de la sesión?||Disconnect from session?"),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Sí||Yes"),action:()=>{this.disconnect(),this.sessionOverlay.style.display="none",this.editor.hidePopup()}}])}),this.sessionContent.appendChild(s)}confirmKickMember(e){this.editor.showPopup(__("Expulsar miembro||Kick member"),`${__("¿Expulsar a||Kick")} ${this.wrapMemberName(e)}?`,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Expulsar||Kick"),action:()=>{this.kickMember(e.id),this.editor.hidePopup()}}])}clearChatMessages(){this.chatMessages=[],this.renderChatMessages()}renderChatMessages(){this.chatMessagesDiv.innerHTML="",this.chatMessages.forEach(e=>this.addMessageHtml(e)),this.scrollMessagesToBottom()}addMessageHtml(e){const t=document.createElement("div");t.className="collab-chat-message",t.innerHTML=`\n      <span class="collab-chat-name" style="color: ${this.getColorHex(e.memberColor)};">${this.escapeHtml(e.memberName||"Unknown")}:</span>\n      <span class="collab-chat-text"> ${this.escapeHtml(e.message)}</span>\n    `,this.chatMessagesDiv.appendChild(t)}scrollMessagesToBottom(){this.chatMessagesDiv.scrollTop=this.chatMessagesDiv.scrollHeight}updatePingIndicator(e){const t=this.pingIndicator.querySelector(".ping-dot"),i=this.pingIndicator.querySelector(".ping-value");let s="#44ff44";e>100&&(s="#ffff44"),e>200&&(s="#ff8844"),e>300&&(s="#ff4444"),t&&(t.style.backgroundColor=s),i&&(i.textContent=`${e}ms`)}startPingInterval(){this.pingInterval=setInterval(()=>{this.sendMessage({type:"ping",timestamp:Date.now()})},5e3)}stopPingInterval(){this.pingInterval&&(clearInterval(this.pingInterval),this.pingInterval=null)}canPerformAction(e){return!this.isConnected||(!!this.isHost||this.permissions&&"everyone"===this.permissions[e])}escapeHtml(e){const t=document.createElement("div");return t.textContent=e,t.innerHTML}}class PaletteManager{constructor(e){this.editor=e,this.palettes=[],this.currentPaletteId=null,this.recentColors=JSON.parse(localStorage.getItem("recentColors"))||[],this.init()}init(){this.loadPalettes()}getDefaultPalette(){return{id:"default_"+Date.now(),name:__("Sistema||System"),colors:["#000000","#7c7c7c","#bcbcbc","#fcfcfc","#a80020","#e40058","#f85898","#f8a4c0","#940084","#d800cc","#f878f8","#f8b8f8","#4428bc","#6844fc","#9878f8","#d8b8f8","#0000bc","#0000fc","#6888fc","#b8b8f8","#0058f8","#0078f8","#3cbcfc","#a4e4fc","#004058","#008888","#00e8d8","#00fcfc","#007800","#00a800","#00b800","#b8f8d8","#006800","#00a844","#58f898","#b8f8b8","#005800","#58d854","#b8f818","#d8f878","#503000","#ac7c00","#f8b800","#fce0a8","#a81000","#fca044","#f8d878","#f0d0b0","#881400","#f83800","#e45c10","#f87858"]}}loadPalettes(){try{const e=localStorage.getItem("palettes");e?(this.palettes=JSON.parse(e),this.palettes.forEach(e=>{e.id||(e.id="palette_"+Date.now()+"_"+Math.random().toString(36).substr(2,6))})):this.palettes=[this.getDefaultPalette()],this.currentPaletteId=this.palettes[0]?.id||null,this.savePalettes()}catch(e){console.warn("Failed to load palettes:",e),this.palettes=[this.getDefaultPalette()],this.currentPaletteId=this.palettes[0].id}}savePalettes(){localStorage.setItem("palettes",JSON.stringify(this.palettes))}getCurrentPalette(){return this.palettes.find(e=>e.id===this.currentPaletteId)||this.palettes[0]}getCurrentColors(){const e=this.getCurrentPalette();return e?e.colors:[]}addPalette(e,t=[]){const i={id:"palette_"+Date.now()+"_"+Math.random().toString(36).substr(2,6),name:e||__("Nueva paleta||New palette"),colors:[...t],createdAt:Date.now()};return this.palettes.push(i),this.currentPaletteId=i.id,this.savePalettes(),i}removePalette(e){const t=this.palettes.findIndex(t=>t.id===e);-1!==t&&(this.palettes.splice(t,1),0===this.palettes.length&&(this.palettes=[this.getDefaultPalette()]),this.currentPaletteId===e&&(this.currentPaletteId=this.palettes[0].id),this.savePalettes())}renamePalette(e,t){const i=this.palettes.find(t=>t.id===e);i&&(i.name=t,this.savePalettes())}setCurrentPalette(e){this.palettes.find(t=>t.id===e)&&(this.currentPaletteId=e,this.savePalettes())}addColorToPalette(e,t){const i=this.palettes.find(t=>t.id===e);return!(!i||i.colors.includes(t))&&(i.colors.push(t),this.savePalettes(),!0)}removeColorFromPalette(e,t){const i=this.palettes.find(t=>t.id===e);return!(!i||!i.colors[t])&&(i.colors.splice(t,1),this.savePalettes(),!0)}moveColorInPalette(e,t,i){const s=this.palettes.find(t=>t.id===e);if(s&&t>=0&&i>=0&&t<s.colors.length&&i<s.colors.length){const e=s.colors.splice(t,1)[0];return s.colors.splice(i,0,e),this.savePalettes(),!0}return!1}updatePaletteColors(e,t){const i=this.palettes.find(t=>t.id===e);return!!i&&(i.colors=[...t],this.savePalettes(),!0)}addToRecent(e){this.recentColors=[e,...this.recentColors.filter(t=>t!==e)].slice(0,20),localStorage.setItem("recentColors",JSON.stringify(this.recentColors))}getRecentColors(){return this.recentColors}async importFromLospec(e){const t=`https://lospec.com/palette-list/${e}.json`;try{const i=await fetch(t);if(!i.ok){if(404===i.status)throw new Error(__("Paleta no encontrada||Palette not found"));throw new Error(__("Error al cargar paleta||Error loading palette"))}const s=await i.json();if(!s.name||!s.colors||!Array.isArray(s.colors))throw new Error(__("Formato de paleta inválido||Invalid palette format"));const a=s.colors.map(e=>e.startsWith("#")?e:"#"+e);return{name:s.name,author:s.author,colors:a,slug:e}}catch(e){throw console.error("Lospec import error:",e),e}}showLospecImportDialog(){const e=document.createElement("div");e.className="lospec-import-dialog";const t=document.createElement("input");t.type="text",t.placeholder=__("Slug de la paleta (ej: greyt-bit)||Palette slug (e.g., greyt-bit)"),e.appendChild(t),this.editor.showPopup(__("Importar de Lospec||Import from Lospec"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Importar||Import"),action:async()=>{const e=t.value.trim().toLowerCase();if(e)try{const t=await this.importFromLospec(e),i=this.palettes.find(e=>e.name.toLowerCase()===t.name.toLowerCase());i?this.editor.showPopup(__("Paleta existente||Existing palette"),__(`La paleta "${t.name}" ya existe. ¿Deseas reemplazarla?||Palette "${t.name}" already exists. Do you want to replace it?`),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Reemplazar||Replace"),action:()=>{this.updatePaletteColors(i.id,t.colors),this.editor.colorPicker?.updatePaletteGrid(),this.editor.hidePopup(),this.editor.showToast(__(`Paleta "${t.name}" actualizada||Palette "${t.name}" updated`))}}]):(this.addPalette(t.name,t.colors),this.editor.colorPicker?.updatePaletteGrid(),this.editor.showToast(__(`Paleta "${t.name}" importada||Palette "${t.name}" imported`)),this.editor.hidePopup())}catch(e){this.editor.showToast(e.message,3e3)}else this.editor.showToast(__("Ingresa un slug válido||Enter a valid slug"),2e3)}}]),setTimeout(()=>t.focus(),100)}showPaletteManagerDialog(){const e=document.createElement("div");e.className="palette-manager-container";const t=document.createElement("div");t.className="palette-manager-list",e.appendChild(t);const i=()=>{t.innerHTML="",this.palettes.forEach(e=>{const s=document.createElement("div");s.className="palette-manager-item "+(e.id===this.currentPaletteId?"active":"");const a=document.createElement("div");a.className="palette-manager-preview",e.colors.slice(0,6).forEach(e=>{const t=document.createElement("div");t.className="palette-manager-swatch",t.style.backgroundColor=e,a.appendChild(t)});const r=document.createElement("div");r.className="palette-manager-info";const n=document.createElement("div");n.className="palette-manager-name",n.textContent=e.name,r.appendChild(n);const o=document.createElement("div");o.className="palette-manager-count",o.textContent=`${e.colors.length} ${__("colores||colors")}`,r.appendChild(o);const l=document.createElement("div");l.className="palette-manager-actions";const c=document.createElement("button");c.className="ui-button palette-manager-btn",c.innerHTML='<div class="icon icon-settings"></div>',c.title=__("Editar||Edit"),c.addEventListener("click",t=>{t.stopPropagation(),this.showPaletteEditor(e.id)}),l.appendChild(c);const h=document.createElement("button");if(h.className="ui-button palette-manager-btn",h.innerHTML='<div class="icon icon-download"></div>',h.title=__("Exportar||Export"),h.addEventListener("click",t=>{t.stopPropagation(),this.exportPaletteToFile(e.id)}),l.appendChild(h),this.palettes.length>1){const t=document.createElement("button");t.className="ui-button palette-manager-btn",t.innerHTML='<div class="icon icon-close"></div>',t.title=__("Eliminar||Delete"),t.addEventListener("click",t=>{t.stopPropagation(),this.editor.showPopup(__("Eliminar paleta||Delete palette"),__(`¿Eliminar la paleta "${e.name}"?||Delete palette "${e.name}"?`),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.editor.hidePopup()},{text:__("Eliminar||Delete"),action:()=>{this.removePalette(e.id),i(),this.editor.colorPicker?.updatePaletteGrid(),this.editor.hidePopup()}}])}),l.appendChild(t)}s.appendChild(a),s.appendChild(r),s.appendChild(l),s.addEventListener("click",()=>{this.setCurrentPalette(e.id),this.editor.colorPicker?.updatePaletteGrid(),this.editor.hidePopup()}),t.appendChild(s)})};i();const s=document.createElement("div");s.className="palette-manager-actions-row";const a=document.createElement("button");a.className="ui-button highlight palette-manager-action-btn",a.innerHTML=__("Nueva paleta||New palette"),a.addEventListener("click",()=>{const e=prompt(__("Nombre de la paleta||Palette name"),__("Mi paleta||My palette"));e&&(this.addPalette(e),i(),this.editor.colorPicker?.updatePaletteGrid())}),s.appendChild(a);const r=document.createElement("button");r.className="ui-button highlight palette-manager-action-btn",r.innerHTML="JSON",r.addEventListener("click",()=>{this.showImportJsonDialog()}),s.appendChild(r);const n=document.createElement("button");n.className="ui-button highlight palette-manager-action-btn",n.innerHTML="Lospec",n.addEventListener("click",()=>{this.editor.hidePopup(),this.showLospecImportDialog()}),s.appendChild(n),e.appendChild(s),this.editor.showPopup(__("Gestor de paletas||Palette Manager"),e,[{text:__("Cerrar||Close"),action:()=>this.editor.hidePopup()}])}showPaletteEditor(e){const t=this.palettes.find(t=>t.id===e);if(!t)return;const i=document.createElement("div");i.className="palette-editor-container";const s=document.createElement("div");s.className="palette-editor-name-row";const a=document.createElement("input");a.type="text",a.value=t.name,a.className="palette-editor-name-input",s.appendChild(a),a.addEventListener("change",()=>{a.value.trim()&&(this.renamePalette(e,a.value.trim()),this.editor.colorPicker?.updatePaletteGrid(),this.editor.showToast(__("Paleta renombrada||Palette renamed")))}),i.appendChild(s);const r=document.createElement("div");r.className="palette-grid",r.style.maxHeight="300px",r.style.overflowY="auto",i.appendChild(r);const n=document.createElement("div");n.className="delete-zone palette-delete-zone",n.innerHTML='\n      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>\n      </svg>\n    ';let o=null;n.addEventListener("dragover",e=>{e.preventDefault(),n.classList.add("drag-over")}),n.addEventListener("dragleave",()=>{n.classList.remove("drag-over")}),n.addEventListener("drop",t=>{t.preventDefault(),n.classList.remove("drag-over"),null!==o&&(this.removeColorFromPalette(e,o),l(),this.editor.colorPicker?.updatePaletteGrid(),o=null)});const l=()=>{r.innerHTML="",t.colors.forEach((t,i)=>{const s=document.createElement("div");s.className="palette-color",s.style.backgroundColor=t,s.style.cursor="grab",s.draggable=!0,s.dataset.index=i,s.addEventListener("click",()=>{this.editor.colorPicker?.updateSlidersFromHex(t)}),s.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",i.toString()),o=i,s.classList.add("dragging"),s.style.cursor="grabbing",n.classList.add("visible")}),s.addEventListener("dragend",()=>{s.classList.remove("dragging"),s.style.cursor="grab",n.classList.remove("visible","drag-over"),o=null}),s.addEventListener("dragover",e=>{e.preventDefault()}),s.addEventListener("drop",t=>{t.preventDefault();const s=parseInt(t.dataTransfer.getData("text/plain")),a=i;s!==a&&(this.moveColorInPalette(e,s,a),l(),this.editor.colorPicker?.updatePaletteGrid())}),r.appendChild(s)});const i=document.createElement("div");i.className="palette-add-button",i.innerHTML="+",i.title=__("Añadir color||Add new color"),i.style.cursor="pointer",i.addEventListener("click",()=>{this.editor.showHexColorInputDialog().then(t=>{this.addColorToPalette(e,t),l(),this.editor.colorPicker?.updatePaletteGrid()}).catch(()=>{})}),r.appendChild(i)};l(),i.appendChild(n),this.editor.showPopup(t.name,i,[{text:__("Cerrar||Close"),action:()=>{this.editor.hidePopup(),this.showPaletteManagerDialog()}}])}exportPaletteToFile(e){const t=this.palettes.find(t=>t.id===e);if(!t)return;const i=JSON.stringify({name:t.name,colors:t.colors,exportedAt:(new Date).toISOString()},null,2),s=new Blob([i],{type:"application/json"}),a=URL.createObjectURL(s),r=document.createElement("a");r.href=a,r.download=`${t.name.replace(/[^a-z0-9]/gi,"_").toLowerCase()}.json`,document.body.appendChild(r),r.click(),document.body.removeChild(r),URL.revokeObjectURL(a),this.editor.showToast(__(`Paleta "${t.name}" exportada||Palette "${t.name}" exported`))}showImportJsonDialog(){this.editor.getFileBrowser({title:__("Importar paleta JSON||Import JSON palette"),mode:"open",fileTypes:["json"],onConfirm:async e=>{try{const t=await this.editor.readFile(e),i=JSON.parse(t);if(!i.name||!i.colors||!Array.isArray(i.colors))throw new Error(__("Formato inválido||Invalid format"));if(this.palettes.find(e=>e.name===i.name)){const e=`${i.name} (${__("copia||copy")})`;this.addPalette(e,i.colors),this.editor.showToast(__(`Paleta importada como "${e}"||Palette imported as "${e}"`))}else this.addPalette(i.name,i.colors),this.editor.showToast(__(`Paleta "${i.name}" importada||Palette "${i.name}" imported`));this.editor.colorPicker?.updatePaletteGrid(),this.editor.hidePopup()}catch(e){this.editor.showToast(e.message,3e3)}}}).show()}}class ColorPicker{constructor(e){this.editor=e,this.selectedColorTab="rgb",this.colorPickerPreviewColor=e.primaryColor,this.isColorPicking=!1,this.colorPickStartX=0,this.colorPickStartY=0,this.colorPickLine=null,this.colorPickStartPos=null,this.colorPickTimeout=null,this.colorPickStartTime=null,this.overlay=null,this.colorPicker=null,this.rgbTab=null,this.hsvTab=null,this.paletteTab=null,this.rgbContent=null,this.hsvContent=null,this.paletteContent=null,this.currentColorPreview=null,this.recentColorsGrid=null,this.paletteGrid=null,this.deleteZone=null,this.floatingColors=new Map,this.floatingColorsDeleteZone=null,this.init()}init(){this.createColorPicker(),this.createFloatingColorsDeleteZone(),this.initColorPickerDrag(),this.loadFloatingColors(JSON.parse(localStorage.getItem("floatingColors"))||[])}createColorPicker(){this.overlay=document.createElement("div"),this.overlay.className="color-picker-overlay",this.overlay.style.display="none",this.editor.uiLayer.appendChild(this.overlay),this.overlay.addEventListener("dragover",e=>{e.preventDefault(),this.overlay.classList.add("drag-over")}),this.overlay.addEventListener("dragleave",()=>{this.overlay.classList.remove("drag-over")}),this.overlay.addEventListener("drop",e=>{e.preventDefault(),this.overlay.classList.remove("drag-over");const t=parseInt(e.dataTransfer.getData("text/plain")),i=this.editor.paletteManager.getCurrentPalette(),s=i?.colors[t];s&&this.floatingColorsDeleteZone&&this.addFloatingPaletteColor(s,e.clientX,e.clientY)}),this.colorPicker=document.createElement("div"),this.colorPicker.className="color-picker",this.overlay.appendChild(this.colorPicker),this.colorPicker.addEventListener("dragover",e=>{e.preventDefault(),e.stopPropagation()}),this.colorPicker.addEventListener("dragleave",e=>{e.preventDefault(),e.stopPropagation()}),this.colorPicker.addEventListener("drop",e=>{e.preventDefault(),e.stopPropagation()});const e=document.createElement("div");e.className="color-picker-header",this.colorPicker.appendChild(e);const t=document.createElement("div");t.className="color-picker-title",t.textContent=__("Recoge Color||Color Picker"),e.appendChild(t);const i=document.createElement("div");i.className="panel-close color-picker-close",i.innerHTML="&times;",i.addEventListener("click",()=>this.hide()),e.appendChild(i);const s=document.createElement("div");s.className="color-picker-tabs",this.colorPicker.appendChild(s),this.rgbTab=this.createTab("RGB",()=>this.showTab("rgb")),this.hsvTab=this.createTab("HSV",()=>this.showTab("hsv")),this.paletteTab=this.createTab(__("Paleta||Palette"),()=>this.showTab("palette"));const a=document.createElement("div");a.className="color-picker-content",this.colorPicker.appendChild(a),this.rgbContent=document.createElement("div"),this.rgbContent.className="color-picker-tab-content rgb-content",a.appendChild(this.rgbContent),this.createColorSlider("r",__("Rojo||Red"),0,255,this.rgbContent),this.createColorSlider("g",__("Verde||Green"),0,255,this.rgbContent),this.createColorSlider("b",__("Azul||Blue"),0,255,this.rgbContent),this.hsvContent=document.createElement("div"),this.hsvContent.className="color-picker-tab-content hsv-content",a.appendChild(this.hsvContent),this.createColorSlider("h",__("Tono||Hue"),0,360,this.hsvContent),this.createColorSlider("s",__("Saturación||Saturation"),0,100,this.hsvContent,"%"),this.createColorSlider("v",__("Valor||Value"),0,100,this.hsvContent,"%"),this.paletteContent=document.createElement("div"),this.paletteContent.className="color-picker-tab-content palette-content",a.appendChild(this.paletteContent);const r=document.createElement("div");r.className="palette-actions",this.paletteContent.appendChild(r);const n=this.editor.createButton("load-palette","icon-folder",()=>this.loadPalette());n.textContent=__("Cargar||Load"),r.appendChild(n);const o=this.editor.createButton("save-palette","icon-save",()=>this.savePalette());o.textContent=__("Guardar||Save"),r.appendChild(o);const l=this.editor.createButton("manage-palettes","icon-settings",()=>{this.editor.paletteManager.showPaletteManagerDialog()});l.textContent=__("Gestionar||Manage"),r.appendChild(l),this.paletteGrid=document.createElement("div"),this.paletteGrid.className="palette-grid",this.paletteContent.appendChild(this.paletteGrid);const c=document.createElement("div");c.className="recent-colors",this.colorPicker.appendChild(c);const h=document.createElement("div");h.className="recent-colors-title",h.textContent=__("Colores Recientes||Recent Colors"),c.appendChild(h),this.recentColorsGrid=document.createElement("div"),this.recentColorsGrid.className="recent-colors-grid",c.appendChild(this.recentColorsGrid);const d=document.createElement("div");d.className="color-picker-footer",this.colorPicker.appendChild(d),this.currentColorPreview=document.createElement("div"),this.currentColorPreview.className="current-color-preview",this.currentColorPreview.addEventListener("click",()=>this.showHexInputDialog()),d.appendChild(this.currentColorPreview);const p=this.editor.createButton("confirm-color",null,()=>this.confirmSelection());p.textContent=__("Usar color||Pick color"),d.appendChild(p),this.deleteZone=document.createElement("div"),this.deleteZone.className="delete-zone palette-delete-zone",this.deleteZone.innerHTML='\n      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>\n      </svg>\n    ',this.overlay.appendChild(this.deleteZone),this.setupDeleteZoneEvents(),this.showTab("rgb"),this.updatePaletteGrid()}createFloatingColorsDeleteZone(){this.floatingColorsDeleteZone=document.createElement("div"),this.floatingColorsDeleteZone.className="delete-zone",this.floatingColorsDeleteZone.innerHTML='\n      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>\n      </svg>\n    ',this.editor.overlayLayer.appendChild(this.floatingColorsDeleteZone),this.floatingColorsDeleteZone.addEventListener("dragover",e=>{e.preventDefault(),this.floatingColorsDeleteZone.classList.add("drag-over")}),this.floatingColorsDeleteZone.addEventListener("dragleave",()=>{this.floatingColorsDeleteZone.classList.remove("drag-over")})}createTab(e,t){const i=document.createElement("div");return i.className="color-picker-tab",i.textContent=e,i.addEventListener("click",t),this.colorPicker.querySelector(".color-picker-tabs").appendChild(i),i}createColorSlider(e,t,i,s,a,r=""){const n=document.createElement("div");n.className="color-slider-container";const o=document.createElement("label");o.textContent=t,n.appendChild(o);const l=document.createElement("div");l.className="slider-controls",n.appendChild(l);const c=document.createElement("button");c.className="slider-btn decrease",c.innerHTML="&minus;",c.addEventListener("click",()=>this.adjustChannel(e,-1)),l.appendChild(c);const h=document.createElement("input");h.type="range",h.min=i,h.max=s,h.value="r"===e?255:0,h.className=`color-slider ${e}-slider`,h.addEventListener("input",t=>this.handleSliderChange(e,t.target.value)),l.appendChild(h);const d=document.createElement("button");d.className="slider-btn increase",d.innerHTML="+",d.addEventListener("click",()=>this.adjustChannel(e,1)),l.appendChild(d);const p=document.createElement("input");p.type="number",p.min=i,p.max=s,p.value="r"===e?255:0,p.className=`color-value ${e}-value`,p.addEventListener("change",t=>this.handleValueChange(e,t.target.value)),l.appendChild(p);const m=document.createElement("span");m.className="suffix",m.textContent=r,l.appendChild(m),a.appendChild(n)}setupDeleteZoneEvents(){this.deleteZone.addEventListener("dragover",e=>{e.preventDefault(),e.stopPropagation(),this.deleteZone.classList.add("drag-over")}),this.deleteZone.addEventListener("dragleave",()=>{this.deleteZone.classList.remove("drag-over")}),this.deleteZone.addEventListener("drop",e=>{e.preventDefault(),e.stopPropagation(),this.deleteZone.classList.remove("drag-over");const t=parseInt(e.dataTransfer.getData("text/plain"));this.removeColorFromPalette(t)})}showTab(e){this.colorPicker.querySelectorAll(".color-picker-tab-content").forEach(e=>e.style.display="none");this.colorPicker.querySelectorAll(".color-picker-tab").forEach(e=>e.classList.remove("active")),"rgb"===e?(this.rgbContent.style.display="block",this.rgbTab.classList.add("active"),this.updateSlidersFromHex(this.colorPickerPreviewColor)):"hsv"===e?(this.hsvContent.style.display="block",this.hsvTab.classList.add("active"),this.updateSlidersFromHex(this.colorPickerPreviewColor)):"palette"===e&&(this.paletteContent.style.display="block",this.paletteTab.classList.add("active"),this.updatePaletteGrid())}updateSlidersFromHex(e){if(!e)return;const t=this.hexToRgb(e);this.updateSlider("r",t.r),this.updateSlider("g",t.g),this.updateSlider("b",t.b);const i=this.rgbToHsv(t.r,t.g,t.b);this.updateSlider("h",i.h),this.updateSlider("s",i.s),this.updateSlider("v",i.v),this.currentColorPreview.style.backgroundColor=e,this.colorPickerPreviewColor=e}updateSlider(e,t){const i=this.colorPicker.querySelector(`.${e}-slider`),s=this.colorPicker.querySelector(`.${e}-value`);i&&(i.value=t),s&&(s.value=t)}handleSliderChange(e,t){this.updateSlider(e,t),this.updateColorFromSliders("r"===e||"g"===e||"b"===e)}handleValueChange(e,t){const i=this.colorPicker.querySelector(`.${e}-slider`),s=parseInt(i.min),a=parseInt(i.max);t=Math.max(s,Math.min(a,parseInt(t)||0)),this.updateSlider(e,t),this.updateColorFromSliders()}adjustChannel(e,t){const i=this.colorPicker.querySelector(`.${e}-value`),s=this.colorPicker.querySelector(`.${e}-slider`),a=parseInt(s.min),r=parseInt(s.max);let n=parseInt(i.value)+t;n=Math.max(a,Math.min(r,n)),this.updateSlider(e,n),this.updateColorFromSliders()}updateColorFromSliders(e=!0){if(e){const e=parseInt(this.colorPicker.querySelector(".r-value").value),t=parseInt(this.colorPicker.querySelector(".g-value").value),i=parseInt(this.colorPicker.querySelector(".b-value").value),s=this.rgbToHex(e,t,i);this.colorPickerPreviewColor=s,this.currentColorPreview.style.backgroundColor=s}else{const e=parseInt(this.colorPicker.querySelector(".h-value").value),t=parseInt(this.colorPicker.querySelector(".s-value").value),i=parseInt(this.colorPicker.querySelector(".v-value").value),s=this.hsvToRgb(e,t,i),a=this.rgbToHex(s.r,s.g,s.b);this.colorPickerPreviewColor=a,this.currentColorPreview.style.backgroundColor=a}}confirmSelection(){const e=this.colorPickerPreviewColor;e&&("primary"===this.editor.selectedColor?this.editor.primaryColor=e:this.editor.secondaryColor=e,this.editor.updateColorIndicator(),this.editor.paletteManager.addToRecent(e),this.updateRecentColorsGrid(),this.hide())}updatePaletteGrid(){if(!this.paletteGrid)return;this.paletteGrid.innerHTML="";const e=this.editor.paletteManager.getCurrentPalette();if(!e)return;for(let t=0;t<e.colors.length;t++){const i=e.colors[t],s=document.createElement("div");s.className="palette-color",s.style.backgroundColor=i,s.style.cursor="grab",s.draggable=!0,s.dataset.index=t,s.addEventListener("click",()=>{this.updateSlidersFromHex(i)}),s.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",t.toString()),s.classList.add("dragging"),s.style.cursor="grabbing",this.deleteZone.classList.add("visible")}),s.addEventListener("dragend",()=>{s.classList.remove("dragging"),s.style.cursor="grab",this.deleteZone.classList.remove("visible")}),s.addEventListener("dragover",e=>e.preventDefault()),s.addEventListener("drop",i=>{i.preventDefault();const s=parseInt(i.dataTransfer.getData("text/plain")),a=t;s!==a&&(this.editor.paletteManager.moveColorInPalette(e.id,s,a),this.updatePaletteGrid())}),this.paletteGrid.appendChild(s)}const t=document.createElement("div");t.className="palette-add-button",t.innerHTML="+",t.title=__("Añadir color||Add new color"),t.style.cursor="pointer",t.addEventListener("click",()=>{this.showHexInputDialog().then(t=>{this.editor.paletteManager.addColorToPalette(e.id,t),this.updatePaletteGrid(),this.editor.showToast(__("Color añadido a la paleta||Color added to palette"))}).catch(()=>{})}),this.paletteGrid.appendChild(t)}updateRecentColorsGrid(){if(!this.recentColorsGrid)return;this.recentColorsGrid.innerHTML="";this.editor.paletteManager.getRecentColors().forEach(e=>{const t=document.createElement("div");t.className="recent-color",t.style.backgroundColor=e,t.addEventListener("click",()=>{this.updateSlidersFromHex(e)}),this.recentColorsGrid.appendChild(t)})}removeColorFromPalette(e){const t=this.editor.paletteManager.getCurrentPalette();t&&(this.editor.paletteManager.removeColorFromPalette(t.id,e),this.updatePaletteGrid(),this.editor.showToast(__("Color quitado de la paleta||Color removed from palette")))}loadPalette(){this.editor.getFileBrowser({title:__("Cargar paleta||Load palette"),mode:"open",fileTypes:["pal"],onConfirm:async e=>{try{const t=await this.editor.readFile(e);this.editor.parsePalFile(t),this.updatePaletteGrid(),this.editor.showToast(__("Paleta cargada||Palette loaded successfully"))}catch(e){this.editor.showToast(__(`(Error al cargar paleta|Error loading palette): ${e.message}`),5e3)}}}).show()}savePalette(){const e=this.editor.paletteManager.getCurrentPalette();if(!e||0===e.colors.length)return void this.editor.showToast(__("No hay paleta que guardar||No palette to save"),3e3);this.editor.getFileBrowser({title:__("Guardar paleta||Save palette"),mode:"saveAs",fileTypes:["pal"],defaultType:"pal",defaultName:e.name||"palette",onConfirm:async e=>{try{const t=this.editor.generatePalFile();await this.editor.saveFile(e.name,"pal",t),this.editor.showToast(__("Paleta guardada||Palette saved successfully"))}catch(e){this.editor.showToast(__(`(Error al guardar la paleta|Error saving palette): ${e.message}`),5e3)}}}).show()}initColorPickerDrag(){this.colorPickLine=document.createElement("div"),this.colorPickLine.className="color-pick-line",this.colorPickLine.style.display="none",this.editor.uiLayer.appendChild(this.colorPickLine),this.editor.colorIndicator.addEventListener("mousedown",e=>this.handleColorPickStart(e)),document.addEventListener("mousemove",e=>this.handleColorPickMove(e)),document.addEventListener("mouseup",e=>this.handleColorPickEnd(e)),this.editor.colorIndicator.addEventListener("touchstart",e=>this.handleColorPickStart(e),{passive:!1}),document.addEventListener("touchmove",e=>this.handleColorPickMove(e),{passive:!1}),document.addEventListener("touchend",e=>this.handleColorPickEnd(e)),document.addEventListener("touchcancel",e=>this.handleColorPickEnd(e)),this.editor.colorIndicator.addEventListener("click",e=>{this.isColorPicking||this.colorPickTimeout||this.toggleSelectedColor()})}handleColorPickStart(e){this.editor.isDrawing||this.editor.isPanning||(e.type.startsWith("touch")&&(e.preventDefault(),e.stopPropagation()),this.colorPickStartTime=Date.now(),this.colorPickStartPos={x:e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,y:e.type.startsWith("touch")?e.touches[0].clientY:e.clientY},this.colorPickTimeout&&(clearTimeout(this.colorPickTimeout),this.colorPickTimeout=null),this.colorPickTimeout=setTimeout(()=>{if(!this.isColorPicking){this.isColorPicking=!0,this.editor.colorIndicator.classList.add("dragging");const e=this.editor.colorIndicator.getBoundingClientRect();this.colorPickStartX=e.left+e.width/2,this.colorPickStartY=e.top+e.height/2,this.colorPickLine.style.display="block",this.updateColorPickLine(this.colorPickStartX,this.colorPickStartY,this.colorPickStartPos.x,this.colorPickStartPos.y)}},200))}handleColorPickMove(e){if(!this.colorPickStartPos)return;let t,i;if(e.type.startsWith("touch")&&e.preventDefault(),e.type.startsWith("touch")){if(!e.touches||0===e.touches.length)return;t=e.touches[0].clientX,i=e.touches[0].clientY}else t=e.clientX,i=e.clientY;if(!this.isColorPicking){if(Math.hypot(t-this.colorPickStartPos.x,i-this.colorPickStartPos.y)>10&&this.colorPickTimeout){clearTimeout(this.colorPickTimeout),this.colorPickTimeout=null,this.isColorPicking=!0,this.editor.colorIndicator.classList.add("dragging");const e=this.editor.colorIndicator.getBoundingClientRect();this.colorPickStartX=e.left+e.width/2,this.colorPickStartY=e.top+e.height/2,this.colorPickLine.style.display="block",this.updateColorPickLine(this.colorPickStartX,this.colorPickStartY,t,i)}return}this.updateColorPickLine(this.colorPickStartX,this.colorPickStartY,t,i)}handleColorPickEnd(e){let t,i;if(this.colorPickTimeout&&(clearTimeout(this.colorPickTimeout),this.colorPickTimeout=null),e.type.startsWith("touchend")||e.type.startsWith("touchcancel")){if(!e.changedTouches||0===e.changedTouches.length)return void this.cleanupColorPicking();t=e.changedTouches[0].clientX,i=e.changedTouches[0].clientY}else t=e.clientX,i=e.clientY;if(!this.isColorPicking){const e=Date.now()-this.colorPickStartTime<300,s=this.colorPickStartPos?Math.hypot(t-this.colorPickStartPos.x,i-this.colorPickStartPos.y):0;return e&&s<15&&this.toggleSelectedColor(),void(this.colorPickStartPos=null)}const s=this.editor.canvasContainer.getBoundingClientRect();if(t>=s.left&&t<=s.right&&i>=s.top&&i<=s.bottom){const e=this.editor.getCanvasPosition(t,i);e&&this.editor.pickColor(e.x,e.y)}this.cleanupColorPicking()}cleanupColorPicking(){this.isColorPicking=!1,this.colorPickStartPos=null,this.colorPickLine.style.display="none",this.editor.colorIndicator.classList.remove("dragging"),this.colorPickTimeout&&(clearTimeout(this.colorPickTimeout),this.colorPickTimeout=null)}updateColorPickLine(e,t,i,s){const a=Math.sqrt(Math.pow(i-e,2)+Math.pow(s-t,2)),r=180*Math.atan2(s-t,i-e)/Math.PI;this.colorPickLine.style.width=`${a}px`,this.colorPickLine.style.left=`${e}px`,this.colorPickLine.style.top=`${t}px`,this.colorPickLine.style.transform=`rotate(${r}deg)`,this.colorPickLine.style.transformOrigin="0 0"}toggleSelectedColor(){this.editor.selectedColor="primary"===this.editor.selectedColor?"secondary":"primary",this.editor.updateColorIndicator()}show(){const e="primary"===this.editor.selectedColor?this.editor.primaryColor:this.editor.secondaryColor;this.updateSlidersFromHex(e),this.updateRecentColorsGrid(),this.updatePaletteGrid(),this.overlay.style.display="flex"}hide(){this.overlay.style.display="none"}isVisible(){return"flex"===this.overlay.style.display}showHexInputDialog(){const e=document.createElement("div");e.className="hex-input-dialog";const t=document.createElement("input");t.type="text",t.value=this.colorPickerPreviewColor,t.placeholder="#RRGGBB",t.className="hex-input-text",e.appendChild(t);const i=document.createElement("input");return i.type="color",i.value=this.colorPickerPreviewColor,i.className="hex-input-color",i.addEventListener("change",()=>{t.value=i.value}),e.appendChild(i),t.addEventListener("input",()=>{if(this.isValidHex(t.value)){let e=t.value;e.startsWith("#")||(e="#"+e),i.value=e}}),new Promise((i,s)=>{this.editor.showPopup(__("Entrada Hexadecimal||Hex Input"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>{this.editor.hidePopup(),s()}},{text:__("Seleccionar||Select"),action:()=>{if(this.isValidHex(t.value)){let e=t.value;e.startsWith("#")||(e="#"+e),this.editor.hidePopup(),i(e)}else this.editor.showToast(__("Expresión hexadecimal inválida||Invalid HEX color expression")),s()}}])})}loadFloatingColors(e){e&&e.length&&e.forEach&&(this.removeAllFloatingPaletteColors(),e.forEach(e=>{this.addFloatingPaletteColor(e.color,e.x,e.y)}))}addFloatingPaletteColor(e,t,i){const s=document.createElement("div");s.className="palette-color floating",s.style.backgroundColor=e,s.style.cursor="grab",s.style.position="fixed",s.style.width="30px",s.style.height="30px",s.style.borderRadius="4px",s.style.boxShadow="0 0 5px rgba(0, 0, 0, 0.5)",s.style.transition="all 0.1s";const a=`color_${Date.now()}_${Math.random().toString(36).substr(2,9)}`;s.dataset.color=e,s.dataset.id=a,s.dataset.x=t,s.dataset.y=i,s.style.top=`${i}px`,s.style.left=`${t}px`,s.style.touchAction="none",s.style.userSelect="none",s.addEventListener("click",t=>{t.stopPropagation(),this.editor.updateColorSlidersFromHex(e)});let r,n,o,l,c=!1;const h=e=>{if(c){if(e.preventDefault(),this.floatingColorsDeleteZone){const t=this.floatingColorsDeleteZone.getBoundingClientRect();e.clientX>=t.left&&e.clientX<=t.right&&e.clientY>=t.top&&e.clientY<=t.bottom?this.removeFloatingPaletteColor(s.dataset.id):this.saveFloatingColors()}c=!1,s.style.cursor="grab",s.classList.remove("dragging"),this.floatingColorsDeleteZone&&this.floatingColorsDeleteZone.classList.remove("visible","drag-over"),s.releasePointerCapture(e.pointerId)}};s.addEventListener("pointerdown",e=>{e.preventDefault(),e.stopPropagation(),s.setPointerCapture(e.pointerId),c=!0,r=e.clientX,n=e.clientY,o=parseFloat(s.style.left)||0,l=parseFloat(s.style.top)||0,s.style.cursor="grabbing",s.classList.add("dragging"),this.floatingColorsDeleteZone&&this.floatingColorsDeleteZone.classList.add("visible")}),s.addEventListener("pointermove",e=>{if(!c)return;e.preventDefault();const t=e.clientX-r,i=e.clientY-n,a=o+t,h=l+i;if(s.style.left=`${a}px`,s.style.top=`${h}px`,s.dataset.x=a,s.dataset.y=h,this.floatingColorsDeleteZone){const t=this.floatingColorsDeleteZone.getBoundingClientRect();e.clientX>=t.left&&e.clientX<=t.right&&e.clientY>=t.top&&e.clientY<=t.bottom?this.floatingColorsDeleteZone.classList.add("drag-over"):this.floatingColorsDeleteZone.classList.remove("drag-over")}}),s.addEventListener("pointerup",h),s.addEventListener("pointercancel",h),s.addEventListener("contextmenu",e=>e.preventDefault()),this.editor.overlayLayer.appendChild(s),this.floatingColors.set(a,s),this.saveFloatingColors()}removeFloatingPaletteColor(e){const t=this.floatingColors.get(e);t&&(t.remove(),this.floatingColors.delete(e),this.saveFloatingColors())}removeAllFloatingPaletteColors(){this.floatingColors.forEach((e,t)=>{e&&e.remove()}),this.floatingColors.clear(),this.saveFloatingColors()}saveFloatingColors(){localStorage.setItem("floatingColors",this.getFloatingColorsData())}getFloatingColorsData(){return JSON.stringify(Array.from(this.floatingColors).map(e=>e[1]).map(e=>({color:e.dataset.color,x:e.dataset.x,y:e.dataset.y})))}rgbToHex(e,t,i){return"#"+((1<<24)+(e<<16)+(t<<8)+i).toString(16).slice(1)}hexToRgb(e){return{r:parseInt(e.slice(1,3),16),g:parseInt(e.slice(3,5),16),b:parseInt(e.slice(5,7),16)}}rgbToHsv(e,t,i){e/=255,t/=255,i/=255;const s=Math.max(e,t,i),a=Math.min(e,t,i);let r,n,o=s;const l=s-a;if(n=0===s?0:l/s,s===a)r=0;else{switch(s){case e:r=(t-i)/l+(t<i?6:0);break;case t:r=(i-e)/l+2;break;case i:r=(e-t)/l+4}r/=6}return{h:Math.round(360*r),s:Math.round(100*n),v:Math.round(100*o)}}hsvToRgb(e,t,i){let s,a,r;e/=360,t/=100,i/=100;const n=Math.floor(6*e),o=6*e-n,l=i*(1-t),c=i*(1-o*t),h=i*(1-(1-o)*t);switch(n%6){case 0:s=i,a=h,r=l;break;case 1:s=c,a=i,r=l;break;case 2:s=l,a=i,r=h;break;case 3:s=l,a=c,r=i;break;case 4:s=h,a=l,r=i;break;case 5:s=i,a=l,r=c}return{r:Math.round(255*s),g:Math.round(255*a),b:Math.round(255*r)}}isValidHex(e){return/^#?([a-f\d]{3}|[a-f\d]{6})$/i.test(e)}}class FileBrowser{constructor(e={}){this.options={container:document.body,onConfirm:null,onCancel:null,onError:null,fileTypes:["pxl","png","jpg","jpeg"],defaultType:"pxl",allowMultiple:!1,mode:"open",defaultName:"untitled"},this.mimeMap={pxl:"text/plain, application/json, application/octet-stream",pal:"text/plain, application/octet-stream",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",psd:"applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",txt:"text/plain, application/octet-stream",project:"application/*",default:"*"},Object.assign(this.options,e),this.selectedFile=null,this.selectedType=this.options.defaultType,this.isCordova=void 0!==window.cordova,this.isFilePluginAvailable=this.isCordova&&void 0!==window.File,this.currentDirectory=null,this.currentPath=null,this.workingDirectory="",this.lastMode=null,this.visible=!1,this.initUI()}initUI(){this.overlay=document.createElement("div"),this.overlay.className="popup-overlay",this.dialog=document.createElement("div"),this.dialog.className="popup-content",this.overlay.appendChild(this.dialog),this.title=document.createElement("div"),this.title.className="file-browser-title",this.title.textContent=this.options.title?this.options.title:"save"===this.options.mode||"saveAs"===this.options.mode?__("Guardar Archivo||Save File"):__("Abrir Archivo||Open File"),this.dialog.appendChild(this.title),this.contentArea=document.createElement("div"),this.contentArea.className="file-browser-content",this.dialog.appendChild(this.contentArea),this.buttonContainer=document.createElement("div"),this.buttonContainer.className="file-browser-buttons",this.dialog.appendChild(this.buttonContainer),this.initContentArea(),this.initButtons(),this.options.container.appendChild(this.overlay)}initContentArea(){this.contentArea.innerHTML="";const e=this.filenameInput,t=this.typeSelect;this.fileList;this.isCordova&&this.isFilePluginAvailable?this.initCordovaUI():this.initBrowserUI(),e&&this.filenameInput&&e.value&&(this.filenameInput.value=e.value),t&&this.typeSelect&&t.value&&(this.typeSelect.value=t.value,this.selectedType=t.value)}initCordovaUI(){this.pathDisplay=this.pathDisplay||document.createElement("div"),this.fileList=this.fileList||document.createElement("div"),this.pathDisplay.className="cordova-path",this.fileList.className="file-browser-list cordova-file-list",this.contentArea.innerHTML="",this.contentArea.appendChild(this.pathDisplay),this.contentArea.appendChild(this.fileList),"save"!==this.options.mode&&"saveAs"!==this.options.mode||(this.filenameInput=this.filenameInput||document.createElement("input"),this.filenameInput.type="text",this.filenameInput.className="file-browser-filename",this.filenameInput.value=this.options.defaultName||"untitled",this.contentArea.appendChild(this.filenameInput),this.typeSelect=this.typeSelect||document.createElement("select"),this.typeSelect.className="file-browser-type",this.typeSelect.innerHTML="",this.options.fileTypes.forEach(e=>{const t=document.createElement("option");t.value=e,t.textContent=e.toUpperCase(),e===this.options.defaultType&&(t.selected=!0),this.typeSelect.appendChild(t)}),this.contentArea.appendChild(this.typeSelect))}initBrowserUI(){if(this.contentArea.innerHTML="","open"===this.options.mode){this.fileInput=this.fileInput||document.createElement("input"),this.fileInput.type="file",this.fileInput.style.display="none",this.fileInput.accept=this.getAccept(),this.fileInput.multiple=this.options.allowMultiple;const e=this.fileInput.cloneNode();this.fileInput=e,this.fileInput.addEventListener("change",e=>this.handleFileSelect(e)),this.contentArea.appendChild(this.fileInput);const t=document.createElement("button");t.className="file-browser-browse",t.textContent=__("Escoger Archivos||Browse Files"),t.addEventListener("click",()=>this.fileInput.click()),this.contentArea.appendChild(t)}else this.filenameInput=this.filenameInput||document.createElement("input"),this.filenameInput.type="text",this.filenameInput.className="file-browser-filename",this.filenameInput.value=this.options.defaultName||"untitled",this.contentArea.appendChild(this.filenameInput),this.typeSelect=this.typeSelect||document.createElement("select"),this.typeSelect.className="file-browser-type",this.typeSelect.innerHTML="",this.options.fileTypes.forEach(e=>{const t=document.createElement("option");t.value=e,t.textContent=e.toUpperCase(),e===this.options.defaultType&&(t.selected=!0),this.typeSelect.appendChild(t)}),this.contentArea.appendChild(this.typeSelect)}initButtons(){this.buttonContainer.innerHTML="",this.cancelButton=document.createElement("button"),this.cancelButton.className="file-browser-cancel",this.cancelButton.textContent=__("Cancelar||Cancel"),this.cancelButton.addEventListener("click",()=>this.handleCancel()),this.buttonContainer.appendChild(this.cancelButton),"save"!==this.options.mode&&"saveAs"!==this.options.mode||(this.confirmButton=document.createElement("button"),this.confirmButton.className="file-browser-confirm",this.confirmButton.textContent=__("Guardar||Save"),this.confirmButton.addEventListener("click",()=>this.handleConfirm()),this.buttonContainer.appendChild(this.confirmButton))}updateExistingUI(){this.filenameInput&&this.options.defaultName&&(this.filenameInput.value=this.options.defaultName),this.title&&(this.title.textContent=this.options.title?this.options.title:"save"===this.options.mode||"saveAs"===this.options.mode?"Save File":"Open File"),this.initContentArea(),this.initButtons()}async loadCordovaFiles(e=this.currentPath){try{let t;if(this.fileList.innerHTML='<div class="loading">Loading files...</div>',e)t=await new Promise((t,i)=>{window.resolveLocalFileSystemURL(e.endsWith("/")?e:e+"/",t,i)});else try{t=await new Promise((e,t)=>{window.resolveLocalFileSystemURL(cordova.file.externalDataDirectory||cordova.file.dataDirectory,e,t)})}catch(e){t=await new Promise((e,t)=>{window.requestFileSystem(window.PERSISTENT||1,0,t=>e(t.root),t)})}const i=t.createReader(),s=await new Promise((e,t)=>{i.readEntries(e,t)});this.currentDirectory=t,this.currentPath=t.toURL(),this.workingDirectory=t.fullPath,this.updatePathDisplay(t),this.renderFileList(s,t)}catch(e){throw this.showError(`Error loading files: ${e.message}`),this.options.onError&&this.options.onError(e),e}}async getDirectoryEntry(e){return new Promise((t,i)=>{window.resolveLocalFileSystemURL(e,t,i)})}async getRootDirectory(){return window.PERSISTENT?new Promise((e,t)=>{window.requestFileSystem(window.PERSISTENT,0,t=>e(t.root),t)}):window.cordova.file.dataDirectory}updatePathDisplay(e){const t=e.fullPath||e.nativeURL;this.pathDisplay.textContent=t}renderFileList(e,t){this.fileList.innerHTML="",e.sort((e,t)=>e.isDirectory&&!t.isDirectory?-1:!e.isDirectory&&t.isDirectory?1:e.name.toLowerCase().localeCompare(t.name.toLowerCase())),this.isRootPath(t)?"open"===this.options.mode&&this.addListItem({text:"[File Selector]",icon:"folder",onClick:()=>{const i=document.createElement("input");i.type="file",i.style.display="none",i.accept=this.getAccept(),i.multiple=this.options.allowMultiple,i.addEventListener("change",e=>this.handleFileSelect(e)),i.addEventListener("cancel",i=>this.renderFileList(e,t)),i.click(),this.fileList.innerHTML=""}}):this.addParentDirectoryItem(t),e.forEach(e=>{e.isDirectory?this.addDirectoryItem(e):this.addFileItem(e)}),0===this.fileList.children.length&&(this.fileList.innerHTML='<div class="empty">No files found</div>')}addListItem({text:e="",type:t="directory",icon:i="folder",onClick:s=null}){const a=document.createElement("div");a.className=`file-item ${t}`;const r=document.createElement("span");r.className=`icon ${i}`;const n=document.createElement("span");n.textContent=e,a.appendChild(r),a.appendChild(n),a.addEventListener("click",()=>s?.(a)),a.addEventListener("touchend",()=>a.scrollTo({left:0,behavior:"smooth"})),this.fileList.appendChild(a)}addParentDirectoryItem(e){const t=document.createElement("div");t.className="file-item directory";const i=document.createElement("span");i.className="icon folder";const s=document.createElement("span");s.textContent=".. (Parent Directory)",t.appendChild(i),t.appendChild(s),t.addEventListener("click",()=>this.goUp()),this.fileList.appendChild(t)}addDirectoryItem(e){const t=document.createElement("div");t.className="file-item directory";const i=document.createElement("span");i.className="icon folder";const s=document.createElement("span");s.textContent=e.name,t.appendChild(i),t.appendChild(s),t.addEventListener("click",()=>{this.loadCordovaFiles(e.toURL())}),t.addEventListener("touchend",()=>t.scrollTo({left:0,behavior:"smooth"})),this.fileList.appendChild(t)}addFileItem(e){const t=e.name.split(".").pop().toLowerCase();if(!this.options.fileTypes.includes(t))return;const i=document.createElement("div");i.className="file-item file";const s=document.createElement("span");["png","gif","jpg","jpeg"].includes(t)?s.className="icon image-file":s.className="pxl"===t?"icon project-file":"icon text-file";const a=document.createElement("span");a.textContent=e.name,i.appendChild(s),i.appendChild(a),i.addEventListener("click",()=>{this.selectedFile=e,this.selectedType=t,"open"===this.options.mode&&this.options.onConfirm?(this.options.onConfirm({name:e.name,type:t,entry:e,fullPath:e.toURL()}),this.hide()):this.filenameInput.value=e.name}),this.fileList.appendChild(i)}handleFileSelect(e){const t=e.target.files;if(!t||0===t.length)return;const i=t[0],s=i.name.split(".").pop().toLowerCase();this.options.onConfirm&&this.options.onConfirm({name:i.name,type:s,file:i}),e.target.value="",this.hide()}show(){this.lastMode!==this.options.mode&&(this.contentArea.innerHTML="",this.initContentArea()),this.overlay.classList.add("visible"),this.selectedFile=null,this.visible=!0,this.filenameInput&&(this.filenameInput.value=this.options.defaultName||"untitled"),this.typeSelect&&this.options.defaultType&&(this.typeSelect.value=this.options.defaultType,this.selectedType=this.options.defaultType),this.isCordova&&this.isFilePluginAvailable&&this.loadCordovaFiles()}hide(){this.overlay.classList.remove("visible"),this.visible=!1}refresh(){this.contentArea.innerHTML="",this.initContentArea(),this.isCordova&&this.isFilePluginAvailable&&this.loadCordovaFiles()}goUp(){this.isRootPath(this.currentDirectory)?this.hide():this.loadCordovaFiles(this.currentDirectory.toURL().split("/").slice(0,-2).join("/")||"/")}isRootPath(e){return"/"==e.fullPath||e.fullPath==cordova.file.dataDirectory}getAccept(){const e=[];return this.options.fileTypes.forEach(t=>{(this.mimeMap[t]||this.mimeMap.default).split(",").map(e=>e.trim()).forEach(t=>{e.includes(t)||e.push(t)})}),e.join(", ")}updateOptions(e){const t=this.options.mode;Object.assign(this.options,e),this.selectedFile=null,this.selectedType=this.options.defaultType||"pxl",t!==this.options.mode||"saveAs"===this.options.mode&&!this.filenameInput||"open"===this.options.mode&&this.isCordova&&!this.fileList?(this.contentArea.innerHTML="",this.initContentArea(),this.updateExistingUI()):this.updateExistingUI(),this.lastMode=this.options.mode}handleConfirm(){if("save"!==this.options.mode&&"saveAs"!==this.options.mode)return;let e=this.filenameInput?this.filenameInput.value.trim():this.options.defaultName;e||(e=this.options.defaultName);const t=this.typeSelect?this.typeSelect.value:this.options.defaultType,i=e.endsWith(`.${t}`)?e:`${e}.${t}`;if(this.options.onConfirm){const e={name:i,type:t};this.isCordova&&this.isFilePluginAvailable&&this.currentDirectory&&(e.directory=this.currentDirectory),this.options.onConfirm(e)}this.hide()}handleCancel(){this.options.onCancel&&this.options.onCancel(),this.hide()}showError(e){this.fileList.innerHTML=`<div class="error">${e}</div>`}destroy(){if(this.fileInput){const e=this.fileInput.cloneNode(!1);this.fileInput.parentNode?.replaceChild(e,this.fileInput),this.fileInput=e}this.overlay&&this.overlay.parentNode&&this.overlay.parentNode.removeChild(this.overlay),this.fileBrowser=null}}class PixelArtEditor{constructor(e){this.container=e||document.createElement("div"),this.container.classList.add("app-container"),document.body.appendChild(this.container),this.version=VERSION,this.tools={},this.currentTool=null,this.lastTool=null,this.isDrawing=!1,this.isPanning=!1,this.brushSize=localStorage.getItem("brushSize")?parseInt(localStorage.getItem("brushSize")):1,this.maxBrushSize=8,this.minBrushSize=1,this.defaultWidth=32,this.defaultHeight=32,this.startX=0,this.startY=0,this.scale=1,this.offsetX=0,this.offsetY=0,this.primaryColor=localStorage.getItem("primaryColor")||"#000000",this.secondaryColor=localStorage.getItem("secondaryColor")||"#ff00ff",this.selectedColor="primary",this.transparentBackground=!0,this.project=null,this.historyManager=new HistoryManager(this),this.touchDistance=0,this.touchCenterX=0,this.touchCenterY=0,this.minScale=1,this.maxScale=35,this.popupOpen=!1,this.toolDropdownOpen=!1,this.toolSettingsOpen=!1,this.isPlaying=!1,this.animationInterval=null,this.defaultFrameTime=1e3/12,this.showMiniView=!1,this.useCordova=window.location.href.startsWith("file"),this.deviceReady=!1,this.isFilePluginAvailable=!1,this.fileBrowser=null,this.defaultFileBrowserPathUrl=null,this.timelapseFPS=30,this.registerLayerVisibilityChanges=!1,this.isCanvasResizing=!1,this.canvasResizeState={x:0,y:0,width:0,height:0},this.collabMemberName=localStorage.getItem("collab_username")||"user_"+Math.floor(1e4*Math.random()),this.collabMemberColor=localStorage.getItem("collab_user_color")||["red","blue","green","yellow","orange","purple"][Math.floor(6*Math.random())],this.tempLine=null,this.tempRect=null,this.tempEllipse=null,this.tempCanvas=null,this.tempCtx=null,this.tempColor=null;try{this.initSettings(),this.initUI(),this.initCollab(),this.initBrushUI(),this.initCanvas(),this.initTools(),this.initEventListeners(),this.gridManager=new GridManager(this),this.spritesheetLoader=new SpritesheetLoader(this),this.referenceManager=new ReferenceManager(this),this.paletteManager=new PaletteManager(this),this.colorPicker=new ColorPicker(this),this.useCordova&&this.initCordova(),this.newProject(),this.showMiniView&&this.animationPreview.classList.add("visible")}catch(e){throw console.error("Editor initialization error:",e),this.showError(e),e}}initSettings(){this.settings=new SettingsManager(this),window.settings=this.settings;const e=this.settings.addCategory({id:"general",title:"General||General",icon:"icon-general"});e.addSetting({id:"language",label:"Idioma||Language",description:"Selecciona el idioma de la interfaz||Select interface language",type:"select",defaultValue:"0",options:[{value:"0",label:"Español"},{value:"1",label:"English"}],needsReload:!0,onInit:(e,t)=>{t.settings.language=e},onUpdate:(e,t,i)=>{i.settings.language=e,i.settings.save()}}),e.addSetting({id:"theme",label:"Tema||Theme",description:"Oscuro / Claro||Dark / Light",type:"select",defaultValue:"dark",options:[{value:"dark",label:"Oscuro||Dark"},{value:"light",label:"Claro||Light"}],needsReload:!1,onInit:(e,t)=>{document.body.classList.add(`theme-${e}`)},onUpdate:(e,t,i)=>{document.body.classList.remove(`theme-${t}`),document.body.classList.add(`theme-${e}`)}});const t=this.settings.addCategory({id:"editor",title:"Editor||Editor",icon:"icon-editor"});t.addSetting({id:"autoSave",label:"Auto-guardado||Auto-save",description:"Guardar automáticamente cada 5 minutos||Auto-save every 5 minutes",type:"boolean",defaultValue:!1,onInit:(e,t)=>{e?t.startAutoSave():t.stopAutoSave()},onUpdate:(e,t,i)=>{e?i.startAutoSave():i.stopAutoSave()}}),t.addSetting({id:"showPreview",label:"Mostrar Vista Previa por defecto||Show Preview by default",description:"Mostrar recuadro de vista previa al iniciar la app||Show preview window at startup",type:"boolean",defaultValue:!1,onInit:(e,t)=>{t.showMiniView=e}}),t.addSetting({id:"registerLayerVisibilityChanges",label:"Registrar cambios de visibilidad||Register visibility changes",description:"Registrar cambios de visibilidad de capas en la historia de deshacer||Register layer visibility changes in undo history",type:"boolean",defaultValue:!1,onInit:(e,t)=>{t.registerLayerVisibilityChanges=e},onUpdate:(e,t,i)=>{i.registerLayerVisibilityChanges=e}});const i=this.settings.addCategory({id:"canvas",title:"Lienzo||Canvas",icon:"icon-canvas"});i.addSetting({id:"defaultWidth",label:"Ancho predeterminado||Default width",description:"Ancho por defecto para nuevos proyectos||Default width for new projects",type:"number",defaultValue:32,min:8,max:512,step:8,onInit:(e,t)=>{t.defaultWidth=e},onUpdate:(e,t,i)=>{i.defaultWidth=e}}),i.addSetting({id:"defaultHeight",label:"Alto predeterminado||Default height",description:"Alto por defecto para nuevos proyectos||Default height for new projects",type:"number",defaultValue:32,min:8,max:512,step:8,onInit:(e,t)=>{t.defaultHeight=e},onUpdate:(e,t,i)=>{i.defaultHeight=e}}),i.addSetting({id:"smooth-panning",label:"Paneo Suave||Smooth Panning",description:"Movimiento suave del lienzo||Smooth movement of the canvas",type:"boolean",defaultValue:!1,onInit:(e,t)=>{e?t.setSmoothPanning(!0):t.setSmoothPanning(!1)},onUpdate:(e,t,i)=>{e?i.setSmoothPanning(!0):i.setSmoothPanning(!1)}});this.settings.addCategory({id:"animation",title:"Animación||Animation",icon:"icon-animation"}).addSetting({id:"defaultFPS",label:"FPS predeterminado||Default FPS",description:"Fotogramas por segundo para nuevas animaciones||Frames per second for new animations",type:"number",defaultValue:12,min:1,max:60,step:1,onInit:(e,t)=>{t.defaultFrameTime=1e3/e}});const s=this.settings.addCategory({id:"performance",title:"Rendimiento||Performance",icon:"icon-performance"});s.addSetting({id:"zoomLimit",label:"Limité de Zoom||Zoom Limit",description:"Límitar el zoom hasta cierto punto||Limit zoom to certain point",type:"boolean",defaultValue:!0,step:10,onInit:(e,t)=>{t.minScale=e?1:0},onUpdate:(e,t,i)=>{i.minScale=e?1:0}}),s.addSetting({id:"maxUndoSteps",label:"Pasos de deshacer máximos||Max undo steps",description:"Límite de historial de deshacer (0 = Ilimitado)||Undo history limit (0 = Unlimited)",type:"number",defaultValue:50,min:0,max:2e3,step:10,onInit:(e,t)=>{t.historyManager.maxHistoryLength=e||1/0},onUpdate:(e,t,i)=>{i.historyManager.maxHistoryLength=e||1/0}}),s.addSetting({id:"maxBrushSize",label:"Tamaño máximo del pincel||Max brush size",description:"Límite del tamaño del pincel, Pinceles muy anchos pueden ralentizar la app||Brush size limit, wide brushes can slow down the app",type:"number",defaultValue:8,min:3,max:32,step:1,onInit:(e,t)=>{t.maxBrushSize=e},onUpdate:(e,t,i)=>{i.maxBrushSize=e}});const a=this.settings.addCategory({id:"collab",title:"Colaboración||Collaboration",icon:"icon-collab"});a.addSetting({id:"memberName",label:"Nombre en pantalla||Display name",description:"Nombre a mostrar en sesiones colaborativas||Name to show in collaborative sessions",type:"text",defaultValue:this.collabMemberName,needsReload:!1,onInit:(e,t)=>{t.collabMemberName=e.length>3?e:`user_${Math.floor(1e4*Math.random())}`},onUpdate:(e,t,i)=>{i.collabMemberName=e.length>3?e:`user_${Math.floor(1e4*Math.random())}`,this.collabManager.updateMemberName(i.collabMemberName),localStorage.setItem("collab_username",e)}}),a.addSetting({id:"memberColor",label:"Color||Color",description:"Color con el que se muestra tu nombre||Color with which your name is shown",type:"select",defaultValue:this.collabMemberColor,options:[{value:"red",label:"Rojo||Red"},{value:"blue",label:"Azul||Blue"},{value:"green",label:"Verde||Green"},{value:"yellow",label:"Amarillo||Yellow"},{value:"orange",label:"Naranja||Orange"},{value:"purple",label:"Púrpura||Purple"},{value:"pink",label:"Rosa||Pink"},{value:"cyan",label:"Cian||Cyan"},{value:"brown",label:"Marrón||Brown"},{value:"gray",label:"Gris||Gray"},{value:"lime",label:"Lima||Lime"},{value:"indigo",label:"Indigo||Indigo"}],needsReload:!1,onInit:(e,t)=>{this.collabMemberColor=e},onUpdate:(e,t,i)=>{this.collabMemberColor=e,this.collabManager.memberColor=e,this.collabManager.updateMemberColor(e),localStorage.setItem("collab_user_color",e)}}),this.settings.init(),this.settingsUI=new SettingsUI(this.settings,this)}initCollab(){this.collabManager=new CollabManager(this)}startAutoSave(){this.autoSaveInterval||(this.autoSaveInterval=setInterval(()=>{this.project&&(this.saveProject(!0),this.showToast(__("Proyecto auto-guardado||Project auto-saved")))},3e5))}stopAutoSave(){this.autoSaveInterval&&(clearInterval(this.autoSaveInterval),this.autoSaveInterval=null)}setSmoothPanning(e){document.body.style.setProperty("--transform-transition",e?"0.2s":"none")}initCordova(){const e=document.createElement("script");e.src="cordova/cordova.js",document.head.appendChild(e),document.addEventListener("deviceready",()=>this.onDeviceReady(),!1)}onDeviceReady(){this.deviceReady=!0,window.requestFileSystem&&window.requestFileSystem(window.PERSISTENT||1,0,e=>{this.isCordova=!0,this.isFilePluginAvailable=!0,window.resolveLocalFileSystemURL(cordova.file.externalRootDirectory,e=>{this.defaultFileBrowserPathUrl=e.toURL()},e=>{console.warn("File system access denied:",e.code),this.isFilePluginAvailable=!1})},e=>{console.warn("File system access denied:",e.code),this.isFilePluginAvailable=!1}),document.addEventListener("backbutton",()=>this.onBackButtonDown())}onBackButtonDown(){this.popupOpen?this.hidePopup():this.fileBrowser&&this.fileBrowser.visible?this.isFilePluginAvailable?this.fileBrowser.goUp():this.fileBrowser.hide():this.colorPickerOpen?this.hideColorPicker():this.menuPanel.classList.contains("visible")?this.toggleMenu():this.animationPanel.classList.contains("visible")?this.togglePanel("animation"):this.layersPanel.classList.contains("visible")?this.togglePanel("layers"):this.gridManager.panelVisible?this.gridManager.hide():this.settingsUI.visible?this.settingsUI.hide():this.exitApp()}showError(e){this.errorElement.innerHTML="",this.errorElement.style.display="flex";const t=document.createElement("h2");t.textContent="App crash",this.errorElement.appendChild(t);const i=document.createElement("p");i.className="error-message",this.errorElement.appendChild(i),i.textContent=e.message||"An unknown error occurred",this.loadingElement.style.display="none";const s=document.createElement("button");s.className="error-reload",s.textContent="Reload",this.errorElement.appendChild(s),s.addEventListener("click",()=>{window.location.reload()})}showCollabDialog(){this.collabManager.isConnected?(this.collabManager.sessionOverlay.style.display="flex",this.collabManager.renderSessionMenu()):this.showCollabConnectDialog()}showCollabConnectDialog(){const e=document.createElement("div");e.className="collab-connect-dialog",e.style.cssText="\n      min-width: 300px;\n    ";const t=document.createElement("div");t.style.cssText="\n      display: flex;\n      gap: 8px;\n      margin-bottom: 20px;\n      border-bottom: 1px solid var(--border-color);\n    ";const i=document.createElement("div");i.style.cssText="\n      padding: 8px 16px;\n      cursor: pointer;\n      border-bottom: 2px solid var(--primary-color);\n      color: var(--primary-color);\n    ",i.textContent=__("Crear Sala||Create Room");const s=document.createElement("div");s.style.cssText="\n      padding: 8px 16px;\n      cursor: pointer;\n      border-bottom: 2px solid transparent;\n    ",s.textContent=__("Unirse||Join"),t.appendChild(i),t.appendChild(s),e.appendChild(t);const a=document.createElement("div");a.style.display="block",a.innerHTML=`\n      <div style="margin-bottom: 16px;">\n        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__("Nombre de sala||Room name")}</label>\n        <input type="text" id="collab-room-name" value="${localStorage.getItem("collab_default_room")||"Mi Sala"}" \n               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">\n      </div>\n      <div style="margin-bottom: 16px;">\n        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__("Contraseña||Password")}</label>\n        <input type="password" id="collab-room-password" value="${localStorage.getItem("collab_default_password")||""}" \n               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">\n      </div>\n      <div style="margin-bottom: 16px;">\n        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__("Permisos||Permissions")}</label>\n        <select id="collab-permissions" style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">\n          <option value="strict">${__("Estricto||Strict")}</option>\n          <option value="balanced" selected>${__("Equilibrado||Balanced")}</option>\n          <option value="open">${__("Abierto||Open")}</option>\n        </select>\n      </div>\n    `,e.appendChild(a);const r=document.createElement("div");r.style.display="none",r.innerHTML=`\n      <div style="margin-bottom: 16px;">\n        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__("ID de sala||Room ID")}</label>\n        <input type="text" id="collab-join-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" \n               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">\n      </div>\n      <div style="margin-bottom: 16px;">\n        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__("Contraseña||Password")}</label>\n        <input type="password" id="collab-join-password" \n               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">\n      </div>\n    `,e.appendChild(r),i.addEventListener("click",()=>{i.style.borderBottomColor="var(--primary-color)",i.style.color="var(--primary-color)",s.style.borderBottomColor="transparent",s.style.color="var(--text-color)",a.style.display="block",r.style.display="none"}),s.addEventListener("click",()=>{s.style.borderBottomColor="var(--primary-color)",s.style.color="var(--primary-color)",i.style.borderBottomColor="transparent",i.style.color="var(--text-color)",r.style.display="block",a.style.display="none"}),this.showPopup(__("Colaboración||Collaboration"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.hidePopup()},{text:__("Conectar||Connect"),action:()=>{if("none"===a.style.display){const e=document.getElementById("collab-join-id").value,t=document.getElementById("collab-join-password").value;return e?void this.showPopup(__("Unirse a sala||Join Room"),__("¿Unirse a la sala? Los cambios no guardados se perderán||Join room? Unsaved changes will be lost"),[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.hidePopup()},{text:__("Unirse||Join"),action:()=>{this.collabManager.joinSession(e,t),this.hidePopup()}}]):void this.showToast(__("ID de sala requerido||Room ID required"),2e3)}{const e=document.getElementById("collab-room-name").value,t=document.getElementById("collab-room-password").value;let i;switch(document.getElementById("collab-permissions").value){case"strict":i={undoRedo:"host",addRemoveFrames:"host",addRemoveLayers:"host",draw:"host",chat:"everyone"};break;case"open":i={undoRedo:"everyone",addRemoveFrames:"everyone",addRemoveLayers:"everyone",draw:"everyone",chat:"everyone"};break;default:i={undoRedo:"host",addRemoveFrames:"everyone",addRemoveLayers:"everyone",draw:"everyone",chat:"everyone"}}this.collabManager.createSession(e,t,i)}this.hidePopup()}}])}initUI(){this.loadingElement=document.createElement("div"),this.loadingElement.className="loading-overlay",this.container.appendChild(this.loadingElement),this.loadingSpinner=document.createElement("div"),this.loadingSpinner.className="loading-spinner",this.loadingElement.appendChild(this.loadingSpinner),this.loadingText=document.createElement("div"),this.loadingText.className="loading-text",this.loadingText.innerHTML=__("Cargando...||Loading..."),this.loadingElement.appendChild(this.loadingText),this.errorElement=document.createElement("div"),this.errorElement.className="editor-error",this.errorElement.style.display="none",this.container.appendChild(this.errorElement),this.editorElement=document.createElement("div"),this.editorElement.className="pixel-art-editor",this.container.appendChild(this.editorElement),this.canvasContainer=document.createElement("div"),this.canvasContainer.className="editor-canvas-container",this.editorElement.appendChild(this.canvasContainer),this.overlayLayer=document.createElement("div"),this.overlayLayer.className="editor-overlay-layer",this.editorElement.appendChild(this.overlayLayer),this.uiLayer=document.createElement("div"),this.uiLayer.className="editor-ui",this.editorElement.appendChild(this.uiLayer),this.topBar=document.createElement("div"),this.topBar.className="ui-top-bar",this.uiLayer.appendChild(this.topBar),this.menuButton=this.createButton("menu","icon-menu",()=>this.toggleMenu()),this.topBar.appendChild(this.menuButton),this.colorIndicator=document.createElement("div"),this.colorIndicator.className="color-indicator",this.topBar.appendChild(this.colorIndicator),this.colorPrimary=document.createElement("div"),this.colorPrimary.className="color-primary",this.colorIndicator.appendChild(this.colorPrimary),this.colorSecondary=document.createElement("div"),this.colorSecondary.className="color-secondary",this.colorIndicator.appendChild(this.colorSecondary),this.colorSelector=document.createElement("div"),this.colorSelector.className="color-selector",this.colorIndicator.appendChild(this.colorSelector),this.colorIndicator.addEventListener("click",()=>this.colorPicker.toggleSelectedColor()),this.colorPickerButton=this.createButton("color-picker","icon-palette",()=>this.colorPicker.show()),this.topBar.appendChild(this.colorPickerButton),this.bottomBar=document.createElement("div"),this.bottomBar.className="ui-bottom-bar",this.uiLayer.appendChild(this.bottomBar),this.toolSelectionContainer=document.createElement("div"),this.toolSelectionContainer.className="tool-selection-container",this.bottomBar.appendChild(this.toolSelectionContainer),this.toolButtonContainer=document.createElement("div"),this.toolButtonContainer.className="tool-button-container",this.toolSelectionContainer.appendChild(this.toolButtonContainer),this.currentToolButton=this.createButton("current-tool","tool-pencil",()=>this.toggleToolDropdown()),this.toolButtonContainer.appendChild(this.currentToolButton),this.currentToolButton.title=__("Herramienta Actual||Current Tool"),this.toolDropdown=document.createElement("div"),this.toolDropdown.className="tool-dropdown",this.toolButtonContainer.appendChild(this.toolDropdown),this.toolSettingsButton=this.createButton("tool-settings","icon-settings",()=>this.showToolSettings()),this.toolSettingsButton.title=__("Opciones de herramienta||Tool settings"),this.toolSettingsButton.style.display="none",this.toolSelectionContainer.appendChild(this.toolSettingsButton),this.toolSettingsPopup=document.createElement("div"),this.toolSettingsPopup.className="tool-settings-popup",this.toolSettingsPopup.style.display="none",this.uiLayer.appendChild(this.toolSettingsPopup),this.toolSettingsPopup.addEventListener("click",e=>e.stopPropagation()),this.toolSwitcher=this.createButton("switch-tool","icon-switch-tool",()=>this.switchLastTool()),this.toolSwitcher.title=__("Rotar herramientas (Espacio)||Switch tools (Space)"),this.toolSelectionContainer.appendChild(this.toolSwitcher),this.animationButton=this.createButton("animation","icon-animation",()=>this.togglePanel("animation")),this.animationButton.title=__("(Animación|Animation) (Ctrl + A)"),this.bottomBar.appendChild(this.animationButton),this.layersButton=this.createButton("layers","icon-layers",()=>this.togglePanel("layers")),this.layersButton.title=__("(Capas|Layers) (Ctrl + L)"),this.bottomBar.appendChild(this.layersButton),this.gridsButton=this.createButton("grids","icon-grids",()=>this.gridManager.toggle()),this.gridsButton.title=__("(Cuadrículas|Grids)"),this.bottomBar.appendChild(this.gridsButton),this.undoRedoButtons=document.createElement("div"),this.undoRedoButtons.className="undo-redo-buttons",this.bottomBar.appendChild(this.undoRedoButtons),this.undoButton=this.createButton("undo","icon-undo",()=>this.undo()),this.undoButton.title=__("(Deshacer|Undo) (Ctrl + Z)"),this.undoRedoButtons.appendChild(this.undoButton),this.redoButton=this.createButton("redo","icon-redo",()=>this.redo()),this.redoButton.title=__("(Rehacer|Redo) (Ctrl + Y)"),this.undoRedoButtons.appendChild(this.redoButton),this.menuPanel=document.createElement("div"),this.menuPanel.className="menu-panel",this.uiLayer.appendChild(this.menuPanel),this.menuTabs=document.createElement("div"),this.menuTabs.className="menu-tabs",this.menuPanel.appendChild(this.menuTabs),this.menuContent=document.createElement("div"),this.menuContent.className="menu-content",this.menuPanel.appendChild(this.menuContent),this.createMenuTab("File"),this.createMenuTab("Edit"),this.createMenuTab("View"),this.createMenuTab("Color"),this.createMenuTab("Help"),this.animationPanel=document.createElement("div"),this.animationPanel.className="animation-panel",this.uiLayer.appendChild(this.animationPanel);const e=document.createElement("div");e.className="timeline-header",this.animationPanel.appendChild(e),this.playPauseButton=this.createButton("play-pause","icon-play",()=>this.togglePlayback()),e.appendChild(this.playPauseButton),this.prevFrameButton=this.createButton("prev-frame","icon-prev",()=>this.prevFrame()),e.appendChild(this.prevFrameButton),this.nextFrameButton=this.createButton("next-frame","icon-next",()=>this.nextFrame()),e.appendChild(this.nextFrameButton),this.addFrameButton=this.createButton("add-frame","icon-add",()=>this.addFrame(this.project.currentFrame)),e.appendChild(this.addFrameButton),this.duplicateFrameButton=this.createButton("duplicate-frame","icon-copy",()=>this.duplicateFrame()),e.appendChild(this.duplicateFrameButton);const t=document.createElement("div");t.className="fps-control",e.appendChild(t);const i=document.createElement("span");i.textContent="FPS:",t.appendChild(i),this.fpsInput=document.createElement("input"),this.fpsInput.type="number",this.fpsInput.min="1",this.fpsInput.max="60",this.fpsInput.value=parseInt(1e3/this.defaultFrameTime),this.fpsInput.addEventListener("keyup",()=>{const e=this.fpsInput.value;this.fpsInput.style.backgroundColor=e&&e<=60?"var(--bg-color)":"#9f0000"}),this.fpsInput.addEventListener("change",()=>{const e=this.fpsInput.value;e&&e<=60?(this.updateFPS(e),this.fpsInput.style.backgroundColor="var(--bg-color)"):this.fpsInput.style.backgroundColor="#9f0000"}),t.appendChild(this.fpsInput);const s=document.createElement("div");s.className="panel-close timeline-close",s.innerHTML="&times;",s.addEventListener("click",()=>this.togglePanel("animation")),e.appendChild(s),this.timelineContent=document.createElement("div"),this.timelineContent.className="timeline-content",this.animationPanel.appendChild(this.timelineContent),this.animationPreview=document.createElement("canvas"),this.animationPreview.className="animation-preview",this.animationPreview.addEventListener("click",()=>{this.animationPanel.classList.add("visible"),this.animationButton.classList.add("active")}),this.animationPanel.appendChild(this.animationPreview),this.layersPanel=document.createElement("div"),this.layersPanel.className="layers-panel",this.uiLayer.appendChild(this.layersPanel);const a=document.createElement("div");a.className="panel-header",this.layersPanel.appendChild(a);const r=document.createElement("div");r.className="panel-title",r.textContent="Layers",a.appendChild(r);const n=document.createElement("div");n.className="panel-close",n.innerHTML="&times;",n.addEventListener("click",()=>this.togglePanel("layers")),a.appendChild(n),this.layersContainer=document.createElement("div"),this.layersContainer.className="layers-container",this.layersPanel.appendChild(this.layersContainer);const o=document.createElement("div");o.className="layer-actions",this.layersPanel.appendChild(o),this.addLayerButton=this.createButton("add-layer","+",()=>this.addLayer()),o.appendChild(this.addLayerButton),this.removeLayerButton=this.createButton("remove-layer","-",()=>this.removeLayer()),o.appendChild(this.removeLayerButton),this.notificationElement=document.createElement("div"),this.notificationElement.className="notification",this.uiLayer.appendChild(this.notificationElement),this.operationMessageElement=document.createElement("div"),this.operationMessageElement.className="operation-message",this.uiLayer.appendChild(this.operationMessageElement),this.popupOverlay=document.createElement("div"),this.popupOverlay.className="popup-overlay",this.uiLayer.appendChild(this.popupOverlay),this.popupContent=document.createElement("div"),this.popupContent.className="popup-content",this.popupOverlay.appendChild(this.popupContent),this.updateColorIndicator()}initBrushUI(){this.brushSizeIndicator=document.createElement("div"),this.brushSizeIndicator.className="brush-size-indicator",this.brushSizeIndicator.style.display="none",this.uiLayer.appendChild(this.brushSizeIndicator),this.brushSizeText=document.createElement("div"),this.brushSizeText.className="brush-size-text",this.brushSizeText.textContent=`${__("Brocha||Brush")}: ${this.brushSize}px`,this.brushSizeIndicator.appendChild(this.brushSizeText),this.brushSizeBar=document.createElement("progress"),this.brushSizeBar.className="brush-size-bar",this.brushSizeIndicator.appendChild(this.brushSizeBar),this.updateBrushSizeIndicator()}initCanvas(){if(this.canvas=document.createElement("canvas"),this.canvas.className="editor-canvas",this.canvasContainer.appendChild(this.canvas),this.canvasWrapper=document.createElement("div"),this.canvasWrapper.className="canvas-wrapper",this.canvasWrapper.style.position="absolute",this.canvasWrapper.style.transformOrigin="0 0",this.canvasContainer.insertBefore(this.canvasWrapper,this.canvas),this.canvasWrapper.appendChild(this.canvas),this.canvasResizeControls=document.createElement("div"),this.canvasResizeControls.className="canvas-resize-controls",this.canvasWrapper.appendChild(this.canvasResizeControls),this.canvasResizeX=document.createElement("div"),this.canvasResizeX.className="canvas-resize-edge vertical",this.canvasResizeControls.appendChild(this.canvasResizeX),this.canvasResizeY=document.createElement("div"),this.canvasResizeY.className="canvas-resize-edge",this.canvasResizeControls.appendChild(this.canvasResizeY),this.canvasResizeWidth=document.createElement("div"),this.canvasResizeWidth.className="canvas-resize-edge vertical",this.canvasResizeControls.appendChild(this.canvasResizeWidth),this.canvasResizeHeight=document.createElement("div"),this.canvasResizeHeight.className="canvas-resize-edge",this.canvasResizeControls.appendChild(this.canvasResizeHeight),this.ctx=this.getCanvasContext(this.canvas),this.scale=4,this.posX=0,this.posY=0,this.debugCanvas=document.getElementById("debug-canvas"),this.debugCanvas){const e=window.innerWidth,t=window.innerHeight;this.debugCanvas.width=e,this.debugCanvas.height=t,this.debugCtx=this.getCanvasContext(this.debugCanvas),this.debug={point:(i,s,a,r)=>{this.debugCtx.clearRect(0,0,e,t),this.drawBrushCircle(this.debugCtx,i,s,a||1,r||"#ffffff")},text:(i,s,a,r)=>{this.debugCtx.clearRect(0,0,e,t),this.debugCtx.fillStyle=r,this.debugCtx.fillText(a,i,s)}}}}getCanvasContext(e){const t=e.getContext("2d",{willReadFrequently:!0});return t.imageSmoothingEnabled=!1,t}getTempCanvas(e,t){return this.tempCanvas=this.tempCanvas||document.createElement("canvas"),this.tempCanvas.width=e||this.project.width,this.tempCanvas.height=t||this.project.height,this.tempCtx=this.tempCtx||this.getCanvasContext(this.tempCanvas),this.tempCtx.clearRect(0,0,this.tempCanvas.width,this.tempCanvas.height),{canvas:this.tempCanvas,ctx:this.tempCtx}}initEventListeners(){this.canvasContainer.addEventListener("mousedown",this.handleMouseDown.bind(this)),this.canvasContainer.addEventListener("mousemove",this.handleMouseMove.bind(this)),this.canvasContainer.addEventListener("mouseup",this.handleMouseUp.bind(this)),this.canvasContainer.addEventListener("mouseleave",this.handleMouseUp.bind(this)),this.canvasContainer.addEventListener("wheel",this.handleMouseWheel.bind(this)),this.canvasContainer.addEventListener("touchstart",this.handleTouchStart.bind(this),{passive:!1}),this.canvasContainer.addEventListener("touchmove",this.handleTouchMove.bind(this),{passive:!1}),this.canvasContainer.addEventListener("touchend",this.handleTouchEnd.bind(this)),document.addEventListener("keydown",this.handleKeyDown.bind(this)),window.addEventListener("resize",this.handleResize.bind(this))}initTools(){this.addTool({name:"Pencil",displayName:__("Lápiz||Pencil"),icon:"tool-pencil",cursor:"crosshair",shortcut:"d",onDown:(e,t,i)=>{this.isDrawing=!0,this._previousPencilPosition={x:e,y:t},this.historyManager.startBatch("draw",__("Dibujar||Draw")),this.drawPixel(e,t)},onMove:(e,t)=>{this.isDrawing&&(this._previousPencilPosition&&this.distance(e,t,this._previousPencilPosition.x,this._previousPencilPosition.y)>=2?(this.startLine(this._previousPencilPosition.x,this._previousPencilPosition.y),this.finishLine(e,t)):this.drawPixel(e,t),this._previousPencilPosition={x:e,y:t})},onUp:(e,t)=>{this.isDrawing&&(this.isDrawing=!1,this.historyManager.endBatch()),this._previousPencilPosition=null}}),this.addTool({name:"Eraser",displayName:__("Borrador||Eraser"),icon:"tool-eraser",cursor:"crosshair",shortcut:"s",onDown:(e,t)=>{this.isDrawing=!0,this._previousPencilPosition={x:e,y:t},this.historyManager.startBatch("draw",__("Borrar||Erase")),this.drawPixel(e,t,{color:"transparent"})},onMove:(e,t)=>{this.isDrawing&&(this._previousPencilPosition&&this.distance(e,t,this._previousPencilPosition.x,this._previousPencilPosition.y)>=2?(this.startLine(this._previousPencilPosition.x,this._previousPencilPosition.y,"transparent"),this.finishLine(e,t)):this.drawPixel(e,t,{color:"transparent"}),this._previousPencilPosition={x:e,y:t})},onUp:(e,t)=>{this.isDrawing&&(this.isDrawing=!1,this.historyManager.endBatch()),this._previousPencilPosition=null}}),this.addTool({name:"Line",displayName:__("Línea||Line"),icon:"tool-line",cursor:"crosshair",shortcut:"l",onDown:(e,t)=>{this.historyManager.startBatch("draw",__("Línea||Line")),this.startLine(e,t)},onMove:(e,t)=>{this.tempLine&&this.previewLine(e,t)},onUp:(e,t)=>{this.tempLine&&(this.finishLine(e,t),this.saveToHistory())}}),this.addTool({name:"Rectangle",displayName:__("Rectángulo||Rectangle"),icon:"tool-rect",cursor:"crosshair",shortcut:"r",settings:{filled:{type:"boolean",default:!1},perfect:{type:"boolean",default:!1}},onDown:(e,t)=>{this.historyManager.startBatch("draw",__("Rectángulo||Rectangle")),this.startRect(e,t)},onMove:(e,t)=>{this.tempRect&&this.previewRect(e,t)},onUp:(e,t)=>{this.tempRect&&(this.finishRect(e,t),this.saveToHistory())}}),this.addTool({name:"Ellipse",displayName:__("Elipse||Ellipse"),icon:"tool-ellipse",cursor:"crosshair",shortcut:"e",settings:{filled:{type:"boolean",default:!1},perfect:{type:"boolean",default:!1}},onDown:(e,t)=>{this.historyManager.startBatch("draw",__("Elipse||Ellipse")),this.startEllipse(e,t)},onMove:(e,t)=>{this.tempEllipse&&this.previewEllipse(e,t)},onUp:(e,t)=>{this.tempEllipse&&(this.finishEllipse(e,t),this.saveToHistory())}}),this.addTool({name:"Paint Bucket",displayName:__("Cubeta||Paint Bucket"),icon:"tool-bucket",cursor:"crosshair",shortcut:"b",onDown:(e,t)=>{this.historyManager.startBatch("draw",__("Rellenar||Bucket fill")),this.fillArea(e,t),this.saveToHistory()}}),this.addTool({name:"Pipette",displayName:__("Pipeta||Pipette"),icon:"tool-pipette",cursor:"crosshair",shortcut:"a",onDown:(e,t)=>{this.pickColor(e,t)}}),this.setTool("Pencil",!0),this.lastTool="Eraser"}updateBrushSizeIndicator(){this.brushSizeText.textContent=__(`(Pincel|Brush): ${this.brushSize}px`),this.brushSizeBar.min=0,this.brushSizeBar.max=this.maxBrushSize,this.brushSizeBar.value=this.brushSize}showLoadingScreen(e="Loading"){this.loadingElement.style.display="flex",this.loadingText.innerHTML=e}hideLoadingScreen(){this.loadingElement.style.display="none"}createButton(e,t,i){const s=document.createElement("button");if(s.className="ui-button",s.id=e,t){const e=document.createElement("div");e.className=`icon ${t}`,s.appendChild(e)}return i&&s.addEventListener("click",i),s}createMenuTab(e){const t={File:__("Archivo||File"),Edit:__("Editar||Edit"),View:__("Ver||View"),Color:"Color",Help:__("Ayuda||Help")},i=document.createElement("div");i.className="menu-tab",i.textContent=t[e]||e,i.name=e,i.addEventListener("click",()=>this.showMenuContent(e)),this.menuTabs.appendChild(i);const s=document.createElement("div");s.className=`menu-content-${e.toLowerCase()}`,s.style.display="none",this.menuContent.appendChild(s),"File"===e?this.createFileMenu(s):"Edit"===e?this.createEditMenu(s):"View"===e?this.createViewMenu(s):"Color"===e?this.createColorMenu(s):"Help"===e&&this.createHelpMenu(s),1===this.menuTabs.children.length&&(i.classList.add("active"),s.style.display="block")}createFileMenu(e){const t=document.createElement("div");t.className="menu-section",e.appendChild(t);const i=document.createElement("div");i.className="menu-item",i.textContent=__("Nuevo Proyecto||New Project"),i.addEventListener("click",()=>this.showNewProjectDialog()),t.appendChild(i);const s=document.createElement("div");s.className="menu-item",s.textContent=__("Abrir Proyecto...||Open Project..."),s.addEventListener("click",()=>this.openFile()),t.appendChild(s);const a=document.createElement("div");a.className="menu-item",a.textContent=__("Abrir Hoja...||Open Spritesheet..."),a.addEventListener("click",()=>this.showSpritesheetLoader()),t.appendChild(a);const r=document.createElement("div");r.className="menu-item",r.textContent=__("Guardar||Save"),r.addEventListener("click",()=>this.saveProject()),t.appendChild(r);const n=document.createElement("div");n.className="menu-item",n.textContent=__("Guardar Como...||Save As..."),n.addEventListener("click",()=>this.saveAs()),t.appendChild(n);const o=document.createElement("div");o.className="menu-item",o.textContent=__("Cargar Referencia...||Load Reference..."),o.addEventListener("click",()=>this.loadReferenceImage()),t.appendChild(o);const l=document.createElement("div");l.className="menu-item",l.innerHTML=`\n      <span>${__("Modo Colaborativo||Collab Mode")}</span>\n      <span class="collab-status" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 8px;"></span>\n    `,l.addEventListener("click",()=>this.showCollabDialog()),t.appendChild(l);const c=document.createElement("div");c.className="menu-item",c.textContent=__("Exportar Frame Actual...||Export Current Frame"),c.addEventListener("click",()=>this.exportCurrentFrame()),t.appendChild(c);const h=document.createElement("div");h.className="menu-item",h.textContent=__("Exportar Animación||Export Animation"),h.addEventListener("click",()=>this.exportAnimation()),t.appendChild(h);this.menuContent.querySelector(".menu-content-file");const d=document.createElement("div");d.className="menu-item",d.textContent=__("Exportar Timelapse...||Export Timelapse..."),d.addEventListener("click",()=>this.exportTimelapse()),t.appendChild(d);const p=document.createElement("div");p.className="menu-item",p.textContent=__("Salir de la app||Exit App"),p.addEventListener("click",()=>this.exitApp()),p.style.display="none",t.appendChild(p),document.addEventListener("deviceready",()=>p.style.display="")}createEditMenu(e){const t=document.createElement("div");t.className="menu-section",e.appendChild(t);const i=document.createElement("h3");i.textContent=__("Transformar||Transform"),t.appendChild(i);const s=document.createElement("div");s.className="menu-item",s.textContent=__("Redimensionar Canvas||Resize Canvas"),s.addEventListener("click",()=>this.startResizeCanvas()),t.appendChild(s);const a=document.createElement("div");a.className="menu-item",a.textContent=__("Espejo Horizontal||Flip Horizontal"),a.addEventListener("click",()=>this.flipHorizontal()),t.appendChild(a);const r=document.createElement("div");r.className="menu-item",r.textContent=__("Espejo Vertical||Flip Vertical"),r.addEventListener("click",()=>this.flipVertical()),t.appendChild(r);const n=document.createElement("div");n.className="menu-item",n.textContent=__("(Rotar|Rotate) 90° CW"),n.addEventListener("click",()=>this.rotate(90)),t.appendChild(n);const o=document.createElement("div");o.className="menu-item",o.textContent=__("(Rotar|Rotate) 90° CCW"),o.addEventListener("click",()=>this.rotate(270)),t.appendChild(o);const l=document.createElement("div");l.className="menu-item",l.textContent=__("(Rotar|Rotate) 180°"),l.addEventListener("click",()=>this.rotate(180)),t.appendChild(l);const c=document.createElement("div");c.className="menu-section",e.appendChild(c);const h=document.createElement("h3");h.textContent=__("Animación||Animation"),c.appendChild(h);const d=document.createElement("div");d.className="menu-item",d.textContent=__("Cambiar FPS...||Set FPS..."),d.addEventListener("click",()=>this.showFPSDialog()),c.appendChild(d);const p=document.createElement("div");p.className="menu-item",p.textContent=__("Cambiar Tiempo del Frame...||Set Frame Time..."),p.addEventListener("click",()=>this.showCurrentFrameTimeDialog()),c.appendChild(p);const m=document.createElement("div");m.className="menu-section",e.appendChild(m);const u=document.createElement("h3");u.textContent=__("Ajustes||Settings"),m.appendChild(u);const g=document.createElement("div");g.className="menu-item",g.textContent=__("Configurar||Configure"),g.addEventListener("click",()=>this.settingsUI.toggle()),m.appendChild(g)}createViewMenu(e){const t=document.createElement("div");t.className="menu-section",e.appendChild(t);const i=document.createElement("div");i.className="menu-item",i.textContent=__("Acercar||Zoom In"),i.addEventListener("click",()=>this.zoom(1.2)),t.appendChild(i);const s=document.createElement("div");s.className="menu-item",s.textContent=__("Alejar||Zoom Out"),s.addEventListener("click",()=>this.zoom(.8)),t.appendChild(s);const a=document.createElement("div");a.className="menu-item",a.textContent=__("Reiniciar zoom||Reset Zoom"),a.addEventListener("click",()=>this.resetZoom()),t.appendChild(a);const r=document.createElement("div");r.className="menu-item",r.textContent=__("Alternar vista previa||Toggle Preview"),r.addEventListener("click",()=>this.togglePreview()),t.appendChild(r)}createColorMenu(e){const t=document.createElement("div");t.className="menu-section",e.appendChild(t);const i=document.createElement("h3");i.textContent=__("Ajustes de Color||Color Adjustments"),t.appendChild(i);const s=document.createElement("div");s.className="menu-item",s.textContent=__("Alternar Transferencia||Toggle Transparency"),s.addEventListener("click",()=>this.toggleTransparency()),t.appendChild(s);const a=document.createElement("div");a.className="menu-item",a.textContent=__("Invertir Colores||Invert Colors"),a.addEventListener("click",()=>this.invertColors()),t.appendChild(a);const r=document.createElement("div");r.className="menu-item",r.textContent=__("Escala de Grises||Grayscale"),r.addEventListener("click",()=>this.grayscale()),t.appendChild(r)}createHelpMenu(e){const t=document.createElement("div");t.className="menu-section",e.appendChild(t);const i=document.createElement("div");i.className="menu-item",i.textContent=__("Acerca de...||About..."),i.addEventListener("click",()=>this.showAboutDialog()),t.appendChild(i);const s=document.createElement("div");s.className="menu-item",s.textContent="Manual",s.addEventListener("click",()=>this.showManualDialog()),t.appendChild(s)}showMenuContent(e){this.menuContent.querySelectorAll('div[class^="menu-content-"]').forEach(e=>{e.style.display="none"});const t=this.menuTabs.querySelectorAll(".menu-tab");t.forEach(e=>{e.classList.remove("active")});const i=this.menuContent.querySelector(`.menu-content-${e.toLowerCase()}`);i&&(i.style.display="block");const s=Array.from(t).find(t=>t.name===e);s&&s.classList.add("active")}toggleMenu(){this.menuPanel.classList.toggle("visible")}togglePanel(e){"animation"===e?(this.animationPanel.classList.toggle("visible"),this.animationButton.classList.toggle("active"),this.layersPanel.classList.remove("visible"),this.layersButton.classList.remove("active"),this.adjustTimelinePosition(),this.gridManager.hide(),this.menuPanel.classList.remove("visible")):"layers"===e&&(this.layersPanel.classList.toggle("visible"),this.layersButton.classList.toggle("active"),this.animationPanel.classList.remove("visible"),this.animationButton.classList.remove("active"),this.menuPanel.classList.remove("visible"),this.gridManager.hide())}togglePreview(){this.showMiniView=!this.showMiniView,this.animationPreview.classList.toggle("visible")}shouldBlockInput(){return this.menuPanel.classList.contains("visible")?(this.toggleMenu(),!0):!!this.layersPanel.classList.contains("visible")&&(this.togglePanel("layers"),!0)}handleMouseDown(e){if(this.shouldBlockInput())return;const t=this.getCanvasPosition(e.clientX,e.clientY);if(t)switch(e.button){case 0:this.isDrawing=!0,this.startX=t.x,this.startY=t.y,this.currentTool&&this.currentTool.onDown&&this.currentTool.onDown(t.x,t.y);break;case 1:this.isDrawing&&this.handleMouseUp(e),this.startPan(e);break;case 2:this.onMouseUp(e)}}handleMouseMove(e){const t=this.getCanvasPosition(e.clientX,e.clientY);t&&(this.isDrawing&&this.currentTool&&this.currentTool.onMove&&this.currentTool.onMove(t.x,t.y),this.isPanning&&this.pan(e.clientX,e.clientY),e.preventDefault())}handleMouseUp(e){if(this.isPanning=!1,!this.isDrawing)return;const t=this.getCanvasPosition(e.clientX,e.clientY);t&&this.currentTool&&this.currentTool.onUp&&this.currentTool.onUp(t.x,t.y,this.startX,this.startY),this.canvas.style.cursor=this.currentTool?this.currentTool.cursor:"crosshair",this.isDrawing=!1}handleMouseWheel(e){e&&0!=e.deltaY&&(e.deltaY<0?this.zoom(1.2,e.clientX,e.clientY):this.zoom(.8,e.clientX,e.clientY))}handleTouchStart(e){if(!this.shouldBlockInput())if(this.isColorPicking)e.preventDefault();else if(e.preventDefault(),1===e.touches.length){const t=e.touches[0],i=this.getCanvasPosition(t.clientX,t.clientY);if(!i)return;this._touchStartTime=Date.now(),this._touchStartPos={x:t.clientX,y:t.clientY},this._touchStartCanvasPos={x:i.x,y:i.y},this._isPotentialTap=!0,this._touchTimer=setTimeout(()=>{this.isCanvasResizing||this.isPanning||!this._isPotentialTap||(this.isDrawing=!0,this.startX=i.x,this.startY=i.y,this.lastX=i.x,this.lastY=i.y,this.currentTool&&this.currentTool.onDown&&this.currentTool.onDown(i.x,i.y)),this._touchTimer=null},50)}else if(2===e.touches.length){this.isPanning=!0,this.isDrawing=!1,this._touchTimer&&(clearTimeout(this._touchTimer),this._touchTimer=null);const t=e.touches[0],i=e.touches[1];this.touchStart1={x:t.clientX,y:t.clientY},this.touchStart2={x:i.clientX,y:i.clientY},this.touchDistance=Math.hypot(i.clientX-t.clientX,i.clientY-t.clientY),this.touchCenterX=(t.clientX+i.clientX)/2,this.touchCenterY=(t.clientY+i.clientY)/2,this.touchStartScale=this.scale,this.touchStartPosX=this.posX,this.touchStartPosY=this.posY,this.startPan({clientX:this.touchCenterX,clientY:this.touchCenterY});const s=this.getCanvasPosition(this.touchCenterX,this.touchCenterY);s&&(this.touchCenterCanvasX=s.x,this.touchCenterCanvasY=s.y)}else if(3===e.touches.length){e.preventDefault();const t=e.touches[0],i=e.touches[1],s=e.touches[2],a=(t.clientX+i.clientX+s.clientX)/3,r=(t.clientY+i.clientY+s.clientY)/3,n=(Math.hypot(t.clientX-a,t.clientY-r)+Math.hypot(i.clientX-a,i.clientY-r)+Math.hypot(s.clientX-a,s.clientY-r))/3;this.initialBrushSpread=n,this.initialBrushSize=this.brushSize,this.isBrushResizing=!0,this.brushResizingCenter={x:a,y:r},this.brushSizeIndicator.style.display="block",this.updateBrushSizeIndicator(),this._touchTimer&&(clearTimeout(this._touchTimer),this._touchTimer=null),this.isDrawing=!1}}handleTouchMove(e){if(e.preventDefault(),1===e.touches.length&&this.isDrawing){const t=e.touches[0];if(this._isPotentialTap){Math.hypot(t.clientX-this._touchStartPos.x,t.clientY-this._touchStartPos.y)>5&&(this._isPotentialTap=!1)}const i=this.getCanvasPosition(t.clientX,t.clientY);if(!i)return;this.currentTool&&this.currentTool.onMove&&(this.currentTool.onMove(i.x,i.y),this.lastX=i.x,this.lastY=i.y)}else if(2===e.touches.length&&this.isPanning){const t=e.touches[0],i=e.touches[1],s=Math.hypot(i.clientX-t.clientX,i.clientY-t.clientY),a=(t.clientX+i.clientX)/2,r=(t.clientY+i.clientY)/2;if(this.touchDistance>0&&Math.abs(s-this.touchDistance)>1){const e=s/this.touchDistance;this.pan(a,r,e)}else this.pan(a,r,1)}else if(3===e.touches.length&&this.isBrushResizing){e.preventDefault();const t=e.touches[0],i=e.touches[1],s=e.touches[2],a=(t.clientX+i.clientX+s.clientX)/3,r=(t.clientY+i.clientY+s.clientY)/3,n=(Math.hypot(t.clientX-a,t.clientY-r)+Math.hypot(i.clientX-a,i.clientY-r)+Math.hypot(s.clientX-a,s.clientY-r))/3;if(Math.abs(n-this.initialBrushSpread)>.001){const e=n/this.initialBrushSpread;let t=Math.round(this.initialBrushSize*e);t=Math.max(this.minBrushSize,Math.min(t,this.maxBrushSize)),t!==this.brushSize&&(this.brushSize=t,this.updateBrushSizeIndicator(),localStorage.setItem("brushSize",this.brushSize))}}}handleTouchEnd(e){if(e.preventDefault(),this._touchTimer&&(clearTimeout(this._touchTimer),this._touchTimer=null),0===e.touches.length){if(this.isDrawing){this._isPotentialTap&&(Date.now(),this._touchStartTime);this.currentTool&&this.currentTool.onUp&&this.currentTool.onUp(this.lastX,this.lastY,this.startX,this.startY),this.canvas.style.cursor=this.currentTool?this.currentTool.cursor:"crosshair"}this.isPanning=!1,this.isDrawing=!1,this._isPotentialTap=!1,this.touchDistance=0,this.isBrushResizing&&setTimeout(()=>{this.brushSizeIndicator.style.display="none"},2e3)}else if(1===e.touches.length){this.touchDistance=0,this._isPotentialTap=!0;const t=e.touches[0];this._touchStartPos={x:t.clientX,y:t.clientY},this._touchStartTime=Date.now()}else 2===e.touches.length&&(this.isPanning=!1,this.isDrawing=!1)}handleTouchCancel(e){(this.isColorPicking||this.colorPickTimeout)&&this.cleanupColorPicking()}handleKeyDown(e){const{ctrlKey:t,key:i}=event;if(t){if("z"==i)return this.undo(),void e.preventDefault();if("y"==i)return this.undo(),void e.preventDefault();if("a"==i)return this.togglePanel("animation"),void e.preventDefault();if("l"==i)return this.togglePanel("layers"),void e.preventDefault();if(" "==i)return this.switchLastTool(),void e.preventDefault();if("Escape"==i)return this.toggleMenu(),void e.preventDefault()}for(const t of Object.values(this.tools))if(t.shortcut&&t.shortcut==e.key)return void this.setTool(t.name)}handleResize(){this.updateCanvasTransform(),this.adjustTimelinePosition()}adjustTimelinePosition(){if(!this.animationPanel)return;const e=this.bottomBar.offsetHeight;this.animationPanel.style.bottom=`${e}px`}getCanvasPosition(e,t,i=!0){if(!this.project)return null;const s=this.canvasContainer.getBoundingClientRect(),a=e-s.left,r=t-s.top,n=a-s.width/2,o=r-s.height/2,l=n-this.posX,c=o-this.posY,h=Math.floor(l/this.scale+this.project.width/2),d=Math.floor(c/this.scale+this.project.height/2);return i&&(h<0||h>=this.project.width||d<0||d>=this.project.height)?null:{x:h,y:d}}checkBounds(e,t){return e>=0&&e<this.project.width&&t>=0&&t<this.project.height}startPan(e){this.isPanning=!0,this.canvasContainer.style.cursor="grab",this.panStartX=e.clientX,this.panStartY=e.clientY,this.panStartCanvasPoint=this.getCanvasPosition(e.clientX,e.clientY),this.panStartScale=this.scale}pan(e,t,i=1){if(!this.panStartCanvasPoint)return;const s=this.panStartScale*i;this.scale=Math.max(this.minScale,Math.min(s,this.maxScale));const a=this.canvasContainer.getBoundingClientRect(),r=this.panStartCanvasPoint.x,n=this.panStartCanvasPoint.y,o=e-((r-this.project.width/2)*this.scale+a.width/2+this.panStartCanvasPoint.x),l=t-((n-this.project.height/2)*this.scale+a.height/2+this.panStartCanvasPoint.y);this.posX=Math.round(this.panStartCanvasPoint.x+o),this.posY=Math.round(this.panStartCanvasPoint.y+l),this.updateCanvasTransform()}zoom(e,t=this.panStartCanvasPoint.x,i=this.panStartCanvasPoint.y){const s=this.scale;if(this.scale*=e,this.scale=Math.max(this.minScale,Math.min(this.scale,this.maxScale)),void 0!==t&&void 0!==i){const e=this.canvasContainer.getBoundingClientRect(),a=t-e.left,r=i-e.top,n=a-this.canvasContainer.clientWidth/2,o=r-this.canvasContainer.clientHeight/2;this.posX=n-(n-this.posX)*(this.scale/s),this.posY=o-(o-this.posY)*(this.scale/s)}this.updateCanvasTransform()}resetZoom(){if(!this.project)return;const e=this.canvasContainer.clientWidth,t=this.canvasContainer.clientHeight,i=e/this.project.width,s=t/this.project.height;this.scale=Math.min(i,s),this.scale=Math.min(this.scale,10),this.posX=0,this.posY=0,this.updateCanvasTransform()}updateCanvasTransform(){if(!this.project)return;this.canvasContainer.clientWidth,this.canvasContainer.clientHeight;const e=this.project.width/2,t=this.project.height/2;this.canvasWrapper.style.transform=`\n      translate(${this.posX}px, ${this.posY}px)\n      translate(${-e*this.scale}px, ${-t*this.scale}px)\n      scale(${this.scale})\n    `;const i=Math.min(4,32/this.scale);this.canvas.style.backgroundSize=`${i}px ${i}px`}newProject(e=this.defaultWidth,t=this.defaultHeight,i=null){this.project=this.getNewProjectData(e,t,i),this.saveLastProjectSize(),this.historyManager.clear(),this.animationPanel.classList.remove("visible"),this.layersPanel.classList.remove("visible"),this.resetCanvasSize(),this.resetZoom(),this.render()}saveLastProjectSize(){localStorage.setItem("lastProjectWidth",this.project.width),localStorage.setItem("lastProjectHeight",this.project.height)}getNewProjectData(e,t,i){const s={width:e,height:t,frames:[{layers:[this.createBlankLayer(e,t,__("Capa Base||Default Layer"))]}],currentFrameTime:1e3/12,frameTimes:[1e3/12],floatingColors:[],currentFrame:0,currentLayer:0};if(i){s.frames[0].layers[0].ctx.drawImage(i,0,0)}return s}resetCanvasSize(){this.project&&(this.canvas.width=this.project.width,this.canvas.height=this.project.height)}startResizeCanvas(){this.project&&(this.isCanvasResizing=!0,this.canvasResizeState={x:0,y:0,width:this.project.width,height:this.project.height},this.showCanvasResizeControls(),this.enterImmersive(),this.showBottomConfirmation(__("Aceptar||Accept"),__("Cancelar||Cancel"),e=>{e?this.finishResizeCanvas():this.cancelResizeCanvas()}),this.setupResizeEventHandlers())}setupResizeEventHandlers(){if(this.resizeHandlersSetup)return;this.canvasResizeX.style.cursor="ew-resize",this.canvasResizeY.style.cursor="ns-resize",this.canvasResizeWidth.style.cursor="ew-resize",this.canvasResizeHeight.style.cursor="ns-resize";const e=(e,t)=>{if(!this.isCanvasResizing)return;e.preventDefault(),e.stopPropagation();const i=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,s=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY,a=this.getCanvasPosition(i,s,!1);a&&(this.resizeDragState={active:!0,edge:t,startCanvasX:a.x,startCanvasY:a.y,startState:{...this.canvasResizeState}},document.addEventListener("mousemove",this.handleResizeMove),document.addEventListener("mouseup",this.handleResizeEnd),document.addEventListener("touchmove",this.handleResizeMove,{passive:!1}),document.addEventListener("touchend",this.handleResizeEnd),document.addEventListener("touchcancel",this.handleResizeEnd))};this.handleResizeMove=(e=>{if(!this.resizeDragState?.active)return;e.preventDefault();const t=e.type.startsWith("touch")?e.touches[0].clientX:e.clientX,i=e.type.startsWith("touch")?e.touches[0].clientY:e.clientY,s=this.getCanvasPosition(t,i,!1);if(!s)return;const a=this.resizeDragState.edge,r=this.resizeDragState.startState;let n=!1;switch(a){case"x":{const e=Math.round(s.x);e!==this.canvasResizeState.x&&(this.canvasResizeState.x=e,this.canvasResizeState.width=r.width+(r.x-e),n=!0);break}case"y":{const e=Math.round(s.y);e!==this.canvasResizeState.y&&(this.canvasResizeState.y=e,this.canvasResizeState.height=r.height+(r.y-e),n=!0);break}case"width":{const e=Math.round(s.x-r.x);e!==this.canvasResizeState.width&&(this.canvasResizeState.width=Math.max(1,e),n=!0);break}case"height":{const e=Math.round(s.y-r.y);e!==this.canvasResizeState.height&&(this.canvasResizeState.height=Math.max(1,e),n=!0);break}}this.canvasResizeState.width<1&&(this.canvasResizeState.width=1),this.canvasResizeState.height<1&&(this.canvasResizeState.height=1),n&&this.updateCanvasResizeControls()}).bind(this),this.handleResizeEnd=(()=>{this.resizeDragState=null,document.removeEventListener("mousemove",this.handleResizeMove),document.removeEventListener("mouseup",this.handleResizeEnd),document.removeEventListener("touchmove",this.handleResizeMove),document.removeEventListener("touchend",this.handleResizeEnd),document.removeEventListener("touchcancel",this.handleResizeEnd)}).bind(this),this.canvasResizeX.addEventListener("mousedown",t=>e(t,"x")),this.canvasResizeX.addEventListener("touchstart",t=>e(t,"x"),{passive:!1}),this.canvasResizeY.addEventListener("mousedown",t=>e(t,"y")),this.canvasResizeY.addEventListener("touchstart",t=>e(t,"y"),{passive:!1}),this.canvasResizeWidth.addEventListener("mousedown",t=>e(t,"width")),this.canvasResizeWidth.addEventListener("touchstart",t=>e(t,"width"),{passive:!1}),this.canvasResizeHeight.addEventListener("mousedown",t=>e(t,"height")),this.canvasResizeHeight.addEventListener("touchstart",t=>e(t,"height"),{passive:!1}),this.resizeHandlersSetup=!0}showCanvasResizeControls(){this.canvasResizeControls.style.display="block",this.updateCanvasResizeControls()}updateCanvasResizeControls(){if(!this.canvasResizeState)return;const e=this.canvasResizeState;this.canvasResizeControls.style.left=`${e.x}px`,this.canvasResizeControls.style.top=`${e.y}px`,this.canvasResizeControls.style.width=`${e.width}px`,this.canvasResizeControls.style.height=`${e.height}px`,this.canvasResizeX.style.left="-1px",this.canvasResizeX.style.height=`${e.height}px`,this.canvasResizeY.style.top="-1px",this.canvasResizeY.style.width=`${e.width}px`,this.canvasResizeWidth.style.left=`${e.width}px`,this.canvasResizeWidth.style.height=`${e.height}px`,this.canvasResizeHeight.style.top=`${e.height}px`,this.canvasResizeHeight.style.width=`${e.width}px`}hideCanvasResizeControls(){this.canvasResizeControls.style.display="none"}finishResizeCanvas(){if(!this.canvasResizeState)return;const e=this.canvasResizeState,t=e.width<0?e.x+e.width:e.x,i=e.height<0?e.y+e.height:e.y,s=Math.abs(e.width),a=Math.abs(e.height);this.historyManager.startBatch("resize",__("Redimensionar Canvas||Resize Canvas"));const r=this.project.width,n=this.project.height,o=[];this.project.frames.forEach(e=>{const t={layers:[]};e.layers.forEach(e=>{const i=e.ctx.getImageData(0,0,r,n);t.layers.push({imageData:Array.from(i.data)})}),o.push(t)}),this.resizeCanvas(t,i,s,a);const l={type:"resize_canvas",description:__("Redimensionar Canvas||Resize Canvas"),oldWidth:r,oldHeight:n,newWidth:s,newHeight:a,cropX:t,cropY:i,framesData:o};this.historyManager.addChange(l),this.historyManager.endBatch(),this.stopResizeCanvas()}cancelResizeCanvas(){this.stopResizeCanvas(),this.showToast(__("Redimensión cancelada||Resize cancelled"))}stopResizeCanvas(){this.isCanvasResizing=!1,this.canvasResizeState=null,this.resizeDragState=null,this.hideCanvasResizeControls(),this.hideBottomConfirmation(),this.exitImmersive()}resizeCanvas(e=0,t=0,i=32,s=32,a){this.project&&(i=Math.max(1,Math.floor(i)),s=Math.max(1,Math.floor(s)),e=Math.floor(e),t=Math.floor(t),this.project.width=i,this.project.height=s,this.resetCanvasSize(),this.project.frames.forEach(a=>{a.layers.forEach(a=>{const r=document.createElement("canvas");r.width=i,r.height=s;r.getContext("2d").drawImage(a.canvas,-e,-t),a.canvas.width=i,a.canvas.height=s,a.ctx.clearRect(0,0,i,s),a.ctx.drawImage(r,0,0)})}),this.updateCanvasTransform(),this.render(),a||this.showOperationMessage(__("Canvas redimensionado||Canvas resized")))}enterImmersive(){this.topBar.style.display="none",this.bottomBar.style.display="none",this.menuPanel.style.display="none",this.animationPanel.style.display="none",this.layersPanel.style.display="none",this.gridManager&&(this.gridManager.panel.style.display="none")}exitImmersive(){this.topBar.style.display="flex",this.bottomBar.style.display="flex",this.menuPanel.style.display="flex",this.animationPanel.style.display="flex",this.layersPanel.style.display="flex",this.gridManager&&(this.gridManager.panel.style.display="flex")}showBottomConfirmation(e,t,i){this.bottomConfirmation||(this.bottomConfirmation=document.createElement("div"),this.bottomConfirmation.className="bottom-confirmation",this.confirmAccept=document.createElement("button"),this.confirmAccept.className="ui-button confirm-accept",this.confirmCancel=document.createElement("button"),this.confirmCancel.className="ui-button confirm-cancel",this.bottomConfirmation.appendChild(this.confirmAccept),this.bottomConfirmation.appendChild(this.confirmCancel),this.uiLayer.appendChild(this.bottomConfirmation)),this.confirmAccept.textContent=e,this.confirmCancel.textContent=t,this.resizeCallback=i,this.bottomConfirmation.style.display="flex",this.confirmAccept.removeEventListener("click",this.handleResizeAccept),this.confirmCancel.removeEventListener("click",this.handleResizeCancel),this.handleResizeAccept=()=>{this.resizeCallback&&this.resizeCallback(!0),this.hideBottomConfirmation()},this.handleResizeCancel=()=>{this.resizeCallback&&this.resizeCallback(!1),this.hideBottomConfirmation()},this.confirmAccept.addEventListener("click",this.handleResizeAccept),this.confirmCancel.addEventListener("click",this.handleResizeCancel)}hideBottomConfirmation(){this.bottomConfirmation&&(this.bottomConfirmation.style.display="none")}render(){if(!this.project)return;const e=this.project.frames[this.project.currentFrame];if(e){this.transparentBackground?this.ctx.clearRect(0,0,this.project.width,this.project.height):(this.ctx.fillStyle=this.secondaryColor,this.ctx.fillRect(0,0,this.project.width,this.project.height)),this.referenceManager&&this.referenceManager.renderBottom(this.ctx,this.project.width,this.project.height);for(let t=0;t<e.layers.length;t++){const i=e.layers[t];i.visible&&this.ctx.drawImage(i.canvas,0,0)}this.referenceManager&&this.referenceManager.renderTop(this.ctx,this.project.width,this.project.height),this.updateFramesUI(),this.updateLayersUI(),this.updateAnimationPreview()}}renderQuick(){if(!this.project)return;const e=this.project.frames[this.project.currentFrame];if(e){this.transparentBackground?this.ctx.clearRect(0,0,this.project.width,this.project.height):(this.ctx.fillStyle=this.secondaryColor,this.ctx.fillRect(0,0,this.project.width,this.project.height));for(let t=0;t<e.layers.length;t++){const i=e.layers[t];i.visible&&this.ctx.drawImage(i.canvas,0,0)}this.updateAnimationPreview(),this.updateFramesUIQuick()}}getProjectSnapshot(){if(!this.project)return null;const e=JSON.parse(JSON.stringify(this.project));for(let t=0;t<e.frames.length;t++){const i=e.frames[t];for(let e=0;e<i.layers.length;e++){const s=i.layers[e];delete s.canvas;const a=this.project.frames[t].layers[e].ctx;s.imageData=a.getImageData(0,0,this.project.width,this.project.height)}}return e}restoreProjectSnapshot(e){if(e){this.project.currentFrame=e.currentFrame,this.project.currentLayer=e.currentLayer,this.project.currentFrameTime=e.currentFrameTime,this.project.frameTimes=e.frameTimes,this.project.width=e.width,this.project.height=e.height;for(let t=0;t<this.project.frames.length;t++){const i=this.project.frames[t];for(let s=0;s<i.layers.length;s++){const a=i.layers[s],r=e.frames[t].layers[s],n=r.canvas;a.canvas=n||document.createElement("canvas"),a.canvas.width=this.project.width,a.canvas.height=this.project.height,r.imageData&&a.ctx.putImageData(r.imageData,0,0)}}this.resetCanvasSize(),this.render()}}saveToHistory(){this.historyManager.endBatch(),this.render()}recordDrawOperation(e){const t={type:"draw",description:"Draw pixels",frameIndex:this.project.currentFrame,layerIndex:this.project.currentLayer,pixels:e};this.historyManager.addChange(t)}undo(){const e=this.historyManager.undo();e&&(this.render(),this.showOperationMessage(e.message))}redo(){const e=this.historyManager.redo();e&&(this.render(),this.showOperationMessage(e.message))}loadReferenceImage(){this.referenceManager.showReferenceTypeDialog()}drawPixel(e,t,i={}){if(!this.project||e<0||t<0||e>=this.project.width||t>=this.project.height)return;const s=i.color||("primary"===this.selectedColor?this.primaryColor:this.secondaryColor),a=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx;if(this.brushSize>1){let i=this.drawBrushCircle(a,e,t,this.brushSize,s);i&&i.length&&this.recordDrawOperation(i.filter(e=>e.newColor!=e.oldColor))}else{const i=this.getPixelColorFromCtx(a,e,t);s!=i&&("transparent"===s?a.clearRect(e,t,1,1):(a.fillStyle=s,a.fillRect(e,t,1,1)),this.recordDrawOperation([{x:e,y:t,oldColor:i,newColor:s}]))}this.render()}drawBrushCircle(e,t,i,s,a){return s<=0?[]:this.midpointEllipse(e,t,i,s/2,s/2,a,!0)}startLine(e,t,i){this.tempLine={startX:e,startY:t},this.getTempCanvas(),this.tempColor=i||("primary"===this.selectedColor?this.primaryColor:this.secondaryColor)}previewLine(e,t){if(!this.tempLine||!this.project)return;this.tempCtx.clearRect(0,0,this.project.width,this.project.height);this.drawBresenhamLine(this.tempLine.startX,this.tempLine.startY,e,t,this.tempCtx,this.tempColor,!0),this.ctx.clearRect(0,0,this.project.width,this.project.height),this.render(),this.ctx.drawImage(this.tempCanvas,0,0)}finishLine(e,t,i=!0){if(!this.tempLine||!this.project)return;const s=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx;let a=this.drawBresenhamLine(this.tempLine.startX,this.tempLine.startY,e,t,s,this.tempColor,!0);a=a.filter(e=>e.newColor!=e.oldColor),this.recordDrawOperation(a),this.tempLine=null,this.tempCanvas=null,this.tempCtx=null,this.render()}drawBresenhamLine(e,t,i,s,a,r,n){const o=Math.abs(i-e),l=-Math.abs(s-t),c=e<i?1:-1,h=t<s?1:-1;let d,p=o+l,m=[],u=[];for(;;){if("transparent"===r)if(n&&this.brushSize>1){const i=this.brushSize/2;u=[...u,...this.midpointEllipse(a,e,t,i,i,"transparent",!0)]}else{const i=this.getPixelColorFromCtx(a,e,t);a.clearRect(e,t,1,1),m.push({x:e,y:t,newColor:r,oldColor:i})}else if(n&&this.brushSize>1){const i=this.brushSize/2;u=[...u,...this.midpointEllipse(a,e,t,i,i,r,!0)]}else{const i=this.getPixelColorFromCtx(a,e,t);a.fillStyle=r,a.fillRect(e,t,1,1),m.push({x:e,y:t,newColor:r,oldColor:i})}if(e===i&&t===s)break;d=2*p,d>=l&&(p+=l,e+=c),d<=o&&(p+=o,t+=h)}return[...m,...u]}startRect(e,t){this.tempRect={startX:e,startY:t,currentX:e,currentY:t},this.getTempCanvas()}previewRect(e,t){if(!this.tempRect||!this.project)return;this.tempCtx.clearRect(0,0,this.project.width,this.project.height);let i=e-this.tempRect.startX,s=t-this.tempRect.startY;if(this.currentTool.settings?.perfect?.value){const e=Math.max(Math.abs(i),Math.abs(s));i=i<0?-e:e,s=s<0?-e:e}this.tempRect.currentX=this.tempRect.startX+i,this.tempRect.currentY=this.tempRect.startY+s;const a="primary"===this.selectedColor?this.primaryColor:this.secondaryColor;this.tempCtx.strokeStyle=a,this.tempCtx.lineWidth=1;const r=!0;this.currentTool.settings?.filled?.value?(this.tempCtx.fillStyle=a,this.tempCtx.fillRect(this.tempRect.startX,this.tempRect.startY,i+1,s+1)):(this.drawBresenhamLine(this.tempRect.startX,this.tempRect.startY,this.tempRect.startX+i,this.tempRect.startY,this.tempCtx,a,r),this.drawBresenhamLine(this.tempRect.startX+i,this.tempRect.startY,this.tempRect.startX+i,this.tempRect.startY+s,this.tempCtx,a,r),this.drawBresenhamLine(this.tempRect.startX+i,this.tempRect.startY+s,this.tempRect.startX,this.tempRect.startY+s,this.tempCtx,a,r),this.drawBresenhamLine(this.tempRect.startX,this.tempRect.startY+s,this.tempRect.startX,this.tempRect.startY,this.tempCtx,a,r)),this.ctx.clearRect(0,0,this.project.width,this.project.height),this.render(),this.ctx.drawImage(this.tempCanvas,0,0)}finishRect(e,t){if(!this.tempRect||!this.project)return;const i=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx;let s=this.tempRect.currentX-this.tempRect.startX,a=this.tempRect.currentY-this.tempRect.startY;if(this.currentTool.settings?.perfect?.value){const e=Math.max(Math.abs(s),Math.abs(a));s=s<0?-e:e,a=a<0?-e:e}const r=!0,n="primary"===this.selectedColor?this.primaryColor:this.secondaryColor;if(this.currentTool.settings?.filled?.value){let e=[];for(let t=this.tempRect.startY;t<=this.tempRect.startY+a;t++)for(let a=this.tempRect.startX;a<=this.tempRect.startX+s+1;a++)e.push({x:a,y:t,newColor:n,oldColor:this.getPixelColorFromCtx(i,a,t)});i.fillStyle=n,i.fillRect(this.tempRect.startX,this.tempRect.startY,s,a),this.recordDrawOperation(e.filter(e=>e.newColor!=e.oldColor))}else{let e=[...this.drawBresenhamLine(this.tempRect.startX,this.tempRect.startY,this.tempRect.startX+s,this.tempRect.startY,i,n,r),...this.drawBresenhamLine(this.tempRect.startX+s,this.tempRect.startY,this.tempRect.startX+s,this.tempRect.startY+a,i,n,r),...this.drawBresenhamLine(this.tempRect.startX+s,this.tempRect.startY+a,this.tempRect.startX,this.tempRect.startY+a,i,n,r),...this.drawBresenhamLine(this.tempRect.startX,this.tempRect.startY+a,this.tempRect.startX,this.tempRect.startY,i,n,r)].filter(e=>e.newColor!=e.oldColor);e.length&&this.recordDrawOperation(e)}this.tempRect=null,this.tempCanvas=null,this.tempCtx=null,this.render()}startEllipse(e,t){this.tempEllipse={startX:e,startY:t,currentX:e,currentY:t},this.getTempCanvas()}previewEllipse(e,t){if(!this.tempEllipse||!this.project)return;this.tempCtx.clearRect(0,0,this.project.width,this.project.height);let i=Math.floor(e-this.tempEllipse.startX),s=Math.floor(t-this.tempEllipse.startY);if(this.currentTool.settings?.perfect?.value){const e=Math.max(Math.abs(i),Math.abs(s));i=i<0?-e:e,s=s<0?-e:e}Math.abs(i)<1&&(i=i<0?-1:1),Math.abs(s)<1&&(s=s<0?-1:1),this.tempEllipse.currentX=this.tempEllipse.startX+i,this.tempEllipse.currentY=this.tempEllipse.startY+s;const a="primary"===this.selectedColor?this.primaryColor:this.secondaryColor,r=Math.floor(this.tempEllipse.startX),n=Math.floor(this.tempEllipse.startY);this.currentTool.settings?.filled?.value?this.drawFilledEllipse(this.tempCtx,r,n,i,s,a):this.drawEllipse(this.tempCtx,r,n,i,s,a),this.ctx.clearRect(0,0,this.project.width,this.project.height),this.render(),this.ctx.drawImage(this.tempCanvas,0,0)}finishEllipse(e,t){if(!this.tempEllipse||!this.project)return;const i=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx;let s=Math.floor(this.tempEllipse.currentX-this.tempEllipse.startX),a=Math.floor(this.tempEllipse.currentY-this.tempEllipse.startY);if(this.currentTool.settings?.perfect?.value){const e=Math.max(Math.abs(s),Math.abs(a));s=s<0?-e:e,a=a<0?-e:e}Math.abs(s)<1&&(s=s<0?-1:1),Math.abs(a)<1&&(a=a<0?-1:1);const r="primary"===this.selectedColor?this.primaryColor:this.secondaryColor,n=Math.floor(this.tempEllipse.startX),o=Math.floor(this.tempEllipse.startY);let l=[];l=this.currentTool.settings?.filled?.value?this.drawFilledEllipse(i,n,o,s,a,r):this.drawEllipse(i,n,o,s,a,r),l=l.filter(e=>e.newColor!=e.oldColor),l.length&&this.recordDrawOperation(l),this.tempEllipse=null,this.tempCanvas=null,this.tempCtx=null,this.render()}drawEllipse(e,t,i,s,a,r){const n=Math.floor(t+s/2),o=Math.floor(i+a/2),l=Math.floor(Math.abs(s/2)),c=Math.floor(Math.abs(a/2));return this.brushSize>1?this.midpointEllipseWithBrush(e,n,o,l,c,r,!1):this.midpointEllipse(e,n,o,l,c,r,!1)}drawFilledEllipse(e,t,i,s,a,r){const n=Math.floor(t+s/2),o=Math.floor(i+a/2),l=Math.floor(Math.abs(s/2)),c=Math.floor(Math.abs(a/2));return this.midpointEllipse(e,n,o,l,c,r,!0)}midpointEllipse(e,t,i,s,a,r,n){if(s<=0||a<=0)return[];const o=Math.floor(t),l=Math.floor(i),c=Math.floor(Math.abs(s)),h=Math.floor(Math.abs(a));if(0===c||0===h)return[];let d=[];const p=(t,i)=>{const s=Math.floor(t),a=Math.floor(i);if(s<0||s>=e.width||a<0||a>=e.height)return;const n=this.getPixelColorFromCtx(e,s,a);n!==r&&("transparent"===r?e.clearRect(s,a,1,1):(e.fillStyle=r,e.fillRect(s,a,1,1)),d.push({x:t,y:i,newColor:r,oldColor:n}))};if(n)return this.fillEllipseScanline(e,o,l,c,h,r);let m=0,u=h,g=h*h-c*c*h+Math.floor(.25*c*c),v=2*h*h*m,y=2*c*c*u;for(;v<y;)p(o+m,l+u),p(o-m,l+u),p(o+m,l-u),p(o-m,l-u),m++,v+=2*h*h,g<0?g+=v+h*h:(u--,y-=2*c*c,g+=v-y+h*h);let f=h*h*((m+.5)*(m+.5))+c*c*((u-1)*(u-1))-c*c*h*h;for(;u>=0;)p(o+m,l+u),p(o-m,l+u),p(o+m,l-u),p(o-m,l-u),u--,y-=2*c*c,f>0?f+=c*c-y:(m++,v+=2*h*h,f+=v-y+c*c);return d}midpointEllipseWithBrush(e,t,i,s,a,r,n){if(s<=0||a<=0)return[];const o=Math.floor(t),l=Math.floor(i),c=Math.floor(Math.abs(s)),h=Math.floor(Math.abs(a));if(0===c||0===h)return[];let d=[];const p=(t,i)=>{if(this.brushSize>1)d=[...d,...this.drawBrushCircle(e,t,i,this.brushSize,r)];else{const s=this.getPixelColorFromCtx(e,t,i);s!==r&&("transparent"===r?e.clearRect(t,i,1,1):(e.fillStyle=r,e.fillRect(t,i,1,1)),d.push({x:t,y:i,newColor:r,oldColor:s}))}};if(n)return this.fillEllipseScanline(e,o,l,c,h,r);let m=0,u=h,g=h*h-c*c*h+Math.floor(.25*c*c),v=2*h*h*m,y=2*c*c*u;for(;v<y;)p(o+m,l+u),p(o-m,l+u),p(o+m,l-u),p(o-m,l-u),m++,v+=2*h*h,g<0?g+=v+h*h:(u--,y-=2*c*c,g+=v-y+h*h);let f=h*h*((m+.5)*(m+.5))+c*c*((u-1)*(u-1))-c*c*h*h;for(;u>=0;)p(o+m,l+u),p(o-m,l+u),p(o+m,l-u),p(o-m,l-u),u--,y-=2*c*c,f>0?f+=c*c-y:(m++,v+=2*h*h,f+=v-y+c*c);return d}fillEllipseScanline(e,t,i,s,a,r){if(s<=0||a<=0)return[];let n=[];const o=(t,i)=>{if(t<0||t>=e.width||i<0||i>=e.height)return;const s=this.getPixelColorFromCtx(e,t,i);s!==r&&("transparent"===r?e.clearRect(t,i,1,1):(e.fillStyle=r,e.fillRect(t,i,1,1)),n.push({x:t,y:i,newColor:r,oldColor:s}))},l=s*s,c=a*a,h=2*l,d=2*c;let p=0,m=a,u=0,g=h*m,v=Math.floor(c-l*a+.25*l);for(;u<g;){for(let e=t-p;e<=t+p;e++)o(e,i+m),o(e,i-m);p++,u+=d,v<0?v+=c+u:(m--,g-=h,v+=c+u-g)}let y=Math.floor(c*(p+.5)*(p+.5)+l*(m-1)*(m-1)-l*c);for(;m>=0;){for(let e=t-p;e<=t+p;e++)o(e,i+m),o(e,i-m);m--,g-=h,y>0?y+=l-g:(p++,u+=d,y+=l-g+u)}return n}fillArea(e,t){if(!this.project||e<0||t<0||e>=this.project.width||t>=this.project.height)return;const i=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx,s=i.getImageData(e,t,1,1),a=Array.from(s.data),r="primary"===this.selectedColor?this.primaryColor:this.secondaryColor,n=this.colorPicker.hexToRgb(r);if(n&&n.r===a[0]&&n.g===a[1]&&n.b===a[2]&&255===a[3])return;let o=this.floodFill(i,e,t,a,n);o=o.filter(e=>e.newColor!=e.oldColor),o.length&&this.recordDrawOperation(o),this.render()}floodFill(e,t,i,s,a){const r=this.project.width,n=this.project.height,o=[[t,i]],l=new Set;let c=[];for(;o.length>0;){const[t,i]=o.pop(),h=`${t},${i}`;if(l.has(h)||t<0||t>=r||i<0||i>=n)continue;l.add(h);const d=e.getImageData(t,i,1,1),p=Array.from(d.data);if(this.colorsMatch(p,s)){const s=this.getPixelColorFromCtx(e,t,i);if(a){const r=new Uint8ClampedArray([a.r,a.g,a.b,255]);e.putImageData(new ImageData(r,1,1),t,i),c.push({x:t,y:i,newColor:`rgba(${a.r}, ${a.g}, ${a.b}, 255)`,oldColor:s})}else e.clearRect(t,i,1,1),c.push({x:t,y:i,newColor:"transparent",oldColor:s});o.push([t+1,i],[t-1,i],[t,i+1],[t,i-1])}}return c}colorsMatch(e,t){return e[0]===t[0]&&e[1]===t[1]&&e[2]===t[2]&&e[3]===t[3]}pickColor(e,t,i=!0,s=!1){if(!this.project||e<0||t<0||e>=this.project.width||t>=this.project.height)return;const a=this.project.frames[this.project.currentFrame],r=i=>{const a=i.getImageData(e,t,1,1).data;if(a[3]>0){const e=`#${this.componentToHex(a[0])}${this.componentToHex(a[1])}${this.componentToHex(a[2])}`;return this.setColor(e),s||this.showOperationMessage(`<span style="aspect-ratio: 1/1; width: 1em; height: 1em; background: ${e}">${e}</span>`),!0}return!1};if(!r(this.getCurrentLayerContext())){for(let e=a.layers.length-1;e>=0;e--){const t=a.layers[e];if(t.visible){if(r(t.ctx))return}}i&&this.referenceManager.traceImage&&r(this.ctx)}}addTool(e){if(!e.name)throw new Error("Tool must have a name");this.tools[e.name]={name:e.name,displayName:e.displayName||e.name,icon:e.icon,cursor:e.cursor||"default",shortcut:e.shortcut||null,onDown:e.onDown,onMove:e.onMove,onUp:e.onUp,settings:e.settings||{}};const t=this.createButton(`tool-${e.name}`,e.icon,()=>{this.setTool(e.name),this.toolDropdown.classList.remove("visible")});t.title=e.shortcut?e.displayName+` (${e.shortcut.toUpperCase()})`:e.displayName,this.toolDropdown.appendChild(t)}setTool(e,t){if(!this.tools[e])throw new Error(`Tool '${e}' not found`);this.currentTool&&this.currentTool.name!==e&&(this.lastTool=this.currentTool.name),this.currentTool=this.tools[e];const i=this.currentToolButton.querySelector(".icon");i&&(i.className=`icon ${this.currentTool.icon}`),this.canvas.style.cursor=this.currentTool.cursor,this.toolSettingsButton.style.display=Object.keys(this.currentTool.settings).length>0?"flex":"none",t||this.showOperationMessage(__(this.currentTool.displayName)),this.hideToolSettings()}switchLastTool(){this.lastTool&&this.lastTool!==this.currentTool.name&&this.setTool(this.lastTool)}toggleToolDropdown(){if(this.toolDropdown.classList.toggle("visible"),this.toolDropdown.classList.contains("visible")){const e=t=>{this.toolButtonContainer.contains(t.target)||(this.toolDropdown.classList.remove("visible"),document.removeEventListener("click",e))};setTimeout(()=>{document.addEventListener("click",e)},0)}}showToolSettings(){if(!this.currentTool||0===Object.keys(this.currentTool.settings).length)return;this.toolSettingsPopup.innerHTML="";const e=document.createElement("h3");e.textContent=`${this.currentTool.name} Settings`,this.toolSettingsPopup.appendChild(e);for(const[e,t]of Object.entries(this.currentTool.settings)){const i=document.createElement("div");i.className="tool-setting";const s=document.createElement("label");if(s.textContent=e.replace(/([A-Z])/g," $1").replace(/^./,e=>e.toUpperCase()),i.appendChild(s),"boolean"===t.type){const s=document.createElement("input");s.type="checkbox",s.checked=t.value,s.addEventListener("change",t=>{this.currentTool.settings[e].value=t.target.checked}),i.appendChild(s)}else if("number"===t.type){const s=document.createElement("input");s.type="number",s.value=t.value,s.min=t.min||0,s.max=t.max||100,s.addEventListener("change",t=>{this.currentTool.settings[e].value=parseFloat(t.target.value)}),i.appendChild(s)}else if("select"===t.type){const s=document.createElement("select");t.options.forEach(e=>{const i=document.createElement("option");i.value=e.value,i.textContent=e.label,e.value===t.value&&(i.selected=!0),s.appendChild(i)}),s.addEventListener("change",t=>{this.currentTool.settings[e].value=t.target.value}),i.appendChild(s)}this.toolSettingsPopup.appendChild(i)}const t=this.toolSettingsButton.getBoundingClientRect();this.toolSettingsPopup.style.position="absolute",this.toolSettingsPopup.style.bottom=window.innerHeight-t.top+10+"px",this.toolSettingsPopup.style.right=window.innerWidth-t.right+"px",this.toolSettingsPopup.style.display="block",setTimeout(()=>{const e=t=>{this.toolSettingsPopup.contains(t.target)||(this.hideToolSettings(),document.removeEventListener("click",e))};document.addEventListener("click",e)},0)}hideToolSettings(){this.toolSettingsPopup.style.display="none"}toggleSelectedColor(){this.selectedColor="primary"===this.selectedColor?"secondary":"primary",this.updateColorIndicator()}updateColorIndicator(){this.colorPrimary.style.backgroundColor=this.primaryColor,this.colorSecondary.style.backgroundColor=this.secondaryColor,this.colorSelector.className="color-selector","secondary"===this.selectedColor&&this.colorSelector.classList.add("secondary"),localStorage.setItem("primaryColor",this.primaryColor),localStorage.setItem("secondaryColor",this.secondaryColor)}showColorPicker(){this.colorPicker.show()}hideColorPicker(){this.colorPicker.hide()}updatePaletteGrid(){this.colorPicker&&this.colorPicker.updatePaletteGrid()}addToRecentColors(e){this.paletteManager.addToRecent(e)}updateRecentColorsGrid(){this.colorPicker&&this.colorPicker.updateRecentColorsGrid()}updatePaletteGrid(){this.colorPicker&&this.colorPicker.updatePaletteGrid()}addColorToPalette(e){const t=this.paletteManager.getCurrentPalette();t&&(this.paletteManager.addColorToPalette(t.id,e),this.updatePaletteGrid())}removeColorFromPalette(e){const t=this.paletteManager.getCurrentPalette();t&&(this.paletteManager.removeColorFromPalette(t.id,e),this.updatePaletteGrid())}loadPalette(){this.getFileBrowser({title:__("Cargar paleta||Load palette"),mode:"open",fileTypes:["pal"],onConfirm:async e=>{try{const t=await this.readFile(e);this.parsePalFile(t),this.updatePaletteGrid(),this.showToast(__("Paleta cargada||Palette loaded successfully"))}catch(e){this.showToast(__(`(Error al cargar paleta|Error loading palette): ${e.message}`),5e3)}}}).show()}savePalette(){const e=this.paletteManager.getCurrentPalette();if(!e||0===e.colors.length)return void this.showToast(__("No hay paleta que guardar||No palette to save"),3e3);this.getFileBrowser({title:__("Guardar paleta||Save palette"),mode:"saveAs",fileTypes:["pal"],defaultType:"pal",defaultName:e.name||"palette",onConfirm:async e=>{try{const t=this.generatePalFile();await this.saveFile(e.name,"pal",t),this.showToast(__("Paleta guardada||Palette saved successfully"))}catch(e){this.showToast(__(`(Error al guardar la paleta|Error saving palette): ${e.message}`),5e3)}}}).show()}parsePalFile(e){const t=e.split("\n").map(e=>e.trim()).filter(e=>e.length>0);if(t.length<3||"JASC-PAL"!==t[0])throw new Error("Invalid PAL file format - missing JASC-PAL header");if("0100"!==t[1])throw new Error("Unsupported PAL version - expected 0100");const i=parseInt(t[2]);if(isNaN(i))throw new Error("Invalid color count - not a number");if(t.length<3+i)throw new Error(`File claims to have ${i} colors but only ${t.length-3} found`);const s=[];for(let e=3;e<3+i;e++){const i=t[e].split(/\s+/).filter(e=>e.length>0);if(i.length<3)throw new Error(`Invalid color at line ${e+1} - expected 3 components`);const a=parseInt(i[0]),r=parseInt(i[1]),n=parseInt(i[2]);if(isNaN(a)||isNaN(r)||isNaN(n))throw new Error(`Invalid RGB values at line ${e+1}`);if(a<0||a>255||r<0||r>255||n<0||n>255)throw new Error(`RGB values out of range (0-255) at line ${e+1}`);s.push(this.colorPicker.rgbToHex(a,r,n))}const a=__("Paleta importada||Imported palette");let r=a,n=1;for(;this.paletteManager.palettes.some(e=>e.name===r);)r=`${a} ${n++}`;this.paletteManager.addPalette(r,s)}generatePalFile(){const e=this.paletteManager.getCurrentPalette().colors.map(e=>{const t=this.colorPicker.hexToRgb(e);return`${t.r} ${t.g} ${t.b}`});return["JASC-PAL","0100",e.length.toString(),...e].join("\n")}showToast(e,t=3e3){this.notificationElement.innerHTML=e,this.notificationElement.classList.add("visible"),setTimeout(()=>{this.notificationElement.classList.remove("visible")},t)}showOperationMessage(e,t=3e3){this.operationMessageElement.innerHTML=e,this.operationMessageElement.classList.add("visible"),setTimeout(()=>{this.operationMessageElement.classList.remove("visible")},t)}showPopup(e,t,i=[{text:"OK",action:()=>this.hidePopup()}],s=!1){this.popupContent.innerHTML="";const a=document.createElement("div");if(a.className="popup-title",a.textContent=e,this.popupContent.appendChild(a),"string"==typeof t){const e=document.createElement("div");e.innerHTML=t,this.popupContent.appendChild(e)}else this.popupContent.appendChild(t);const r=document.createElement("div");r.className="popup-buttons",this.popupContent.appendChild(r),this.popupButtons=[],i.forEach(e=>{const t=document.createElement("button");t.className=e.class||"confirm",t.textContent=e.text,t.addEventListener("click",e.action),r.appendChild(t),this.popupButtons.push(t)}),this.popupOverlay.classList.add("visible"),s?this.popupOverlay.classList.add("fullscreen"):this.popupOverlay.classList.remove("fullscreen"),this.popupOpen=!0}hidePopup(){this.popupOverlay.classList.remove("visible"),this.popupOpen=!1}hidePopupButtons(){this.popupButtons&&this.popupButtons.forEach(e=>{e.style.display="none"})}showNewProjectDialog(){const e=document.createElement("div");e.innerHTML=`\n      <div style="margin-bottom: 15px;">\n        <label style="display: block; margin-bottom: 5px;">Width:</label>\n        <input type="number" id="new-width" value="${this.defaultWidth}">\n      </div>\n      <div style="margin-bottom: 15px;">\n        <label style="display: block; margin-bottom: 5px;">Height:</label>\n        <input type="number" id="new-height" value="${this.defaultHeight}">\n      </div>\n    `,this.showPopup(__("Nuevo Proyecto||New Project"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.hidePopup()},{text:__("Crear||Create"),action:()=>{const e=parseInt(document.getElementById("new-width").value),t=parseInt(document.getElementById("new-height").value);e>0&&t>0?(this.newProject(e,t),this.hidePopup()):this.showToast(__("Dimensiones inválidas||Invalid dimensions"))}}])}flipHorizontal(){if(!this.project)return;this.historyManager.startBatch("transform",__("Espejo Horizontal||Flip Horizontal"));const e=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx,t=e.getImageData(0,0,this.project.width,this.project.height),i=new ImageData(new Uint8ClampedArray(Array.from(t.data)),this.project.width,this.project.height),s=i.data;for(let e=0;e<this.project.height;e++)for(let t=0;t<Math.floor(this.project.width/2);t++){const i=4*(e*this.project.width+t),a=4*(e*this.project.width+(this.project.width-t-1));for(let e=0;e<4;e++){const t=s[i+e];s[i+e]=s[a+e],s[a+e]=t}}e.putImageData(i,0,0);const a={type:"transform",description:__("Espejo Horizontal||Flip Horizontal"),frameIndex:this.project.currentFrame,layerIndex:this.project.currentLayer,transformType:"flip_horizontal",transformData:{oldImageData:Array.from(t.data),newImageData:Array.from(e.getImageData(0,0,this.project.width,this.project.height).data)}};this.historyManager.addChange(a),this.historyManager.endBatch(),this.render()}flipVertical(){if(!this.project)return;this.historyManager.startBatch("transform",__("Girar Horizontal||Flip Vertical"));const e=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx,t=e.getImageData(0,0,this.project.width,this.project.height),i=new ImageData(new Uint8ClampedArray(Array.from(t.data)),this.project.width,this.project.height),s=i.data;for(let e=0;e<Math.floor(this.project.height/2);e++)for(let t=0;t<this.project.width;t++){const i=4*(e*this.project.width+t),a=4*((this.project.height-e-1)*this.project.width+t);for(let e=0;e<4;e++){const t=s[i+e];s[i+e]=s[a+e],s[a+e]=t}}e.putImageData(i,0,0);const a={type:"transform",description:__("Girar Horizontal||Flip Vertical"),frameIndex:this.project.currentFrame,layerIndex:this.project.currentLayer,transformType:"flip_vertical",transformData:{oldImageData:Array.from(t.data),newImageData:Array.from(e.getImageData(0,0,this.project.width,this.project.height).data)}};this.historyManager.addChange(a),this.historyManager.endBatch(),this.render()}rotate(e=0){if(!this.project)return;this.historyManager.startBatch("transform",__(`(Rotar|Rotate) ${e}°`));const t=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer],i=t.ctx,s=i.getImageData(0,0,this.project.width,this.project.height),a=s,r=new ImageData(90===e||270===e?this.project.height:this.project.width,90===e||270===e?this.project.width:this.project.height);for(let t=0;t<this.project.height;t++)for(let i=0;i<this.project.width;i++){const s=4*(t*this.project.width+i);let n,o;if(90===e)n=this.project.height-t-1,o=i;else if(180===e)n=this.project.width-i-1,o=this.project.height-t-1;else{if(270!==e)return;n=t,o=this.project.width-i-1}const l=4*(o*r.width+n);for(let e=0;e<4;e++)r.data[l+e]=a.data[s+e]}90!==e&&270!==e||(t.canvas.width=this.project.height,t.canvas.height=this.project.width),i.putImageData(r,0,0);const n={type:"transform",description:__(`(Rotar|Rotate) ${e}°`),frameIndex:this.project.currentFrame,layerIndex:this.project.currentLayer,transformType:`rotate_${e}`,transformData:{oldImageData:Array.from(s.data),newImageData:Array.from(i.getImageData(0,0,t.canvas.width,t.canvas.height).data),oldWidth:this.project.width,oldHeight:this.project.height,newWidth:t.canvas.width,newHeight:t.canvas.height}};if(this.historyManager.addChange(n),this.historyManager.endBatch(),90===e||270===e){const e=this.project.width;this.project.width=this.project.height,this.project.height=e,this.resetCanvasSize()}this.render()}toggleTransparency(){this.transparentBackground=!this.transparentBackground,this.render()}invertColors(){if(!this.project)return;this.historyManager.startBatch("color_adjustment",__("Invertir Colores||Invert Colors"));const e=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx,t=e.getImageData(0,0,this.project.width,this.project.height),i=e.getImageData(0,0,this.project.width,this.project.height),s=i.data;for(let e=0;e<s.length;e+=4)s[e]=255-s[e],s[e+1]=255-s[e+1],s[e+2]=255-s[e+2];e.putImageData(i,0,0);const a={type:"color_adjustment",description:__("Invertir Colores||Invert Colors"),frameIndex:this.project.currentFrame,layerIndex:this.project.currentLayer,adjustmentType:"invert",adjustmentData:{oldImageData:Array.from(t.data),newImageData:Array.from(e.getImageData(0,0,this.project.width,this.project.height).data)}};this.historyManager.addChange(a),this.historyManager.endBatch(),this.render()}grayscale(){if(!this.project)return;this.historyManager.startBatch("color_adjustment",__("Escala de Grises||Grayscale"));const e=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx,t=e.getImageData(0,0,this.project.width,this.project.height),i=new ImageData(new Uint8ClampedArray(Array.from(t.data)),this.project.width,this.project.height),s=i.data;for(let e=0;e<s.length;e+=4){const t=(s[e]+s[e+1]+s[e+2])/3;s[e]=t,s[e+1]=t,s[e+2]=t}e.putImageData(i,0,0);const a={type:"color_adjustment",description:__("Escala de Grises||Grayscale"),frameIndex:this.project.currentFrame,layerIndex:this.project.currentLayer,adjustmentType:"grayscale",adjustmentData:{oldImageData:Array.from(t.data),newImageData:Array.from(e.getImageData(0,0,this.project.width,this.project.height).data)}};this.historyManager.addChange(a),this.historyManager.endBatch(),this.render()}showAboutDialog(){this.showPopup(__("Acerca de Pixelite||About Pixelite"),`\n        <div style="text-align: center;">\n          <h2 style="margin-top: 0; color: var(--primary-color);">Pixelite</h2>\n          <p><strong>${__("Versión||Version")} ${this.version}</strong></p>\n          <p>${__("© %Y RETORA. Todos los derechos reservados.||© %Y RETORA. All rights reserved.").replace("%Y",(new Date).getFullYear())}</p>\n          <p>${__("Creado por||Created by")} <a onclick="openExternalUrl('https://retora.html-5.me')">retora</a>.</p></p>\n          <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0;">\n            <a href="https://retora.itch.io/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://retora.itch.io/pixelite')">itch.io</a>\n            <span>•</span>\n            <a href="https://github.com/RetoraDev/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://github.com/RetoraDev/pixelite')">GitHub</a>\n          </div>\n          <p style="font-size: 0.9em; color: var(--text-dim); margin-bottom: 0;">\n            ${__("Un editor de pixel art colaborativo con soporte de animación||Collaborative pixel art editor with animation support")}.\n          </p>\n        </div>\n      `,[{text:__("Cerrar||Close"),action:()=>this.hidePopup()}])}showManualDialog(){this.showPopup("Manual",__("\n        (El manual no está disponible todavía|Manual is not available yet)\n      "),[{text:__("Cerrar||Close"),action:()=>this.hidePopup()}])}addFrame(e=this.project.currentFrame,t){if(!this.project)return;const i=e+1;this.historyManager.startBatch("add_layer",__("(Añadir|Add) Frame"));const s={layers:[]},a=this.project.frames[e];for(let e=0;e<a.layers.length;e++){const t=a.layers[e],i=this.createBlankLayer(this.project.width,this.project.height,t.name);i.visible=t.visible,s.layers.push(i)}this.project.frames.splice(i,0,s),this.project.frameTimes.splice(i,0,t||this.project.currentFrameTime),this.project.currentFrame=i;const r={type:"add_frame",description:__("(Añadir|Add) Frame"),index:e,frameTime:this.project.currentFrameTime,layers:a.layers.map(e=>({name:e.name,visible:e.visible,imageData:Array.from(e.ctx.getImageData(0,0,this.project.width,this.project.height).data)}))};this.showOperationMessage(__("Nuevo Frame añadido||New Frame added")),this.historyManager.addChange(r),this.historyManager.endBatch(),this.render()}removeFrame(e=this.project.currentFrame,t){if(!this.project||this.project.frames.length<=1)return;this.historyManager.startBatch("remove_layer",__("(Quitar|Add) Frame"));const i=this.project.frames[e],s=this.project.frameTimes[e];this.project.frames.splice(e,1),this.project.frameTimes.splice(e,1),this.project.currentFrame=Math.min(e,this.project.frames.length-1);const a={type:"remove_frame",description:__("(Quitar|Remove) Frame"),index:e,frameTime:s,layers:i.layers.map(e=>({name:e.name,visible:e.visible,imageData:Array.from(e.ctx.getImageData(0,0,this.project.width,this.project.height).data)}))};t||this.showOperationMessage(__("Frame quitado||Frame removed")),this.historyManager.addChange(a),this.historyManager.endBatch(),this.render()}duplicateFrame(e=this.project.currentFrame){if(!this.project)return;const t=this.project.frames[e],i=e+1;this.historyManager.startBatch("duplicate_frame",__("Duplicar Frame||Duplicate Frame"));const s={layers:[]};for(let e=0;e<t.layers.length;e++){const i=t.layers[e],a=this.createBlankLayer(this.project.width,this.project.height,`${i.name} (${__("copia||copy")})`);a.visible=i.visible,a.ctx.drawImage(i.canvas,0,0),s.layers.push(a)}this.project.frames.splice(i,0,s),this.project.frameTimes.splice(i,0,this.project.frameTimes[e]),this.project.currentFrame=i;const a={type:"duplicate_frame",description:__("Duplicar Frame||Duplicate Frame"),index:i,frameTime:this.project.frameTimes[i],layers:s.layers.map(e=>({name:e.name,visible:e.visible,imageData:Array.from(e.ctx.getImageData(0,0,this.project.width,this.project.height).data)}))};this.showOperationMessage(__("Frame duplicado||Frame duplicated")),this.historyManager.addChange(a),this.historyManager.endBatch(),this.updateFramesUI(),this.render()}moveFrame(e,t,i){if(e===t)return;this.historyManager.startBatch("move_frame",__("(Move|Mover) Frame"));const s=this.project.frames.splice(e,1)[0],a=this.project.frameTimes.splice(e,1)[0];this.project.frames.splice(t,0,s),this.project.frameTimes.splice(t,0,a),this.project.currentFrame=t;const r={type:"move_frame",description:__("(Move|Mover) Frame"),fromIndex:e,toIndex:t};this.historyManager.addChange(r),this.historyManager.endBatch(),i||this.showOperationMessage(__("Frame movido||Frame moved")),this.render()}setFrameTime(e,t){if(!this.project||e<0||e>=this.project.frameTimes.length)return;const i=this.project.frameTimes[e];this.project.frameTimes[e]=t;const s={type:"edit_frame",description:__("Cambiar Tiempo de Frame||Change Frame Time"),frameIndex:e,property:"time",oldValue:i,newValue:t};this.historyManager.addChange(s)}updateFramesUI(){if(!this.project)return;const e=this.project.frames.length;this.project.frameTimes.length!==e&&(this.project.frameTimes=new Array(e).fill(this.project.currentFrameTime));const t=Array.from(this.timelineContent.children);let i=t.find(e=>e.classList.contains("add-button"));i||(i=document.createElement("div"),i.className="timeline-frame add-button",i.innerHTML=`\n        <div class="add-button-icon">\n          <svg width="24" height="24" viewBox="0 0 24 24">\n            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>\n          </svg>\n        </div>\n        <span>${__("Añadir||Add")}</span>\n      `,i.addEventListener("click",()=>this.addFrame()),this.timelineContent.appendChild(i));const s=t.filter(e=>!e.classList.contains("add-button")),a=Math.max(0,e-s.length),r=Math.max(0,s.length-e);for(let e=0;e<r;e++){const t=s[s.length-1-e];t&&t.parentNode&&t.remove()}for(let t=0;t<Math.min(e,s.length);t++){const e=this.project.frames[t],i=s[t];i.className="timeline-frame "+(t===this.project.currentFrame?"active":""),i.setAttribute("data-index",t);const a=i.querySelector(".frame-thumb");if(a){a.innerHTML="";const t=document.createElement("canvas");t.width=this.project.width,t.height=this.project.height,t.style.width="auto",t.style.height="60px",t.style.backgroundColor="#fff",t.style.backgroundImage="var(--transparent-bg)",t.style.backgroundSize="16px 16px";const i=this.getCanvasContext(t);this.transparentBackground||(i.fillStyle=this.secondaryColor,i.fillRect(0,0,t.width,t.height));for(let t=0;t<e.layers.length;t++)e.layers[t].visible&&i.drawImage(e.layers[t].canvas,0,0);a.appendChild(t)}const r=i.querySelector(".frame-time");r&&(r.textContent=`${this.project.frameTimes[t].toFixed(2)}ms`);const n=i.querySelector(".frame-number");n&&(n.textContent=t+1)}if(a>0)for(let t=s.length;t<e;t++){const e=this.project.frames[t],s=document.createElement("div");s.className="timeline-frame "+(t===this.project.currentFrame?"active":""),s.setAttribute("data-index",t),s.draggable=!0;const a=document.createElement("div");a.className="frame-thumb",s.appendChild(a);const r=document.createElement("canvas");r.width=this.project.width,r.height=this.project.height,r.style.width="auto",r.style.height="60px",r.style.backgroundColor="#fff",r.style.backgroundImage="var(--transparent-bg)",r.style.backgroundSize="16px 16px";const n=this.getCanvasContext(r);this.transparentBackground||(n.fillStyle=this.secondaryColor,n.fillRect(0,0,r.width,r.height));for(let t=0;t<e.layers.length;t++)e.layers[t].visible&&n.drawImage(e.layers[t].canvas,0,0);a.appendChild(r);const o=document.createElement("div");o.className="frame-time",o.textContent=`${this.project.frameTimes[t].toFixed(2)}ms`,s.appendChild(o);const l=document.createElement("div");l.className="frame-number",l.textContent=t+1,s.appendChild(l),s.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",t.toString()),s.classList.add("dragging")}),s.addEventListener("dragend",()=>{s.classList.remove("dragging")}),s.addEventListener("dragover",e=>{e.preventDefault()}),s.addEventListener("drop",e=>{e.preventDefault();const i=parseInt(e.dataTransfer.getData("text/plain")),s=t;i!==s&&this.moveFrame(i,s)}),o.addEventListener("click",e=>{this.showFrameTimeDialog(t),e.stopPropagation()}),s.addEventListener("click",e=>{this.project.currentFrame=t,this.render(),e.stopPropagation()}),this.setupTimelineSwipe(s,t),this.timelineContent.insertBefore(s,i)}this.updateAnimationPreview()}updateFramesUIQuick(){if(!this.project)return;const e=this.timelineContent.children;for(let t=0;t<e.length-1;t++){const i=e[t];i.classList.contains("timeline-frame")&&(t===this.project.currentFrame?i.classList.add("active"):i.classList.remove("active"))}this.updateAnimationPreview()}addLayer(){if(!this.project)return;this.historyManager.startBatch("add_layer",__("Añadir Capa||Add Layer"));const e=this.project.frames[this.project.currentFrame],t=this.createBlankLayer(this.project.width,this.project.height,`Layer ${e.layers.length+1}`),i=e.layers.length;e.layers.push(t),this.project.currentLayer=i;const s={type:"add_layer",description:__("Añadir Capa||Add Layer"),frameIndex:this.project.currentFrame,layerIndex:i,layerData:{name:t.name,visible:!this.registerLayerVisibilityChanges||t.visible,imageData:Array.from(t.ctx.getImageData(0,0,this.project.width,this.project.height).data)}};this.showOperationMessage(__("Nueva capa añadida||New layer added")),this.historyManager.addChange(s),this.historyManager.endBatch(),this.render()}removeLayer(){if(!this.project)return;const e=this.project.frames[this.project.currentFrame];if(e.layers.length<=1)return;this.historyManager.startBatch("remove_layer",__("Quitar capa||Remove Layer"));const t=this.project.currentLayer,i=e.layers[t];e.layers.splice(t,1),this.project.currentLayer=Math.min(t,e.layers.length-1);const s={type:"remove_layer",description:__("Quitar capa||Remove Layer"),frameIndex:this.project.currentFrame,layerIndex:t,layerData:{name:i.name,visible:!this.registerLayerVisibilityChanges||i.visible,imageData:Array.from(i.ctx.getImageData(0,0,this.project.width,this.project.height).data)}};this.showOperationMessage(__("Capa quitada||Layer removed")),this.historyManager.addChange(s),this.historyManager.endBatch(),this.render()}setLayerVisibility(e,t,i){if(!this.project||!this.project.frames[e]||!this.project.frames[e].layers[t])return;const s=this.project.frames[e].layers[t],a=s.visible;s.visible=i;const r={type:"change_layer_visibility",description:__("Cambiar visibilidad de la capa||Change Layer Visibility"),frameIndex:e,layerIndex:t,visible:i,oldVisible:a};this.registerLayerVisibilityChanges&&this.historyManager.addChange(r),this.render()}moveLayer(e,t,i){if(t===i)return;this.historyManager.startBatch("move_layer","Move Layer");const s=this.project.frames[e],a=s.layers.splice(t,1)[0];s.layers.splice(i,0,a),this.project.currentLayer=i;const r={type:"move_layer",description:"Move Layer",frameIndex:e,fromIndex:t,toIndex:i};this.historyManager.addChange(r),this.historyManager.endBatch(),this.render()}prevLayer(){if(!this.project)return;const e=Math.max(0,this.project.currentLayer-1);this.project.currentLayer=e,this.updateLayersUI()}nextLayer(){if(!this.project)return;const e=this.project.frames[this.project.currentFrame],t=Math.min(e.layers.length-1,this.project.currentLayer+1);this.project.currentLayer=t,this.updateLayersUI()}duplicateLayer(){if(!this.project)return;const e=this.project.frames[this.project.currentFrame],t=this.project.currentLayer,i=e.layers[t],s=t+1;this.historyManager.startBatch("duplicate_layer",__("Duplicar capa||Duplicate Layer"));const a=this.createBlankLayer(this.project.width,this.project.height,`${i.name} (${__("copia||copy")})`);a.visible=i.visible,a.ctx.drawImage(i.canvas,0,0),e.layers.splice(s,0,a),this.project.currentLayer=s;const r={type:"duplicate_layer",description:__("Duplicar capa||Duplicate Layer"),frameIndex:this.project.currentFrame,layerIndex:s,layerData:{name:a.name,visible:a.visible,imageData:Array.from(a.ctx.getImageData(0,0,this.project.width,this.project.height).data)}};this.historyManager.addChange(r),this.historyManager.endBatch(),this.showOperationMessage(__("Capa duplicada||Layer duplicated")),this.updateLayersUI(),this.render()}renameLayer(e,t){if(!this.project)return;this.historyManager.startBatch("rename_layer",__("Renombrar capa||Rename Layer"));const i=void 0!==t?t:this.currentLayer;let s,a=e;this.project.frames.forEach(e=>{const t=e.layers[i];s||(s=t.name),t.name=a||t.name});const r={type:"rename_layer",description:__("Renombrar capa||Rename Layer"),layerIndex:i,previousName:s,newName:a};this.historyManager.addChange(r),this.historyManager.endBatch(),this.showOperationMessage(__("Nombre editado||Name edited"))}mergeLayerUp(e=this.project.currentLayer){if(!this.project)return;const t=this.project.frames[this.project.currentFrame];if(e>=t.layers.length-1)return;const i=e,s=e+1;this.historyManager.startBatch("merge_layers",__("Combinar capas||Merge Layers"));const a=t.layers[i],r=t.layers[s],n={name:a.name,visible:a.visible,imageData:Array.from(a.ctx.getImageData(0,0,this.project.width,this.project.height).data)},o={name:r.name,visible:r.visible,imageData:Array.from(r.ctx.getImageData(0,0,this.project.width,this.project.height).data)};r.ctx.drawImage(a.canvas,0,0),t.layers.splice(i,1),this.project.currentLayer=s-1;const l={type:"merge_layers",description:__("Combinar capas||Merge Layers"),frameIndex:this.project.currentFrame,sourceIndex:i,targetIndex:s,sourceData:n,targetData:o};this.historyManager.addChange(l),this.historyManager.endBatch(),this.showOperationMessage(__("Capas combinadas||Layers merged")),this.updateLayersUI(),this.render()}mergeLayerDown(e=this.project.currentLayer){if(!this.project)return;const t=this.project.frames[this.project.currentFrame];if(e<=0)return;const i=e,s=e-1;this.historyManager.startBatch("merge_layers",__("Combinar capas||Merge Layers"));const a=t.layers[i],r=t.layers[s],n={name:a.name,visible:a.visible,imageData:Array.from(a.ctx.getImageData(0,0,this.project.width,this.project.height).data)},o={name:r.name,visible:r.visible,imageData:Array.from(r.ctx.getImageData(0,0,this.project.width,this.project.height).data)};r.ctx.drawImage(a.canvas,0,0),t.layers.splice(i,1),this.project.currentLayer=s;const l={type:"merge_layers",description:__("Combinar capas||Merge Layers"),frameIndex:this.project.currentFrame,sourceIndex:i,targetIndex:s,sourceData:n,targetData:o};this.historyManager.addChange(l),this.historyManager.endBatch(),this.showOperationMessage(__("Capas combinadas||Layers merged")),this.updateLayersUI(),this.render()}createBlankLayer(e,t,i=`Layer ${this.project&&this.project.frames.length?this.project.frames[0].layers.length+1:1}`){const s=document.createElement("canvas");s.width=e,s.height=t;return{canvas:s,ctx:this.getCanvasContext(s),visible:!0,name:i}}updateLayersUI(){if(!this.project)return;const e=this.project.frames[this.project.currentFrame],t=e.layers.length;this.layersContainer.innerHTML="";const i=document.createElement("div");i.className="layers-header";const s=document.createElement("button");s.className="ui-button",s.innerHTML='<div class="icon icon-prev"></div>',s.title=__("Capa anterior||Previous Layer"),s.addEventListener("click",()=>this.prevLayer()),i.appendChild(s);const a=document.createElement("button");a.className="ui-button",a.innerHTML='<div class="icon icon-next"></div>',a.title=__("Capa siguiente||Next Layer"),a.addEventListener("click",()=>this.nextLayer()),i.appendChild(a);const r=document.createElement("button");r.className="ui-button",r.innerHTML='<div class="icon icon-add"></div>',r.title=__("Añadir capa||Add Layer"),r.addEventListener("click",()=>this.addLayer()),i.appendChild(r);const n=document.createElement("button");n.className="ui-button",n.innerHTML='<div class="icon icon-copy"></div>',n.title=__("Duplicar capa||Duplicate Layer"),n.addEventListener("click",()=>this.duplicateLayer()),i.appendChild(n);const o=document.createElement("button");o.className="ui-button",o.innerHTML='<div class="icon icon-merge-up"></div>',o.title=__("Combinar con superior||Merge with Top"),o.addEventListener("click",()=>this.mergeLayerUp()),i.appendChild(o);const l=document.createElement("button");l.className="ui-button",l.innerHTML='<div class="icon icon-merge-down"></div>',l.title=__("Combinar con inferior||Merge with Bottom"),l.addEventListener("click",()=>this.mergeLayerDown()),i.appendChild(l),this.layersContainer.appendChild(i);for(let i=t-1;i>=0;i--){const s=e.layers[i],a=document.createElement("div");a.className="layer-item",i===this.project.currentLayer&&a.classList.add("active"),a.setAttribute("data-index",i),a.draggable=!0;const r=document.createElement("div");r.className="layer-thumb",a.appendChild(r);const n=document.createElement("canvas");n.width=this.project.width,n.height=this.project.height,n.style.width="auto",n.style.height="44px",n.style.backgroundColor="#fff",n.style.backgroundImage="var(--transparent-bg)",n.style.backgroundSize="16px 16px";const o=this.getCanvasContext(n);this.transparentBackground||(o.fillStyle=this.secondaryColor,o.fillRect(0,0,n.width,n.height)),s.canvas&&o.drawImage(s.canvas,0,0),r.appendChild(n);const l=document.createElement("input");l.className="layer-name",l.value=s.name,a.appendChild(l);const c=document.createElement("div");c.className="layer-actions";const h=document.createElement("button");h.className="ui-button layer-action",h.innerHTML='<div class="icon icon-up"></div>',h.title=__("Subir||Move Up"),i>=t-1?(h.disabled=!0,h.classList.add("disabled")):h.addEventListener("click",e=>{e.stopPropagation(),this.moveLayer(this.project.currentFrame,i,i+1)}),c.appendChild(h);const d=document.createElement("button");d.className="ui-button layer-action",d.innerHTML='<div class="icon icon-down"></div>',d.title=__("Bajar||Move Down"),i<=0?(d.disabled=!0,d.classList.add("disabled")):d.addEventListener("click",e=>{e.stopPropagation(),this.moveLayer(this.project.currentFrame,i,i-1)}),c.appendChild(d);const p=document.createElement("button");p.className="ui-button layer-action",p.innerHTML=s.visible?'<div class="icon icon-visible"></div>':'<div class="icon icon-hidden"></div>',p.title=__("Visibilidad||Toggle Visibility"),p.addEventListener("click",e=>{e.stopPropagation(),this.setLayerVisibility(this.project.currentFrame,i,!s.visible)}),c.appendChild(p);const m=document.createElement("button");m.className="ui-button layer-action",m.innerHTML='<div class="icon icon-merge-up"></div>',m.title=__("Combinar arriba||Merge Up"),i>=t-1?(m.disabled=!0,m.classList.add("disabled")):m.addEventListener("click",e=>{e.stopPropagation(),this.mergeLayerUp(i)}),c.appendChild(m);const u=document.createElement("button");u.className="ui-button layer-action",u.innerHTML='<div class="icon icon-merge-down"></div>',u.title=__("Combinar abajo||Merge Down"),i<=0?(u.disabled=!0,u.classList.add("disabled")):u.addEventListener("click",e=>{e.stopPropagation(),this.mergeLayerDown(i)}),c.appendChild(u);const g=document.createElement("button");g.className="ui-button layer-action",g.innerHTML='<div class="icon icon-close"></div>',g.title=__("Eliminar||Remove"),t<=1?(g.disabled=!0,g.classList.add("disabled")):g.addEventListener("click",e=>{e.stopPropagation(),this.removeLayer(i)}),c.appendChild(g),a.appendChild(c),a.addEventListener("dragstart",e=>{e.dataTransfer.setData("text/plain",i.toString()),a.classList.add("dragging")}),a.addEventListener("dragend",()=>{a.classList.remove("dragging")}),a.addEventListener("dragover",e=>{e.preventDefault()}),a.addEventListener("drop",e=>{e.preventDefault();const t=parseInt(e.dataTransfer.getData("text/plain")),s=i;t!==s&&this.moveLayer(this.project.currentFrame,t,s)}),a.addEventListener("click",()=>{this.project.currentLayer!=i&&(this.project.currentLayer=i,this.updateLayersUI())}),l.addEventListener("change",()=>{this.renameLayer(l.value,i),l.blur()}),this.layersContainer.appendChild(a)}}showButtonToast(e,t,i){const s=document.createElement("div");s.className="toast-with-button",s.innerHTML=`\n      <span>${e||""}</span>\n      <button class="toast-button">${t||__("Deshacer||Undo")}</button>\n    `,this.editorElement.appendChild(s),s.querySelector(".toast-button").addEventListener("click",()=>{i(),s.remove()}),setTimeout(()=>{s.parentNode&&s.remove()},5e3)}setupTimelineSwipe(e,t){let i,s=!1;e.addEventListener("touchstart",e=>{i=e.touches[0].clientY,s=!0}),e.addEventListener("touchmove",t=>{if(!s)return;const a=t.touches[0].clientY-i;a<-30&&(t.preventDefault(),e.style.transform=`translateY(${a}px)`,e.style.opacity=""+(1-Math.abs(a)/100))}),e.addEventListener("touchend",a=>{if(!s)return;a.changedTouches[0].clientY-i<-60&&this.removeFrame(t),e.style.transform="",e.style.opacity="",s=!1})}showFrameTimeDialog(e){const t=document.createElement("div");t.innerHTML=`\n    <div style="margin-bottom: 15px;">\n      <label style="display: block; margin-bottom: 5px;">${__("Tiempo del Frame||Frame Time")} (ms):</label>\n      <input type="number" id="frame-time-value" value="${this.project.frameTimes[e]}" min="1" max="5000" style="width: 100%; padding: 5px;">\n    </div>\n  `,this.showPopup(__("Cambiar Tiempo del Frame||Set Frame Time"),t,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.hidePopup()},{text:__("Aplicar||Apply"),action:()=>{const t=parseInt(document.getElementById("frame-time-value").value);t>=1&&t<=5e3&&(this.setFrameTime(e,t),this.updateFramesUI(),this.hidePopup())}}])}updateFPS(e){let t=parseInt(e||this.fpsInput.value);if(t>=1&&t<=60){const e=1e3/this.project.currentFrameTime,i=this.project.frameTimes;this.project.currentFrameTime=1e3/t,this.project.frameTimes=this.project.frameTimes.map(()=>this.project.currentFrameTime);const s={type:"change_animation_fps",description:__("Cambiar FPS||Change FPS"),oldFPS:e,newFPS:t,oldFrameTimes:i,newFrameTimes:this.project.frameTimes};this.historyManager.addChange(s),this.updateFramesUI(),this.isPlaying&&(this.stopAnimation(),this.startAnimation())}}togglePlayback(){this.isPlaying?this.stopAnimation():this.startAnimation()}startAnimation(){if(this.project.frames.length<=1)return;this.isPlaying=!0,this.playPauseButton.querySelector(".icon").className="icon icon-pause";let e=this.project.currentFrame,t=Date.now(),i=0;this.animationInterval=setInterval(()=>{const s=Date.now();i+=s-t-i;let a=0,r=e;for(let e=0;e<this.project.frameTimes.length;e++)if(a+=this.project.frameTimes[e],i<a){r=e;break}i>=a&&(i=0,r=0,t=Date.now()),r!==e&&(e=r,this.showMiniView?this.isDrawing||this.updateAnimationPreview(e):(this.project.currentFrame=e,this.renderQuick()))},16)}stopAnimation(){this.isPlaying=!1,this.playPauseButton&&(this.playPauseButton.querySelector(".icon").className="icon icon-play"),this.animationInterval&&(clearInterval(this.animationInterval),this.animationInterval=null)}prevFrame(){this.project.frames.length<=1||(this.project.currentFrame=(this.project.currentFrame-1+this.project.frames.length)%this.project.frames.length,this.render())}nextFrame(){this.project.frames.length<=1||(this.project.currentFrame=(this.project.currentFrame+1)%this.project.frames.length,this.render())}updateAnimationPreview(e=this.project.currentFrame){if(!this.project||!this.animationPreview)return;const t=this.project.frames[e];this.animationPreview.width=this.project.width,this.animationPreview.height=this.project.height;const i=this.getCanvasContext(this.animationPreview);i.clearRect(0,0,this.animationPreview.width,this.animationPreview.height),this.transparentBackground||(i.fillStyle=this.secondaryColor,i.fillRect(0,0,this.animationPreview.width,this.animationPreview.height));for(let e=0;e<t.layers.length;e++)t.layers[e].visible&&i.drawImage(t.layers[e].canvas,0,0,this.project.width,this.project.height,0,0,this.animationPreview.width,this.animationPreview.height)}hasTransparency(e){const t=this.getCanvasContext(e).getImageData(0,0,e.width,e.height).data;for(let e=3;e<t.length;e+=4)if(t[e]<255)return!0;return!1}showFPSDialog(){const e=document.createElement("div");e.innerHTML=`\n    <div style="margin-bottom: 15px;">\n      <label style="display: block; margin-bottom: 5px;">${__("Frames Por Segundo||Frames Per Second")}:</label>\n      <input type="number" id="fps-value" value="${parseInt(1e3/this.project.currentFrameTime)}" min="1" max="60" style="width: 100%; padding: 5px;">\n    </div>\n  `,this.showPopup(__("Cambiar FPS||Set Animation FPS"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.hidePopup()},{text:__("Aplicar||Apply"),action:()=>{const e=parseInt(document.getElementById("fps-value").value);e>=1&&e<=60&&(this.fpsInput.value=e,this.updateFPS(e),this.hidePopup())}}])}showCurrentFrameTimeDialog(){this.showFrameTimeDialog(this.project.currentFrame)}initFileHandling(){this.isCordova=void 0!==window.cordova,this.isFilePluginAvailable=this.isCordova&&void 0!==window.File,this.lastSavedPath=null}openFile(){this.getFileBrowser({mode:"open",fileTypes:["pxl","psd","png","jpg","jpeg","pal"],onConfirm:async e=>{try{const t=await this.readFile(e);"pxl"===e.type?this.loadProject(t):"psd"===e.type?await this.importPSD(t,e.name):"pal"===e.type?(this.parsePalFile(t),this.updatePaletteGrid(),this.showToast(__(`(Paleta|Palette) ${e.name} (cargada|loaded)`))):this.importImage(t,e.name),this.showToast(__(`(Archivo|File) ${e.name} (abierto|opened)`)),this.menuPanel.classList.remove("visible")}catch(e){this.showToast(__(`(Error al abrir el archivo|Error opening file): ${e.message}`),5e3),console.error(e)}},onError:e=>{this.showToast(__(`(Error de archivo|File error): ${e.message}`),5e3)}}).show()}saveProject(e){this.project&&(this.lastSavedPath?this.saveFile(this.lastSavedPath,"pxl",this.getProjectData()):e||this.saveAs())}saveAs(){this.getFileBrowser({mode:"saveAs",fileTypes:["pxl","psd","png"],defaultType:"pxl",defaultName:this.project.name||"untitled",onConfirm:async e=>{try{if(this.lastSavedPath=e.name,"pxl"===e.type)await this.saveFile(e.name,"pxl",this.getProjectData());else if("psd"===e.type){const t=await this.exportAsPSD();await this.saveFile(e.name,"psd",t)}else{const t=this.canvas.toDataURL("image/png");await this.saveFile(e.name,"png",t)}this.showToast(__(`(Archivo guardado como|File saved as) ${e.name}`))}catch(e){this.showToast(__(`(Error al guardar el archivo|Error saving file): ${e.message}`),5e3),console.error(e)}}}).show()}exportCurrentFrame(){if(!this.project)return;this.getFileBrowser({title:"Export frame",mode:"saveAs",fileTypes:["png"],defaultType:"png",defaultName:`frame_${this.project.currentFrame+1}`,onConfirm:async e=>{try{const t=this.project.frames[this.project.currentFrame],i=this.renderFrameToCanvas(t).toDataURL("image/png");await this.saveFile(e.name,"png",i),this.showToast(__(`Frame (exportado como|exported as) ${e.name}`))}catch(e){this.showToast(__(`(Error exportando el frame|Error exporting frame): ${e.message}`),5e3),console.error(e)}}}).show()}exportAnimation(){if(!this.project||this.project.frames.length<=1)return void this.showToast("Project has only one frame",3e3);this.getFileBrowser({title:"Export animation sheet",mode:"saveAs",fileTypes:["png"],defaultType:"png",defaultName:`animation_${this.project.name||Date.now()}`,onConfirm:async e=>{try{const t=this.createSpriteSheet().toDataURL("image/png");await this.saveFile(e.name,"png",t),this.showToast(__(`(Animación exportada como|Animation exported as) ${e.name}`))}catch(e){this.showToast(__(`(Error exportando animación|Error exporting animation): ${e.message}`),5e3),console.error(e)}}}).show()}showSpritesheetLoader(){this.spritesheetLoader||(this.spritesheetLoader=new SpritesheetLoader(this)),this.spritesheetLoader.show()}async readFile(e){if(e.entry)return this.readCordovaFile(e.entry);if(e.file)return this.readBrowserFile(e.file);throw new Error("Unsupported file source")}async readCordovaFile(e){return new Promise((t,i)=>{e.file(e=>{const s=new FileReader;s.onloadend=()=>t(s.result),s.onerror=()=>i(new Error("Failed to read file")),e.name.endsWith(".pxl")||e.name.endsWith(".anim")||e.name.endsWith(".pal")||e.name.endsWith(".txt")?s.readAsText(e):s.readAsDataURL(e)},e=>{i(new Error(`Could not read file: ${e.code}`))})})}async readBrowserFile(e){return new Promise((t,i)=>{const s=new FileReader;s.onload=()=>t(s.result),s.onerror=()=>i(new Error("Failed to read file")),e.name.endsWith(".pxl")||e.name.endsWith(".anim")||e.name.endsWith(".pal")||e.name.endsWith(".txt")?s.readAsText(e):s.readAsDataURL(e)})}async saveFile(e,t,i){if(this.isCordova&&this.isFilePluginAvailable)try{await this.saveWithCordova(e,t,i)}catch(s){console.error("Cordova save failed, falling back to browser:",s),this.saveWithBrowser(e,t,i)}else this.saveWithBrowser(e,t,i)}async saveWithCordova(e,t,i){return new Promise((s,a)=>{window.requestFileSystem||(window.requestFileSystem=window.requestFileSystem||window.webkitRequestFileSystem),window.requestFileSystem?window.requestFileSystem(window.PERSISTENT||1,5242880,r=>{r.root.getFile(this.fileBrowser.workingDirectory+e,{create:!0,exclusive:!1},r=>{r.createWriter(r=>{let n;r.onwriteend=()=>{this.lastSavedPath=e,s()},r.onerror=e=>{a(new Error(`File write error: ${e.code}`))},n="pxl"===t?new Blob([i],{type:"application/json"}):this.dataURLtoBlob(i),r.write(n)},e=>{a(new Error(`Could not create file writer: ${e.code}`))})},e=>{a(new Error(`Could not create file: ${e.code}`))})},e=>{a(new Error(`Could not access file system: ${e.code}`))}):a(new Error("File system API not available"))})}async saveWithBrowser(e,t,i){try{let s;s=i instanceof Blob?i:"pxl"===t?new Blob([i],{type:"application/json"}):"pal"===t?new Blob([i],{type:"text/plain"}):this.dataURLtoBlob(i);const a=URL.createObjectURL(s),r=document.createElement("a");r.href=a,r.download=e,document.body.appendChild(r),r.click(),setTimeout(()=>{document.body.removeChild(r),URL.revokeObjectURL(a)},100)}catch(e){console.error("Browser save failed:",e),this.showToast(__("Error al guardar||Failed to save file"),3e3)}}async exportAsPSD(){if(this.project)try{const e=this.project.frames[this.project.currentFrame],t={width:this.project.width,height:this.project.height,children:[]};for(let i=0;i<e.layers.length;i++){const s=e.layers[i],a=document.createElement("canvas");a.width=this.project.width,a.height=this.project.height;a.getContext("2d").drawImage(s.canvas,0,0),t.children.push({name:s.name,canvas:a,visible:s.visible,opacity:255,blendMode:"normal"})}const i=agPsd.writePsd(t);return new Blob([i],{type:"application/octet-stream"})}catch(e){throw console.error("Error exporting PSD:",e),new Error("Failed to export PSD")}}async exportTimelapse(){if(!this.project||!this.historyManager.history.length)return void this.showToast(__("No hay suficiente historia para exportar el proceso||Not enough history to export a timelapse"));const e=document.createElement("div");e.innerHTML=`\n      <div style="margin-bottom: 15px;">\n        <label style="display: block; margin-bottom: 5px;">FPS:</label>\n        <input type="number" id="timelapse-fps" value="${this.timelapseFPS}" min="1" max="60" style="width: 100%; padding: 5px;">\n      </div>\n      <div style="margin-bottom: 15px;">\n        <label style="display: block; margin-bottom: 5px;">${__("Escala||Scale")}:</label>\n        <input type="number" id="timelapse-scale" value="4" min="1" max="10" style="width: 100%; padding: 5px;">\n      </div>\n      <img style="display:none;image-rendering:pixelated;width:100%;height:auto;background-color:#fff;border:1px solid #000" class="timelapse-preview">\n      <div class="timelapse-progress" style="display: none;">\n        <div style="text-align: center; margin-bottom: 5px;">${__("Generando||Generating")} timelapse...</div>\n        <progress value="0" max="100" style="width: 100%;"></progress>\n        <div class="progress-text" style="text-align: center; margin-top: 5px;">0%</div>\n      </div>\n    `;const t=e.querySelector(".timelapse-progress"),i=e.querySelector("progress"),s=e.querySelector(".progress-text");this.showPopup(__("Exportar Timelapse||Export Timelapse"),e,[{text:__("Cancelar||Cancel"),class:"cancel",action:()=>this.hidePopup()},{text:__("Generar||Generate"),action:async()=>{const a=parseInt(document.getElementById("timelapse-fps").value)||30,r=parseInt(document.getElementById("timelapse-scale").value)||4;e.querySelector("div:first-child").style.display="none",e.querySelector("div:nth-child(2)").style.display="none",t.style.display="block",this.hidePopupButtons();try{const t=await this.generateTimelapse(a,r,(t,a)=>{i.value=t,s.textContent=`${t}%`;const r=e.querySelector(".timelapse-preview");r&&a&&(r.style.display="flex",r.src=a)});this.hidePopup(),this.saveTimelapseWithBrowser(t)}catch(e){throw this.showToast(__(`(Error generando proceso|Error generating timelapse): ${e.message}`),5e3),e}}}])}async generateTimelapse(e,t,i){return this.historyManager.generateTimelapse(e,t,i)}saveTimelapseWithBrowser(e){this.getFileBrowser({mode:"saveAs",fileTypes:["webm"],defaultType:"webm",defaultName:`timelapse_${this.project.name||"artwork"}_${this.formatDate(new Date)}`,onConfirm:async t=>{try{await this.saveFile(t.name,"webm",e),this.showToast(__("Timelapse exportado||Timelapse saved successfully"))}catch(e){this.showToast(__(`(Error guardando proceso|Error saving timelapse): ${e.message}`),5e3)}}}).show()}getFileBrowser(e={}){return this.fileBrowser?this.fileBrowser.updateOptions({onConfirm:e.onConfirm,onCancel:e.onCancel,onError:e.onError,title:e.title||null,fileTypes:e.fileTypes||["pxl","png"],mode:e.mode||"open",defaultType:e.defaultType||"pxl",defaultName:e.defaultName||"untitled"}):(this.fileBrowser=new FileBrowser({container:this.container,onConfirm:e.onConfirm,onCancel:e.onCancel,onError:e.onError,title:e.title||null,fileTypes:e.fileTypes||["pxl","png"],mode:e.mode||"open",defaultType:e.defaultType||"pxl",defaultName:e.defaultName||"untitled"}),this.fileBrowser.currentPath=this.defaultFileBrowserPathUrl),this.fileBrowser}loadProject(e){if("string"==typeof e)try{e=JSON.parse(e)}catch(e){throw new Error("Invalid project file format: Not valid JSON")}if(!e||!e.width||!e.height)throw new Error("Invalid project file format: Missing width or height");if(this.project={width:e.width,height:e.height,frames:[],floatingColors:e.floatingColors||0,currentFrame:e.currentFrame||0,currentLayer:e.currentLayer||0,name:e.name||"untitled"},this.project.frameTimes=e.frameTimes||new Array(e.frames.length).fill(1e3/(e.fps||12)),this.project.currentFrameTime=e.animation?e.currentFrameTime:1e3/12,e.backgroundColor&&(this.transparentBackground="transparent"===e.backgroundColor,this.transparentBackground||(this.secondaryColor=e.backgroundColor)),!e.frames||!Array.isArray(e.frames))throw new Error("Invalid project file format: Missing or invalid frames array");for(let t=0;t<e.frames.length;t++){const i=e.frames[t],s={layers:[]};i.layers&&Array.isArray(i.layers)||(console.warn(`Frame ${t} has invalid layers array, creating default layer`),i.layers=[{name:"Layer 1",visible:!0,imageData:null}]);for(let e=0;e<i.layers.length;e++){const a=i.layers[e],r=this.createBlankLayer(this.project.width,this.project.height);if(r.name=a.name||`Layer ${e+1}`,r.visible=void 0===a.visible||a.visible,a.imageData&&Array.isArray(a.imageData))try{const e=r.ctx,t=new ImageData(new Uint8ClampedArray(a.imageData),this.project.width,this.project.height);e.putImageData(t,0,0)}catch(i){console.error(`Error loading image data for frame ${t}, layer ${e}:`,i)}s.layers.push(r)}this.project.frames.push(s)}e.history?this.historyManager.deserialize(e.history):this.historyManager.clear(),e.floatingColors&&this.loadFloatingColors(JSON.parse(e.floatingColors)),this.resetCanvasSize(),this.resetZoom(),this.render()}recreateProjectCanvases(){for(let e=0;e<this.project.frames.length;e++){const t=this.project.frames[e];for(let e=0;e<t.layers.length;e++){const i=t.layers[e];i.canvas=document.createElement("canvas"),i.canvas.width=this.project.width,i.canvas.height=this.project.height,i.imageData&&this.drawImageToCanvas(i.canvas,i.imageData)}}}drawImageToCanvas(e,t){return new Promise(i=>{const s=new Image;s.onload=()=>{this.getCanvasContext(e).drawImage(s,0,0),i()},s.src=t})}importImage(e,t="Imported Image"){return new Promise(t=>{const i=new Image;i.onload=()=>{this.newProject(i.width,i.height,i),this.render(),t()},i.src=e})}async importPSD(e,t){return new Promise((i,s)=>{try{let a;if("string"==typeof e)if(e.startsWith("data:")){const t=e.split(",")[1],i=atob(t);a=new ArrayBuffer(i.length);const s=new Uint8Array(a);for(let e=0;e<i.length;e++)s[e]=i.charCodeAt(e)}else{a=new ArrayBuffer(e.length);const t=new Uint8Array(a);for(let i=0;i<e.length;i++)t[i]=e.charCodeAt(i)}else{if(!(e instanceof ArrayBuffer)){if(e instanceof Blob){const a=new FileReader;return a.onload=e=>{this.importPSDFromBuffer(e.target.result,t).then(i).catch(s)},a.onerror=s,void a.readAsArrayBuffer(e)}return void s(new Error("Unsupported file format"))}a=e}const r=agPsd.readPsd(a);this.newProject(r.width,r.height);const n=this.project.frames[0];if(n.layers=[],r.children&&r.children.length>0)for(let e=0;e<r.children.length;e++){const t=r.children[e],i=this.createBlankLayer(r.width,r.height,t.name||`Layer ${e+1}`);if(i.visible=!1!==t.visible,t.canvas)i.ctx.drawImage(t.canvas,0,0);else if(t.imageData){const e=new ImageData(new Uint8ClampedArray(t.imageData),r.width,r.height);i.ctx.putImageData(e,0,0)}n.layers.push(i)}else{console.warn("PSD has no layer structure, creating merged layer");const e=this.createBlankLayer(r.width,r.height,"Merged");r.canvas&&e.ctx.drawImage(r.canvas,0,0),n.layers.push(e)}this.project.currentLayer=n.layers.length-1,this.updateLayersUI(),this.updateFramesUI(),this.render(),this.showToast(__(`PSD importado: ${t}||PSD imported: ${t}`)),i()}catch(e){console.error("Error importing PSD:",e),s(new Error("Failed to import PSD file"))}})}async importPSDFromBuffer(e,t){try{const i=agPsd.readPsd(e);this.newProject(i.width,i.height);const s=this.project.frames[0];if(s.layers=[],i.children&&i.children.length>0)for(let e=0;e<i.children.length;e++){const t=i.children[e],a=this.createBlankLayer(i.width,i.height,t.name||`Layer ${e+1}`);a.visible=!1!==t.visible,t.canvas&&a.ctx.drawImage(t.canvas,0,0),s.layers.push(a)}this.project.currentLayer=s.layers.length-1,this.updateLayersUI(),this.updateFramesUI(),this.render(),this.showToast(__(`PSD importado: ${t}||PSD imported: ${t}`))}catch(e){throw console.error("Error importing PSD from buffer:",e),e}}getProjectData(){const e={version:this.version,width:this.project.width,height:this.project.height,frames:[],floatingColors:this.getFloatingColorsData(),currentFrameTime:this.project.currentFrameTime,frameTimes:this.project.frameTimes,backgroundColor:this.transparentBackground?"transparent":this.secondaryColor,createdAt:(new Date).toISOString(),history:this.historyManager.serialize(),currentFrame:this.project.currentFrame,currentLayer:this.project.currentLayer};for(let t=0;t<this.project.frames.length;t++){const i=this.project.frames[t],s={layers:[]};for(let e=0;e<i.layers.length;e++){const t=i.layers[e],a=t.ctx.getImageData(0,0,this.project.width,this.project.height);s.layers.push({name:t.name||`Layer ${e+1}`,visible:void 0===t.visible||t.visible,imageData:Array.from(a.data)})}e.frames.push(s)}return JSON.stringify(e)}compressJSON(e){const t=JSON.stringify(e);let i="",s=1,a=t[0];for(let e=1;e<=t.length;e++){const r=t[e];r===a&&s<255?s++:(i+=s>3?`${String.fromCharCode(s)}${a}`:a.repeat(s),s=1,a=r)}return Object.entries({'{"':"",'"}':"",'":':"",',"':"",',"_':"",true:"",false:"\b",null:"\t","[]":"\n","{}":"\v"}).forEach(([e,t])=>{i=i.split(e).join(t)}),i}decompressJSON(e){let t=e;Object.entries({"":'{"',"":'"}',"":'":',"":',"',"":',"_',"":"true","\b":"false","\t":"null","\n":"[]","\v":"{}"}).forEach(([e,i])=>{t=t.split(e).join(i)});let i="",s=0;for(;s<t.length;)if(""===t[s]&&s+2<t.length){const e=t.charCodeAt(s+1);i+=t[s+2].repeat(e),s+=3}else i+=t[s],s++;return JSON.parse(i)}serializeSnapshot(e){if(!e)return null;const t={frames:[],currentFrame:e.currentFrame,currentLayer:e.currentLayer};for(let i=0;i<e.frames.length;i++){const s=e.frames[i],a={layers:[]};for(let e=0;e<s.layers.length;e++){const t=s.layers[e];a.layers.push({name:t.name,visible:t.visible,imageData:t.imageData?Array.from(t.imageData.data):null})}t.frames.push(a)}return t}deserializeSnapshot(e){if(!e)return null;const t={frames:[],currentFrame:e.currentFrame,currentLayer:e.currentLayer};for(let i=0;i<e.frames.length;i++){const s=e.frames[i],a={layers:[]};for(let e=0;e<s.layers.length;e++){const t=s.layers[e],i=t.imageData?new ImageData(new Uint8ClampedArray(t.imageData),this.project.width,this.project.height):null,r=document.createElement("canvas");r.width=this.project.width,r.height=this.project.height,this.drawImageToCanvas(r,i);const n={name:t.name,visible:t.visible,imageData:i,canvas:r,ctx:this.getCanvasContext(r)};a.layers.push(n)}t.frames.push(a)}return t}renderFrameToCanvas(e){const t=document.createElement("canvas");t.width=this.project.width,t.height=this.project.height;const i=this.getCanvasContext(t);for(let t=0;t<e.layers.length;t++){const s=e.layers[t];s.visible&&i.drawImage(s.canvas,0,0)}return t}createSpriteSheet(){const e=this.project.frames.length,t=Math.ceil(Math.sqrt(e)),i=Math.ceil(e/t),s=document.createElement("canvas");s.width=t*this.project.width,s.height=i*this.project.height;const a=this.getCanvasContext(s);for(let i=0;i<e;i++){const e=i%t,s=Math.floor(i/t),r=this.project.frames[i];for(let t=0;t<r.layers.length;t++){const i=r.layers[t];i.visible&&a.drawImage(i.canvas,e*this.project.width,s*this.project.height)}}return s}dataURLtoBlob(e){try{if(e instanceof Blob)return e;const t=e.split(","),i=t[0].match(/:(.*?);/)[1],s=atob(t[1]),a=new ArrayBuffer(s.length),r=new Uint8Array(a);for(let e=0;e<s.length;e++)r[e]=s.charCodeAt(e);return new Blob([a],{type:i})}catch(e){throw console.error("Error converting data URL to blob:",e),new Error("Invalid data URL format")}}distance(e,t,i,s){var a=e-i,r=t-s;return Math.sqrt(a*a+r*r)}getCurrentLayerContext(){if(!this.project)return null;return this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx}getPixelColor(e,t){if(!this.project||e<0||t<0||e>=this.project.width||t>=this.project.height)return null;const i=this.project.frames[this.project.currentFrame].layers[this.project.currentLayer].ctx;return this.getPixelColorFromCtx(i,e,t)}getPixelColorFromCtx(e,t,i){const s=e.getImageData(t,i,1,1);return 0===s.data[3]?"transparent":`#${this.componentToHex(s.data[0])}${this.componentToHex(s.data[1])}${this.componentToHex(s.data[2])}`}componentToHex(e){const t=e.toString(16);return 1===t.length?"0"+t:t}setColor(e){"primary"===this.selectedColor?this.primaryColor=e:this.secondaryColor=e,this.updateColorIndicator()}formatDate(e){const t=e=>e.toString().padStart(2,"0");return`${e.getFullYear()}${t(e.getMonth()+1)}${t(e.getDate())}_${t(e.getHours())}${t(e.getMinutes())}${t(e.getSeconds())}`}getColor(){return"primary"==this.selectedColor?this.primaryColor:this.secondaryColor}exitApp(){this.showPopup(__("Cerrar App||Exit App"),__("¿Estás seguro de que quieres irte ahora? Cualquier cambio no guardado se perderá para siempre.||Are you sure you want to leave now? Any unsaved changes will be lost forever."),[{text:"No",class:"cancel",action:()=>this.hidePopup()},{text:__("Sí||Yes"),action:()=>navigator.app.exitApp()}])}}
+const COPYRIGHT = "(C) RETORA 2026";
+const VERSION = "v1.0.1";
+const HOST = "wss://pixelite.onrender.com";
+const DEBUG = false;
+
+// Global language processor
+window.__ = function(text) {
+  if (typeof text !== 'string') return text;
+
+  // Get current language from SettingsManager if available
+  const language = window.settings?.getLanguage?.() || 0;
+
+  // First handle parenthetical cases (ES|EN) - these are the highest priority
+  // Matches patterns like (Hello|Hola) and replaces with the appropriate language
+  const parenRegex = /\(([^|)]+)\|([^)]+)\)/g;
+  text = text.replace(parenRegex, (match, enText, esText) => {
+    return language === 0 ? esText : enText;
+  });
+
+  // Then handle simple split case (text||text)
+  // These are lower priority and won't interfere with already processed parentheses
+  const simpleSplitRegex = /([^|(]+\|\|[^|)]+)/g;
+  text = text.replace(simpleSplitRegex, match => {
+    const parts = match.split('||');
+    return parts[language] || parts[0];
+  });
+  
+  // Fix some artifacts
+  text = text.replace('))', ')');
+
+  return text;
+};
+
+// Open external URL
+window.openExternalUrl = url => {
+  // Ensure URL is properly encoded
+  const encodedUrl = encodeURI(url);
+  
+  const isCordova = typeof window.cordova != undefined;
+  
+  if (isCordova) {
+    navigator.app.loadUrl(encodedUrl, { openExternal: true });
+  } else {
+    const a = document.createElement('a');
+    a.href = encodedUrl;
+    a.target = '_blank';
+    a.click();
+  }
+};
+
+// fetch() polyfill for file protocol 
+(function() {
+  'use strict';
+  
+  // Only apply polyfill if running in file protocol
+  if (window.location.protocol !== 'file:') {
+    return;
+  }
+
+  // Check if we need to polyfill
+  const originalFetch = window.fetch;
+
+  async function fileProtocolFetch(input, init = {}) {
+    // Handle Request object if passed
+    let url = input;
+    let options = { ...init };
+
+    if (input instanceof Request) {
+      url = input.url;
+      options = {
+        method: input.method,
+        headers: input.headers,
+        body: input.body,
+        mode: input.mode,
+        credentials: input.credentials,
+        cache: input.cache,
+        redirect: input.redirect,
+        referrer: input.referrer,
+        integrity: input.integrity,
+        ...init
+      };
+    }
+
+    // Parse URL to determine if it's relative or absolute
+    let fullUrl;
+    try {
+      fullUrl = new URL(url, window.location.href);
+    } catch (e) {
+      fullUrl = new URL(url);
+    }
+
+    // For absolute URLs with different protocol, use original fetch if available
+    if (fullUrl.protocol !== 'file:' && fullUrl.protocol !== 'about:' && originalFetch) {
+      return originalFetch(input, init);
+    }
+
+    // Handle file:// or relative paths
+    const filePath = fullUrl.href.replace(/^file:\/\//, '').replace(/^\//, '');
+    
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Determine method
+      const method = (options.method || 'GET').toUpperCase();
+      
+      xhr.open(method, fullUrl.href, true);
+      
+      // Set headers
+      if (options.headers) {
+        if (options.headers instanceof Headers) {
+          options.headers.forEach((value, key) => {
+            xhr.setRequestHeader(key, value);
+          });
+        } else if (Array.isArray(options.headers)) {
+          options.headers.forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+          });
+        } else if (typeof options.headers === 'object') {
+          Object.entries(options.headers).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+          });
+        }
+      }
+      
+      // Set response type for blob/buffer/etc
+      if (options.responseType) {
+        xhr.responseType = options.responseType;
+      }
+      
+      // Handle credentials
+      xhr.withCredentials = options.credentials === 'include';
+      
+      // Handle timeout
+      if (options.timeout) {
+        xhr.timeout = options.timeout;
+      }
+      
+      // Create Response object
+      function createResponse(xhr) {
+        const headers = new Headers();
+        const responseHeaders = xhr.getAllResponseHeaders();
+        responseHeaders.split('\r\n').forEach(line => {
+          const [key, value] = line.split(': ');
+          if (key && value) {
+            headers.append(key, value);
+          }
+        });
+        
+        let body = xhr.response;
+        
+        // Handle different response types
+        if (xhr.responseType === '' || xhr.responseType === 'text') {
+          body = xhr.responseText;
+        }
+        
+        const responseInit = {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: headers
+        };
+        
+        return new Response(body, responseInit);
+      }
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(createResponse(xhr));
+        } else {
+          reject(new TypeError(`Failed to fetch: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      
+      xhr.onerror = () => {
+        reject(new TypeError('Failed to fetch: Network error'));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new TypeError('Failed to fetch: Timeout'));
+      };
+      
+      // Send request
+      if (options.body) {
+        xhr.send(options.body);
+      } else {
+        xhr.send();
+      }
+    });
+  }
+
+  // Override fetch
+  window.fetch = fileProtocolFetch;
+  
+  // Also polyfill window.fetch if needed for older browsers
+  if (!window.Promise) {
+    console.warn('Promise polyfill required for fetch polyfill');
+  }
+})();
+
+// Settings Manager Class
+class SettingsManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.categories = [];
+    this.settings = new Map();
+    this.values = new Map();
+    this.listeners = new Map();
+    this.initialized = false;
+    this.language = 0; // 0 = Español, 1 = English
+    
+    // Load saved settings
+    this.load();
+  }
+
+  // Category management
+  addCategory(config) {
+    const category = {
+      id: config.id || `category-${this.categories.length}`,
+      title: config.title || 'Category',
+      icon: config.icon || 'icon-settings',
+      settings: [],
+      addSetting: setting => this.addSetting(config.id, setting)
+    };
+    
+    this.categories.push(category);
+    return category;
+  }
+
+  // Add setting to category
+  addSetting(categoryId, config) {
+    const category = this.categories.find(c => c.id === categoryId);
+    if (!category) throw new Error(`Category ${categoryId} not found`);
+
+    const setting = {
+      id: config.id || `setting-${Date.now()}-${Math.random()}`,
+      label: config.label || 'Setting',
+      description: config.description || '',
+      type: config.type || 'boolean', // 'boolean', 'number', 'select', 'text', 'color', 'range'
+      defaultValue: config.defaultValue,
+      value: config.defaultValue,
+      options: config.options || [], // for select type
+      min: config.min,
+      max: config.max,
+      step: config.step,
+      
+      // Callbacks
+      needsReload: config.needsReload || false,
+      onInit: config.onInit || null,
+      onUpdate: config.onUpdate || null,
+      
+      // UI
+      visible: config.visible !== false,
+      disabled: config.disabled || false
+    };
+
+    category.settings.push(setting);
+    this.settings.set(setting.id, setting);
+    
+    // Set initial value
+    const savedValue = this.values.get(setting.id);
+    if (savedValue !== undefined) {
+      setting.value = savedValue;
+    } else {
+      this.values.set(setting.id, setting.defaultValue);
+    }
+    
+    return setting;
+  }
+
+  // Get setting value
+  get(settingId) {
+    return this.values.get(settingId);
+  }
+
+  // Get language (for global __ function)
+  getLanguage() {
+    return this.language;
+  }
+
+  // Update setting value
+  set(settingId, value, skipSave = false) {
+    const setting = this.settings.get(settingId);
+    if (!setting) return false;
+
+    const oldValue = this.values.get(settingId);
+    if (oldValue === value) return false;
+
+    // Update value
+    this.values.set(settingId, value);
+    setting.value = value;
+
+    // Trigger onUpdate callback
+    if (setting.onUpdate) {
+      setting.onUpdate(value, oldValue, this.editor);
+    }
+
+    // Notify listeners
+    if (this.listeners.has(settingId)) {
+      this.listeners.get(settingId).forEach(cb => cb(value, oldValue));
+    }
+
+    // Auto-save if not skipped
+    if (!skipSave) {
+      this.save();
+    }
+
+    // Check if reload needed
+    if (setting.needsReload) {
+      this.pendingReload = true;
+    }
+
+    return true;
+  }
+
+  // Subscribe to setting changes
+  subscribe(settingId, callback) {
+    if (!this.listeners.has(settingId)) {
+      this.listeners.set(settingId, []);
+    }
+    this.listeners.get(settingId).push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const listeners = this.listeners.get(settingId);
+      const index = listeners.indexOf(callback);
+      if (index > -1) listeners.splice(index, 1);
+    };
+  }
+
+  // Initialize all settings
+  init() {
+    if (this.initialized) return;
+    
+    // Run onInit for all settings
+    this.settings.forEach(setting => {
+      if (setting.onInit) {
+        setting.onInit(this.get(setting.id), this.editor);
+      }
+    });
+    
+    this.initialized = true;
+  }
+
+  // Save settings to localStorage
+  save() {
+    const saveData = {
+      language: this.language,
+      values: {}
+    };
+    
+    this.values.forEach((value, key) => {
+      saveData.values[key] = value;
+    });
+    
+    localStorage.setItem('app_settings', JSON.stringify(saveData));
+  }
+
+  // Load settings from localStorage
+  load() {
+    try {
+      const saved = localStorage.getItem('app_settings');
+      if (saved) {
+        const data = JSON.parse(saved);
+        this.language = data.language || 0;
+        
+        if (data.values) {
+          Object.entries(data.values).forEach(([key, value]) => {
+            this.values.set(key, value);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load settings:', e);
+    }
+  }
+
+  // Reset setting to default
+  reset(settingId) {
+    const setting = this.settings.get(settingId);
+    if (setting) {
+      this.set(settingId, setting.defaultValue);
+    }
+  }
+
+  // Reset all settings to defaults
+  resetAll() {
+    this.settings.forEach(setting => {
+      this.set(setting.id, setting.defaultValue, true);
+    });
+    this.save();
+  }
+
+  // Check if restart is needed
+  isRestartNeeded() {
+    return this.pendingReload || false;
+  }
+}
+
+// Settings UI Manager
+class SettingsUI {
+  constructor(settingsManager, editor) {
+    this.settings = settingsManager;
+    this.editor = editor;
+    this.visible = false;
+    
+    this.initUI();
+  }
+
+  initUI() {
+    // Create overlay (full screen, no backdrop)
+    this.overlay = document.createElement('div');
+    this.overlay.className = 'settings-overlay';
+    this.overlay.style.display = 'none';
+    
+    // Create container (full screen)
+    this.container = document.createElement('div');
+    this.container.className = 'settings-container';
+    this.overlay.appendChild(this.container);
+
+    // Header with app-style
+    this.header = document.createElement('div');
+    this.header.className = 'settings-header';
+    this.container.appendChild(this.header);
+
+    this.title = document.createElement('div');
+    this.title.className = 'settings-title';
+    this.title.textContent = __('Ajustes||Settings');
+    this.header.appendChild(this.title);
+
+    this.closeBtn = document.createElement('button');
+    this.closeBtn.className = 'settings-close';
+    this.closeBtn.innerHTML = '&times;';
+    this.closeBtn.addEventListener('click', () => this.hide());
+    this.header.appendChild(this.closeBtn);
+
+    // Main content area
+    this.mainContent = document.createElement('div');
+    this.mainContent.className = 'settings-main';
+    this.container.appendChild(this.mainContent);
+
+    // Sidebar with categories (like app bottom bar)
+    this.sidebar = document.createElement('div');
+    this.sidebar.className = 'settings-sidebar';
+    this.mainContent.appendChild(this.sidebar);
+
+    // Content area
+    this.content = document.createElement('div');
+    this.content.className = 'settings-content';
+    this.mainContent.appendChild(this.content);
+
+    // Footer with action buttons (like app top bar)
+    this.footer = document.createElement('div');
+    this.footer.className = 'settings-footer';
+    this.container.appendChild(this.footer);
+
+    this.resetAllBtn = document.createElement('button');
+    this.resetAllBtn.className = 'settings-btn secondary';
+    this.resetAllBtn.textContent = __('Restablecer todo||Reset all');
+    this.resetAllBtn.addEventListener('click', () => this.showResetConfirm());
+    this.footer.appendChild(this.resetAllBtn);
+
+    this.doneBtn = document.createElement('button');
+    this.doneBtn.className = 'settings-btn primary';
+    this.doneBtn.textContent = __('Hecho||Done');
+    this.doneBtn.addEventListener('click', () => this.hide());
+    this.footer.appendChild(this.doneBtn);
+
+    setTimeout(() => this.editor.editorElement.appendChild(this.overlay));
+
+    // Build category list
+    this.buildCategories();
+    
+    // Show first category by default
+    if (this.settings.categories.length > 0) {
+      this.showCategory(this.settings.categories[0].id);
+    }
+  }
+
+  buildCategories() {
+    this.sidebar.innerHTML = '';
+    
+    this.settings.categories.forEach(category => {
+      const item = document.createElement('div');
+      item.className = 'settings-category-item';
+      item.dataset.category = category.id;
+      
+      const icon = document.createElement('span');
+      icon.className = `icon ${category.icon}`;
+      
+      const label = document.createElement('span');
+      label.textContent = __(category.title);
+      
+      item.appendChild(icon);
+      item.appendChild(label);
+      
+      item.addEventListener('click', () => this.showCategory(category.id));
+      
+      this.sidebar.appendChild(item);
+    });
+  }
+
+  showCategory(categoryId) {
+    // Update active state
+    document.querySelectorAll('.settings-category-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.category === categoryId);
+    });
+
+    const category = this.settings.categories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    this.content.innerHTML = '';
+    
+    const categoryTitle = document.createElement('h3');
+    categoryTitle.className = 'settings-category-title';
+    categoryTitle.textContent = __(category.title);
+    this.content.appendChild(categoryTitle);
+
+    category.settings.forEach(setting => {
+      if (!setting.visible) return;
+      
+      const settingElement = this.createSettingElement(setting);
+      this.content.appendChild(settingElement);
+    });
+  }
+
+  createSettingElement(setting) {
+    const container = document.createElement('div');
+    container.className = `setting-item ${setting.disabled ? 'disabled' : ''}`;
+    container.dataset.setting = setting.id;
+
+    const infoContainer = document.createElement('div');
+    infoContainer.className = 'setting-info';
+    
+    const label = document.createElement('div');
+    label.className = 'setting-label';
+    label.textContent = __(setting.label);
+    
+    const description = document.createElement('div');
+    description.className = 'setting-description';
+    description.textContent = __(setting.description);
+    
+    infoContainer.appendChild(label);
+    infoContainer.appendChild(description);
+    
+    const control = document.createElement('div');
+    control.className = 'setting-control';
+
+    switch (setting.type) {
+      case 'boolean':
+        this.createBooleanControl(control, setting);
+        break;
+      case 'number':
+      case 'range':
+        this.createRangeControl(control, setting);
+        break;
+      case 'select':
+        this.createSelectControl(control, setting);
+        break;
+      case 'text':
+        this.createTextControl(control, setting);
+        break;
+      case 'color':
+        this.createColorControl(control, setting);
+        break;
+    }
+
+    container.appendChild(infoContainer);
+    container.appendChild(control);
+
+    return container;
+  }
+
+  createBooleanControl(control, setting) {
+    const toggle = document.createElement('label');
+    toggle.className = 'switch';
+    
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = this.settings.get(setting.id);
+    input.disabled = setting.disabled;
+    
+    const slider = document.createElement('span');
+    slider.className = 'slider';
+    
+    toggle.appendChild(input);
+    toggle.appendChild(slider);
+    control.appendChild(toggle);
+
+    input.addEventListener('change', (e) => {
+      this.settings.set(setting.id, e.target.checked);
+      if (setting.needsReload) {
+        this.showRestartWarning();
+      }
+    });
+
+    this.settings.subscribe(setting.id, (value) => {
+      input.checked = value;
+    });
+  }
+
+  createRangeControl(control, setting) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'range-wrapper';
+    
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = setting.min || 0;
+    input.max = setting.max || 100;
+    input.step = setting.step || 1;
+    input.value = this.settings.get(setting.id);
+    input.disabled = setting.disabled;
+    
+    const valueDisplay = document.createElement('input');
+    valueDisplay.className = 'range-value';
+    valueDisplay.type = 'number';
+    valueDisplay.min = setting.min || 0;
+    valueDisplay.max = setting.max || 100;
+    valueDisplay.value = input.value;
+    valueDisplay.disabled = setting.disabled;
+    
+    wrapper.appendChild(input);
+    wrapper.appendChild(valueDisplay);
+    control.appendChild(wrapper);
+
+    input.addEventListener('input', (e) => {
+      valueDisplay.value = e.target.value;
+    });
+    
+    valueDisplay.addEventListener('input', (e) => {
+      input.value = e.target.value;
+    });
+
+    const changeHandler = (e) => {
+      this.settings.set(setting.id, parseInt(e.target.value));
+      if (setting.needsReload) {
+        this.showRestartWarning();
+      }
+    };
+    
+    input.addEventListener("change", (e) => changeHandler(e));
+    valueDisplay.addEventListener("change", (e) => changeHandler(e));
+
+    this.settings.subscribe(setting.id, (value) => {
+      input.value = value;
+      valueDisplay.value = value;
+    });
+  }
+
+  createSelectControl(control, setting) {
+    const select = document.createElement('select');
+    select.disabled = setting.disabled;
+    
+    setting.options.forEach(option => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = __(option.label);
+      opt.selected = option.value === this.settings.get(setting.id);
+      select.appendChild(opt);
+    });
+    
+    control.appendChild(select);
+
+    select.addEventListener('change', (e) => {
+      this.settings.set(setting.id, e.target.value);
+      if (setting.needsReload) {
+        this.showRestartWarning();
+      }
+    });
+
+    this.settings.subscribe(setting.id, (value) => {
+      select.value = value;
+    });
+  }
+
+  createTextControl(control, setting) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = this.settings.get(setting.id);
+    input.disabled = setting.disabled;
+    input.placeholder = setting.placeholder || '';
+    
+    control.appendChild(input);
+
+    input.addEventListener('change', (e) => {
+      this.settings.set(setting.id, e.target.value);
+      if (setting.needsReload) {
+        this.showRestartWarning();
+      }
+    });
+
+    this.settings.subscribe(setting.id, (value) => {
+      input.value = value;
+    });
+  }
+
+  createColorControl(control, setting) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'color-wrapper';
+    
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = this.settings.get(setting.id);
+    input.disabled = setting.disabled;
+    
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.value = this.settings.get(setting.id);
+    textInput.disabled = setting.disabled;
+    
+    wrapper.appendChild(input);
+    wrapper.appendChild(textInput);
+    control.appendChild(wrapper);
+
+    input.addEventListener('input', (e) => {
+      textInput.value = e.target.value;
+    });
+
+    textInput.addEventListener('input', (e) => {
+      if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+        input.value = e.target.value;
+      }
+    });
+
+    input.addEventListener('change', (e) => {
+      this.settings.set(setting.id, e.target.value);
+      if (setting.needsReload) {
+        this.showRestartWarning();
+      }
+    });
+
+    textInput.addEventListener('change', (e) => {
+      if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+        this.settings.set(setting.id, e.target.value);
+      }
+    });
+
+    this.settings.subscribe(setting.id, (value) => {
+      input.value = value;
+      textInput.value = value;
+    });
+  }
+
+  showRestartWarning() {
+    this.editor.showButtonToast(
+      __('Algunos cambios requieren reiniciar||Some changes require restart'),
+      __('Reiniciar||Restart'),
+      () => {
+        this.editor.showPopup(
+          __('Reiniciar aplicación||Restart app'),
+          __('¿Reiniciar la app? Los cambios sin guardar se perderán||Restart the app? Unsaved changes will be lost'),
+          [
+            {
+              text: __('No||No'),
+              class: "cancel",
+              action: () => {
+                this.editor.hidePopup();
+              }
+            },
+            {
+              text: __('Sí||Yes'),
+              action: () => {
+                window.location.reload();
+              }
+            }
+          ]
+        );
+      }
+    );
+  }
+
+  showResetConfirm() {
+    if (this.editor) {
+      this.editor.showPopup(
+        __('Restablecer ajustes||Reset settings'),
+        __('¿Estás seguro?||Are you sure?'),
+        [
+          {
+            text: __('Cancelar||Cancel'),
+            class: 'cancel',
+            action: () => this.editor.hidePopup()
+          },
+          {
+            text: __('Restablecer||Reset'),
+            action: () => {
+              this.settings.resetAll();
+              this.showCategory(this.settings.categories[0].id);
+              this.editor.hidePopup();
+            }
+          }
+        ]
+      );
+    }
+  }
+
+  show() {
+    this.overlay.style.display = 'flex';
+    this.visible = true;
+    
+    this.buildCategories();
+    if (this.settings.categories.length > 0) {
+      this.showCategory(this.settings.categories[0].id);
+    }
+  }
+
+  hide() {
+    this.overlay.style.display = 'none';
+    this.visible = false;
+  }
+
+  toggle() {
+    if (this.visible) {
+      this.hide();
+    } else {
+      this.show();
+    }
+  }
+}
+
+// Grid Manager Class
+class GridManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.grids = [];
+    this.panelVisible = false;
+    
+    this.initOverlay();
+    this.initUI();
+  }
+
+  initOverlay() {
+    // Create or get grid overlay
+    this.overlay = document.querySelector('.grid-overlay');
+    if (!this.overlay) {
+      this.overlay = document.createElement('div');
+      this.overlay.className = 'grid-overlay';
+      this.editor.canvasWrapper.appendChild(this.overlay);
+    }
+  }
+
+  initUI() {
+    // Grid panel
+    this.panel = document.createElement('div');
+    this.panel.className = 'grid-panel';
+    
+    // Header
+    const header = document.createElement('div');
+    header.className = 'grid-panel-header';
+    
+    const title = document.createElement('div');
+    title.className = 'grid-panel-title';
+    title.textContent = __('Cuadrículas||Grids');
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'grid-panel-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', () => this.hide());
+    
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    this.panel.appendChild(header);
+
+    // Toolbar
+    const toolbar = document.createElement('div');
+    toolbar.className = 'grid-toolbar';
+    
+    const addBtn = document.createElement('button');
+    addBtn.className = 'grid-btn primary';
+    addBtn.innerHTML = `
+      <span class="icon icon-add"></span>
+      <span>${__('Añadir cuadrícula||Add grid')}</span>
+    `;
+    addBtn.addEventListener('click', () => this.addGrid());
+    
+    toolbar.appendChild(addBtn);
+    this.panel.appendChild(toolbar);
+
+    // Grid list container
+    this.listContainer = document.createElement('div');
+    this.listContainer.className = 'grid-list';
+    this.panel.appendChild(this.listContainer);
+
+    // Add to editor
+    this.editor.uiLayer.appendChild(this.panel);
+  }
+
+  addGrid() {
+    const newGrid = {
+      id: 'grid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      width: 8,
+      height: 8,
+      color: '#ff0000',
+      opacity: 0.3,
+      enabled: true
+    };
+    
+    this.grids.push(newGrid);
+    this.renderList();
+    this.renderGrids();
+  }
+
+  removeGrid(id) {
+    this.grids = this.grids.filter(g => g.id !== id);
+    this.renderList();
+    this.renderGrids();
+  }
+
+  duplicateGrid(id) {
+    const original = this.grids.find(g => g.id === id);
+    if (original) {
+      const newGrid = {
+        id: 'grid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        width: original.width,
+        height: original.height,
+        color: original.color,
+        opacity: original.opacity,
+        enabled: original.enabled
+      };
+      const index = this.grids.findIndex(g => g.id === id);
+      this.grids.splice(index + 1, 0, newGrid);
+      this.renderList();
+      this.renderGrids();
+    }
+  }
+
+  moveGridDown(id) {
+    const index = this.grids.findIndex(g => g.id === id);
+    if (index < this.grids.length - 1) {
+      const temp = this.grids[index];
+      this.grids[index] = this.grids[index + 1];
+      this.grids[index + 1] = temp;
+      this.renderList();
+      this.renderGrids();
+    }
+  }
+
+  moveGridUp(id) {
+    const index = this.grids.findIndex(g => g.id === id);
+    if (index > 0) {
+      const temp = this.grids[index];
+      this.grids[index] = this.grids[index - 1];
+      this.grids[index - 1] = temp;
+      this.renderList();
+      this.renderGrids();
+    }
+  }
+
+  updateGrid(id, updates) {
+    const grid = this.grids.find(g => g.id === id);
+    if (grid) {
+      Object.assign(grid, updates);
+      this.renderList();
+      this.renderGrids();
+    }
+  }
+
+  renderList() {
+    this.listContainer.innerHTML = '';
+    
+    if (this.grids.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'grid-empty';
+      empty.textContent = __('Sin cuadrículas||No grids');
+      this.listContainer.appendChild(empty);
+      return;
+    }
+
+    this.grids.forEach((grid, idx) => {
+      const item = document.createElement('div');
+      item.className = 'grid-item';
+      item.dataset.id = grid.id;
+      if (idx === this.grids.length - 1) {
+        item.style.borderBottom = 'none';
+      }
+
+      // Info container
+      const info = document.createElement('div');
+      info.className = 'grid-info';
+      
+      // Title row with inline inputs
+      const titleRow = document.createElement('div');
+      titleRow.className = 'grid-title-row';
+      
+      const widthInput = document.createElement('input');
+      widthInput.type = 'number';
+      widthInput.className = 'grid-dimension-input';
+      widthInput.value = grid.width;
+      widthInput.min = 1;
+      widthInput.max = 256;
+      widthInput.step = 1;
+      widthInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (isNaN(value)) value = grid.width;
+        value = Math.max(1, Math.min(256, value));
+        widthInput.value = value;
+        this.updateGrid(grid.id, { width: value });
+      });
+      
+      const xSpan = document.createElement('span');
+      xSpan.className = 'grid-dimension-sep';
+      xSpan.textContent = '×';
+      
+      const heightInput = document.createElement('input');
+      heightInput.type = 'number';
+      heightInput.className = 'grid-dimension-input';
+      heightInput.value = grid.height;
+      heightInput.min = 1;
+      heightInput.max = 256;
+      heightInput.step = 1;
+      heightInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (isNaN(value)) value = grid.height;
+        value = Math.max(1, Math.min(256, value));
+        heightInput.value = value;
+        this.updateGrid(grid.id, { height: value });
+      });
+      
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.className = 'grid-color-inline';
+      colorInput.value = grid.color;
+      colorInput.addEventListener('change', (e) => {
+        this.updateGrid(grid.id, { color: e.target.value });
+      });
+      
+      titleRow.appendChild(widthInput);
+      titleRow.appendChild(xSpan);
+      titleRow.appendChild(heightInput);
+      titleRow.appendChild(colorInput);
+      
+      // Controls row
+      const controlsRow = document.createElement('div');
+      controlsRow.className = 'grid-controls-row';
+      
+      // Opacity control
+      const opacityControl = document.createElement('div');
+      opacityControl.className = 'grid-opacity-control';
+      
+      const opacityLabel = document.createElement('span');
+      opacityLabel.className = 'grid-opacity-label';
+      opacityLabel.textContent = __('Opacidad||Opacity') + ':';
+      
+      const opacitySlider = document.createElement('input');
+      opacitySlider.type = 'range';
+      opacitySlider.className = 'grid-opacity-slider';
+      opacitySlider.min = 0;
+      opacitySlider.max = 100;
+      opacitySlider.value = Math.round(grid.opacity * 100);
+      opacitySlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        opacityValue.textContent = value + '%';
+        this.updateGrid(grid.id, { opacity: value / 100 });
+      });
+      
+      const opacityValue = document.createElement('span');
+      opacityValue.className = 'grid-opacity-value';
+      opacityValue.textContent = Math.round(grid.opacity * 100) + '%';
+      
+      opacityControl.appendChild(opacityLabel);
+      opacityControl.appendChild(opacitySlider);
+      opacityControl.appendChild(opacityValue);
+      
+      controlsRow.appendChild(opacityControl);
+      
+      info.appendChild(titleRow);
+      info.appendChild(controlsRow);
+      
+      // Actions container
+      const actions = document.createElement('div');
+      actions.className = 'grid-actions';
+      
+      // Toggle visibility button
+      const visibilityBtn = document.createElement('button');
+      visibilityBtn.className = 'ui-button grid-action-btn';
+      visibilityBtn.innerHTML = grid.enabled ? 
+        '<div class="icon icon-visible"></div>' : 
+        '<div class="icon icon-hidden"></div>';
+      visibilityBtn.title = __('Visibilidad||Toggle Visibility');
+      visibilityBtn.addEventListener('click', () => {
+        this.updateGrid(grid.id, { enabled: !grid.enabled });
+      });
+      actions.appendChild(visibilityBtn);
+      
+      // Move up button
+      const moveUpBtn = document.createElement('button');
+      moveUpBtn.className = 'ui-button grid-action-btn';
+      moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
+      moveUpBtn.title = __('Subir||Move Up');
+      if (idx > 0) {
+        moveUpBtn.addEventListener('click', () => this.moveGridUp(grid.id));
+      } else {
+        moveUpBtn.disabled = true;
+        moveUpBtn.classList.add('disabled');
+      }
+      actions.appendChild(moveUpBtn);
+      
+      // Move down button
+      const moveDownBtn = document.createElement('button');
+      moveDownBtn.className = 'ui-button grid-action-btn';
+      moveDownBtn.innerHTML = '<div class="icon icon-down"></div>';
+      moveDownBtn.title = __('Bajar||Move Down');
+      if (idx < this.grids.length - 1) {
+        moveDownBtn.addEventListener('click', () => this.moveGridDown(grid.id));
+      } else {
+        moveDownBtn.disabled = true;
+        moveDownBtn.classList.add('disabled');
+      }
+      actions.appendChild(moveDownBtn);
+      
+      // Duplicate button
+      const duplicateBtn = document.createElement('button');
+      duplicateBtn.className = 'ui-button grid-action-btn';
+      duplicateBtn.innerHTML = '<div class="icon icon-copy"></div>';
+      duplicateBtn.title = __('Duplicar||Duplicate');
+      duplicateBtn.addEventListener('click', () => this.duplicateGrid(grid.id));
+      actions.appendChild(duplicateBtn);
+      
+      // Remove button
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'ui-button grid-action-btn';
+      removeBtn.innerHTML = '<div class="icon icon-close"></div>';
+      removeBtn.title = __('Eliminar||Remove');
+      removeBtn.addEventListener('click', () => this.removeGrid(grid.id));
+      actions.appendChild(removeBtn);
+      
+      item.appendChild(info);
+      item.appendChild(actions);
+      
+      this.listContainer.appendChild(item);
+    });
+  }
+
+  renderGrids() {
+    // Clear overlay
+    this.overlay.innerHTML = '';
+
+    // Get canvas transform
+    const width = this.editor.project.width;
+    const height = this.editor.project.height;
+
+    // Set overlay size
+    Object.assign(this.overlay.style, {
+      position: 'absolute',
+      width: width + 'px',
+      height: height + 'px'
+    });
+
+    // Render each enabled grid
+    this.grids.forEach(grid => {
+      if (!grid.enabled) return;
+
+      const gridLayer = document.createElement('div');
+      gridLayer.className = 'grid-layer';
+      
+      // Create grid pattern using linear gradients
+      const horizontalGradient = `linear-gradient(to bottom, 
+        ${grid.color} 1px, 
+        transparent 1px
+      )`;
+      
+      const verticalGradient = `linear-gradient(to right, 
+        ${grid.color} 1px, 
+        transparent 1px
+      )`;
+      
+      // We don't want to show grids at the same pixel size of canvas so reduce scale to have a thinner line
+      const scale = 8;
+
+      // Calculate scaled grid size
+      const scaledWidth = Math.max(1, grid.width * scale);
+      const scaledHeight = Math.max(1, grid.height * scale);
+
+      Object.assign(gridLayer.style, {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: 100 * scale + '%',
+        height: 100 * scale + '%',
+        backgroundImage: `${verticalGradient}, ${horizontalGradient}`,
+        backgroundSize: `${scaledWidth}px ${scaledHeight}px`,
+        transform: `scale(${1 / scale})`,
+        transformOrigin: '0 0',
+        backgroundPosition: `-1px -1px`,
+        backgroundRepeat: 'repeat',
+        opacity: grid.opacity,
+        pointerEvents: 'none',
+        zIndex: '10'
+      });
+
+      this.overlay.appendChild(gridLayer);
+    });
+  }
+
+  show() {
+    // Hide other panels
+    this.editor.menuPanel.classList.remove('visible');
+    this.editor.animationPanel.classList.remove('visible');
+    this.editor.layersPanel.classList.remove('visible');
+    this.editor.animationButton.classList.remove('active');
+    this.editor.layersButton.classList.remove('active');
+    
+    // Show our panel
+    this.panel.classList.add('visible');
+    this.editor.gridsButton.classList.add("active");
+    this.panelVisible = true;
+    this.renderList();
+    this.renderGrids();
+  }
+
+  hide() {
+    this.panel.classList.remove('visible');
+    this.editor.menuPanel.classList.remove('visible');
+    this.editor.gridsButton.classList.remove("active");
+    this.panelVisible = false;
+  }
+
+  toggle() {
+    if (this.panelVisible) {
+      this.hide();
+    } else {
+      this.show();
+    }
+  }
+
+  updateTransform() {
+    this.renderGrids();
+  }
+}
+
+class ReferenceManager {
+  constructor(editor) {
+    this.editor = editor;
+    
+    // Trace reference (single)
+    this.traceImage = null;
+    this.traceOpacity = 0.5;
+    this.traceOnTop = false;
+    
+    // Floating references (multiple)
+    this.floatingRefs = [];
+    this.nextId = 1;
+    this.selectedRef = null;
+    
+    // Drag state
+    this.dragState = null;
+    this.resizeState = null;
+    
+    // UI Elements
+    this.traceControls = null;
+    this.floatingContainer = null;
+    this.deleteZone = null;
+    
+    this.init();
+  }
+
+  init() {
+    this.createTraceControls();
+    this.createFloatingContainer();
+    this.setupDeleteZone();
+    this.setupEventListeners();
+  }
+
+  createTraceControls() {
+    // Create trace reference controls
+    this.traceControls = document.createElement("div");
+    this.traceControls.className = "trace-reference-controls";
+    
+    // Opacity control
+    const opacityContainer = document.createElement("div");
+    opacityContainer.className = "trace-opacity-control";
+    
+    this.traceOpacityValue = document.createElement("span");
+    this.traceOpacityValue.className = "trace-opacity-value";
+    this.traceOpacityValue.textContent = this.traceOpacity * 100 + "%";
+    opacityContainer.appendChild(this.traceOpacityValue);
+    
+    this.traceOpacitySlider = document.createElement("input");
+    this.traceOpacitySlider.type = "range";
+    this.traceOpacitySlider.min = "0";
+    this.traceOpacitySlider.max = "100";
+    this.traceOpacitySlider.value = this.traceOpacity * 100;
+    this.traceOpacitySlider.className = "trace-opacity-slider";
+    this.traceOpacitySlider.addEventListener("input", (e) => {
+      this.traceOpacity = parseInt(e.target.value) / 100;
+      this.updateOpacityValue(e.target.value + "%");
+      this.editor.render();
+    });
+    opacityContainer.appendChild(this.traceOpacitySlider);
+    
+    this.traceControls.appendChild(opacityContainer);
+    
+    // Toggle top/bottom button
+    this.traceToggleBtn = this.editor.createButton("trace-toggle", "icon-switch-tool", () => {
+      this.traceOnTop = !this.traceOnTop;
+      this.editor.render();
+    });
+    this.traceToggleBtn.title = __("Alternar capa||Toggle Layer");
+    this.traceControls.appendChild(this.traceToggleBtn);
+    
+    // Remove button
+    this.traceRemoveBtn = this.editor.createButton("trace-remove", "icon-close", () => {
+      this.removeTraceReference();
+    });
+    this.traceRemoveBtn.title = __("Eliminar||Remove");
+    this.traceControls.appendChild(this.traceRemoveBtn);
+    
+    this.editor.uiLayer.appendChild(this.traceControls);
+  }
+
+  createFloatingContainer() {
+    this.floatingContainer = document.createElement("div");
+    this.floatingContainer.className = "floating-references-container";
+    this.editor.overlayLayer.appendChild(this.floatingContainer);
+  }
+
+  setupDeleteZone() {
+    this.deleteZone = document.createElement("div");
+    this.deleteZone.className = "delete-zone";
+    this.deleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.editor.overlayLayer.appendChild(this.deleteZone);
+  }
+
+  setupEventListeners() {
+    // Global mouse/touch events for dragging
+    document.addEventListener("mousemove", (e) => this.handleDragMove(e));
+    document.addEventListener("mouseup", (e) => this.handleDragEnd(e));
+    document.addEventListener("touchmove", (e) => this.handleDragMove(e), { passive: false });
+    document.addEventListener("touchend", (e) => this.handleDragEnd(e));
+    document.addEventListener("touchcancel", (e) => this.handleDragEnd(e));
+    
+    // Delete zone events
+    this.deleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.deleteZone.classList.add("drag-over");
+    });
+    
+    this.deleteZone.addEventListener("dragleave", () => {
+      this.deleteZone.classList.remove("drag-over");
+    });
+    
+    this.deleteZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      this.deleteZone.classList.remove("drag-over");
+      
+      if (this.selectedRef) {
+        this.removeFloatingReference(this.selectedRef.id);
+        this.selectedRef = null;
+      }
+    });
+  }
+
+  // Method to show reference type selection
+  showReferenceTypeDialog() {
+    this.editor.showPopup(
+      __("Cargar Referencia||Load Reference"),
+      __("¿Qué tipo de referencia quieres cargar?||What type of reference do you want to load?"),
+      [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => this.editor.hidePopup()
+        },
+        {
+          text: __("Traza||Trace"),
+          action: () => {
+            this.editor.hidePopup();
+            this.loadReference("trace");
+          }
+        },
+        {
+          text: __("Flotante||Floating"),
+          action: () => {
+            this.editor.hidePopup();
+            this.loadReference("floating");
+          }
+        }
+      ]
+    );
+  }
+  
+  loadReference(type) {
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Cargar imagen||Load image"),
+      mode: "open",
+      fileTypes: ["png", "jpg", "jpeg", "gif","webp"],
+      onConfirm: async (fileInfo) => {
+        try {
+          const fileData = await this.editor.readFile(fileInfo);
+          await this.createReference(type, fileData);
+        } catch (error) {
+          this.editor.showToast(__(`Error al cargar imagen: ${error.message}||Error loading image: ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+
+  async createReference(type, imageData) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        if (type === "trace") {
+          this.setTraceReference(img);
+        } else {
+          this.addFloatingReference(img);
+        }
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = imageData;
+    });
+  }
+
+  setTraceReference(img) {
+    // Remove existing trace
+    this.traceImage = img;
+    
+    // Show controls
+    this.traceControls.classList.add("visible");
+    
+    // Center image in view
+    const containerRect = this.editor.canvasContainer.getBoundingClientRect();
+    const scale = Math.min(
+      containerRect.width / img.width * 0.8,
+      containerRect.height / img.height * 0.8
+    );
+    
+    // Store for rendering
+    this.traceImageData = {
+      img: img,
+      scale: scale,
+      x: 0,
+      y: 0
+    };
+    
+    this.editor.render();
+    this.editor.showToast(__("Referencia de traza cargada||Trace reference loaded"));
+  }
+
+  addFloatingReference(img) {
+    const id = `ref_${this.nextId++}`;
+    
+    // Get container dimensions
+    const containerRect = this.editor.canvasContainer.getBoundingClientRect();
+    
+    // Calculate initial size and position
+    const maxSize = 200;
+    const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+    const width = img.width * scale;
+    const height = img.height * scale;
+    
+    // Center in view
+    const x = (containerRect.width - width) / 2;
+    const y = (containerRect.height - height) / 2;
+    
+    const ref = {
+      id: id,
+      img: img,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      scale: scale,
+      rotation: 0
+    };
+    
+    this.floatingRefs.push(ref);
+    this.renderFloatingReference(ref);
+    
+    this.editor.showToast(__("Referencia flotante añadida||Floating reference added"));
+  }
+
+  startDrag(e, ref) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    this.selectedRef = ref;
+    this.updateSelection();
+    
+    const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
+    
+    this.dragState = {
+      ref: ref,
+      startX: clientX,
+      startY: clientY,
+      startLeft: ref.x,
+      startTop: ref.y
+    };
+    
+    // Bring to top when starting drag
+    this.bringToTop(ref);
+    
+    // Show delete zone
+    this.deleteZone.classList.add("visible");
+    this.deleteZone.classList.remove("drag-over"); // Reset any previous drag-over state
+  }
+
+  startResize(e, ref) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    this.selectedRef = ref;
+    this.updateSelection();
+    
+    const el = document.getElementById(ref.id);
+    const rect = el.getBoundingClientRect();
+    const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
+    
+    // Detect resize direction based on click position
+    const threshold = 20;
+    let direction = 'se'; // default
+    
+    // Bring to top when starting resizing
+    this.bringToTop(ref);
+    
+    if (e.type.startsWith("touch") && e.touches.length === 2) {
+      // Pinch gesture
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      this.resizeState = {
+        ref: ref,
+        type: "pinch",
+        startDistance: distance,
+        startWidth: ref.width,
+        startHeight: ref.height,
+        startScale: ref.scale,
+        startX: ref.x,
+        startY: ref.y,
+        centerX: (touch1.clientX + touch2.clientX) / 2,
+        centerY: (touch1.clientY + touch2.clientY) / 2
+      };
+    } else {
+      // Edge resize - detect which edge
+      const relativeX = clientX - rect.left;
+      const relativeY = clientY - rect.top;
+      
+      if (relativeX < threshold) direction = 'w';
+      else if (relativeX > rect.width - threshold) direction = 'e';
+      
+      if (relativeY < threshold) direction = (direction === 'w' ? 'nw' : direction === 'e' ? 'ne' : 'n');
+      else if (relativeY > rect.height - threshold) direction = (direction === 'w' ? 'sw' : direction === 'e' ? 'se' : 's');
+      
+      this.resizeState = {
+        ref: ref,
+        type: "edge",
+        direction: direction,
+        startX: clientX,
+        startY: clientY,
+        startLeft: ref.x,
+        startTop: ref.y,
+        startWidth: ref.width,
+        startHeight: ref.height,
+        aspect: ref.width / ref.height
+      };
+      
+      // Update cursor
+      el.style.cursor = direction + '-resize';
+      el.classList.add("resizing");
+    }
+  }
+
+  handleDragMove(e) {
+    if (!this.dragState && !this.resizeState) return;
+    
+    e.preventDefault();
+    
+    if (this.dragState) {
+      this.handleDrag(e);
+    } else if (this.resizeState) {
+      this.handleResize(e);
+    }
+  }
+
+  handleDrag(e) {
+    const state = this.dragState;
+    const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
+    
+    const deltaX = clientX - state.startX;
+    const deltaY = clientY - state.startY;
+    
+    state.ref.x = state.startLeft + deltaX;
+    state.ref.y = state.startTop + deltaY;
+    
+    const el = document.getElementById(state.ref.id);
+    if (el) {
+      el.style.left = state.ref.x + "px";
+      el.style.top = state.ref.y + "px";
+      
+      const rect = this.deleteZone.getBoundingClientRect();
+      const isOverDelete = clientX >= rect.left && clientX <= rect.right &&
+                          clientY >= rect.top && clientY <= rect.bottom;
+      
+      if (isOverDelete) {
+        el.classList.add("over-delete");
+      } else {
+        el.classList.remove("over-delete");
+      }
+    }
+  }
+  
+  handleDragEnd(e) {
+    if (this.dragState) {
+      // Get final position
+      const clientX = e.type.startsWith("touchend") ? e.changedTouches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith("touchend") ? e.changedTouches[0].clientY : e.clientY;
+      
+      const rect = this.deleteZone.getBoundingClientRect();
+      const isOverDelete = clientX >= rect.left && clientX <= rect.right &&
+                          clientY >= rect.top && clientY <= rect.bottom;
+      
+      if (isOverDelete) {
+        // Delete the reference
+        this.removeFloatingReference(this.dragState.ref.id);
+        this.selectedRef = null;
+      }
+      
+      const el = document.getElementById(this.dragState.ref.id);
+      if (el) {
+        el.classList.remove("grabbing");
+      }
+      
+      this.dragState = null;
+    }
+    
+    if (this.resizeState) {
+      const el = document.getElementById(this.resizeState.ref.id);
+      if (el) {
+        el.classList.remove("resizing");
+        el.classList.remove("grabbing");
+        el.classList.remove("over-delete");
+      }
+      this.resizeState = null;
+    }
+    
+    // Always remove delete zone styling
+    this.deleteZone.classList.remove("visible", "drag-over");
+  }
+
+  handleResize(e) {
+    const state = this.resizeState;
+    if (!state) return;
+    
+    e.preventDefault();
+    
+    if (state.type === "pinch" && e.touches?.length === 2) {
+      // Pinch resize
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      const scale = distance / state.startDistance;
+      const newWidth = Math.max(20, state.startWidth * scale);
+      const newHeight = Math.max(20, state.startHeight * scale);
+      
+      state.ref.width = newWidth;
+      state.ref.height = newHeight;
+      state.ref.scale = state.startScale * scale;
+      
+      // Adjust position to keep center
+      const centerX = (touch1.clientX + touch2.clientX) / 2;
+      const centerY = (touch1.clientY + touch2.clientY) / 2;
+      
+      if (state.centerX && state.centerY) {
+        const deltaX = centerX - state.centerX;
+        const deltaY = centerY - state.centerY;
+        state.ref.x = state.startX + deltaX;
+        state.ref.y = state.startY + deltaY;
+      }
+      
+      state.centerX = centerX;
+      state.centerY = centerY;
+      
+    } else if (state.type === "edge") {
+      // Edge resize
+      const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
+      
+      const deltaX = clientX - state.startX;
+      const deltaY = clientY - state.startY;
+      
+      let newWidth = state.startWidth;
+      let newHeight = state.startHeight;
+      let newX = state.startLeft;
+      let newY = state.startTop;
+      
+      const direction = state.direction;
+      const keepAspect = e.shiftKey || direction == 'se'; // Hold Shift to keep aspect ratio
+      
+      // Handle different resize directions
+      if (direction.includes('e')) {
+        newWidth = Math.max(20, state.startWidth + deltaX);
+        if (keepAspect) newHeight = newWidth / state.aspect;
+      }
+      if (direction.includes('w')) {
+        const change = Math.min(deltaX, state.startWidth - 20);
+        newWidth = Math.max(20, state.startWidth - change);
+        newX = state.startLeft + (state.startWidth - newWidth);
+        if (keepAspect) {
+          newHeight = newWidth / state.aspect;
+          newY = state.startTop + (state.startHeight - newHeight) / 2;
+        }
+      }
+      if (direction.includes('s')) {
+        newHeight = Math.max(20, state.startHeight + deltaY);
+        if (keepAspect) newWidth = newHeight * state.aspect;
+      }
+      if (direction.includes('n')) {
+        const change = Math.min(deltaY, state.startHeight - 20);
+        newHeight = Math.max(20, state.startHeight - change);
+        newY = state.startTop + (state.startHeight - newHeight);
+        if (keepAspect) {
+          newWidth = newHeight * state.aspect;
+          newX = state.startLeft + (state.startWidth - newWidth) / 2;
+        }
+      }
+      
+      state.ref.width = newWidth;
+      state.ref.height = newHeight;
+      state.ref.x = newX;
+      state.ref.y = newY;
+    }
+    
+    // Update element
+    const el = document.getElementById(state.ref.id);
+    if (el) {
+      el.style.width = state.ref.width + "px";
+      el.style.height = state.ref.height + "px";
+      el.style.left = state.ref.x + "px";
+      el.style.top = state.ref.y + "px";
+    }
+  }
+
+  handleDragMove(e) {
+    if (!this.dragState && !this.resizeState) return;
+    
+    e.preventDefault();
+    
+    if (this.dragState) {
+      this.handleDrag(e);
+      
+      // Check if over delete zone during drag
+      const clientX = e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY;
+      
+      const rect = this.deleteZone.getBoundingClientRect();
+      const isOverDelete = clientX >= rect.left && clientX <= rect.right &&
+                          clientY >= rect.top && clientY <= rect.bottom;
+      
+      if (isOverDelete) {
+        this.deleteZone.classList.add("drag-over");
+      } else {
+        this.deleteZone.classList.remove("drag-over");
+      }
+      
+    } else if (this.resizeState) {
+      this.handleResize(e);
+    }
+  }
+  
+  bringToTop(ref) {
+    // Update z-index of all floating references
+    const allRefs = this.floatingContainer.children;
+    let maxZIndex = 20; // Base z-index from CSS
+    
+    // Find current max z-index
+    for (let i = 0; i < allRefs.length; i++) {
+      const zIndex = parseInt(window.getComputedStyle(allRefs[i]).zIndex) || 20;
+      if (zIndex > maxZIndex) maxZIndex = zIndex;
+    }
+    
+    // Set this reference to top
+    const el = document.getElementById(ref.id);
+    if (el) {
+      el.style.zIndex = (maxZIndex + 1).toString();
+    }
+    
+    // Update selected reference
+    this.selectedRef = ref;
+    this.updateSelection();
+  }
+
+  updateSelection() {
+    // Update selection styling
+    const allRefs = this.floatingContainer.children;
+    for (let i = 0; i < allRefs.length; i++) {
+      allRefs[i].classList.remove("selected");
+    }
+    
+    if (this.selectedRef) {
+      const el = document.getElementById(this.selectedRef.id);
+      if (el) el.classList.add("selected");
+    }
+  }
+
+  renderFloatingReference(ref) {
+    // Remove existing element if any
+    const existing = document.getElementById(ref.id);
+    if (existing) existing.remove();
+    
+    // Create element
+    const el = document.createElement("div");
+    el.id = ref.id;
+    el.className = "floating-reference";
+    if (this.selectedRef && this.selectedRef.id === ref.id) {
+      el.classList.add("selected");
+    }
+    
+    el.style.left = ref.x + "px";
+    el.style.top = ref.y + "px";
+    el.style.width = ref.width + "px";
+    el.style.height = ref.height + "px";
+    el.style.transform = `rotate(${ref.rotation}deg)`;
+    
+    // Create image
+    const img = document.createElement("img");
+    img.src = ref.img.src;
+    img.draggable = false;
+    el.appendChild(img);
+    
+    // Create resize handles for all edges
+    const positions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    positions.forEach(pos => {
+      const handle = document.createElement("div");
+      handle.className = `resize-handle ${pos}`;
+      handle.setAttribute('data-direction', pos);
+      
+      handle.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        this.startResize(e, ref);
+      });
+      
+      handle.addEventListener("touchstart", (e) => {
+        e.stopPropagation();
+        if (e.touches.length === 1) this.startResize(e, ref);
+      }, { passive: false });
+      
+      el.appendChild(handle);
+    });
+    
+    // Click/tap to bring to top and select
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.bringToTop(ref);
+    });
+    
+    // Main element events for dragging
+    el.addEventListener("mousedown", (e) => {
+      // Only start drag if not clicking a handle
+      if (!e.target.classList.contains('resize-handle')) {
+        this.startDrag(e, ref);
+        el.classList.add("grabbing");
+      }
+    });
+    
+    el.addEventListener("touchstart", (e) => {
+      if (!e.target.classList.contains('resize-handle')) {
+        this.startDrag(e, ref);
+        el.classList.add("grabbing");
+      } else if (e.touches.length === 2) {
+        this.startResize(e, ref);
+      }
+    }, { passive: false });
+    
+    this.floatingContainer.appendChild(el);
+  }
+
+  removeTraceReference() {
+    this.traceImage = null;
+    this.traceImageData = null;
+    this.traceControls.classList.remove("visible");
+    this.editor.render();
+    this.editor.showToast(__("Referencia de traza eliminada||Trace reference removed"));
+  }
+
+  removeFloatingReference(id) {
+    // Find the reference
+    const index = this.floatingRefs.findIndex(ref => ref.id === id);
+    if (index === -1) return;
+    
+    // Remove from array
+    this.floatingRefs.splice(index, 1);
+    
+    // Remove DOM element
+    const el = document.getElementById(id);
+    if (el) el.remove();
+    
+    // Clear selection if this was the selected reference
+    if (this.selectedRef && this.selectedRef.id === id) {
+      this.selectedRef = null;
+    }
+    
+    // Show toast notification
+    this.editor.showToast(__("Referencia eliminada||Reference removed"));
+  }
+
+  updateOpacityValue(value) {
+    if (this.traceOpacityValue) {
+      this.traceOpacityValue.textContent = value;
+    }
+  }
+
+  // Render methods called from editor.render()
+  renderBottom(ctx, width, height) {
+    if (this.traceImage && !this.traceOnTop) {
+      this.drawTraceReference(ctx, width, height);
+    }
+  }
+
+  renderTop(ctx, width, height) {
+    if (this.traceImage && this.traceOnTop) {
+      this.drawTraceReference(ctx, width, height);
+    }
+  }
+
+  drawTraceReference(ctx, width, height) {
+    if (!this.traceImage) return;
+    
+    ctx.globalAlpha = this.traceOpacity;
+    ctx.drawImage(this.traceImage, 0, 0, width, height);
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Clean up
+  destroy() {
+    // Remove all floating references
+    this.floatingRefs.forEach(ref => {
+      const el = document.getElementById(ref.id);
+      if (el) el.remove();
+    });
+    this.floatingRefs = [];
+    
+    // Remove trace controls
+    if (this.traceControls) {
+      this.traceControls.remove();
+    }
+    
+    // Remove container
+    if (this.floatingContainer) {
+      this.floatingContainer.remove();
+    }
+  }
+}
+
+// Spritesheet Loader
+class SpritesheetLoader {
+  constructor(editor) {
+    this.editor = editor;
+    
+    // Spritesheet data
+    this.image = null;
+    this.imageData = null;
+    this.imageUrl = null;
+    
+    // Grid settings
+    this.frameWidth = 16;
+    this.frameHeight = 16;
+    this.offsetX = 0;
+    this.offsetY = 0;
+    
+    // Calculated frames
+    this.frames = [];
+    this.totalFrames = 0;
+    this.cols = 0;
+    this.rows = 0;
+    
+    // UI elements
+    this.fullCanvas = null;
+    this.previewContainer = null;
+    this.widthInput = null;
+    this.heightInput = null;
+    this.offsetXInput = null;
+    this.offsetYInput = null;
+    this.frameCountSpan = null;
+    
+    // Preview thumbnails
+    this.thumbnailCanvases = [];
+    this.thumbnailWidth = 60;
+    this.thumbnailHeight = 60;
+    
+    // Lazy loading
+    this.scrollTimeout = null;
+    
+    // Selected frames
+    this.selectedFrames = new Set();
+    
+    // Popup buttons reference
+    this.popupButtons = [];
+  }
+
+  show() {
+    // Reset state
+    this.frames = [];
+    this.selectedFrames.clear();
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.frameWidth = 16;
+    this.frameHeight = 16;
+    
+    // Show file browser first
+    this.showFileBrowser();
+  }
+
+  showFileBrowser() {
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Cargar Spritesheet||Load Spritesheet"),
+      mode: "open",
+      fileTypes: ["png", "jpg", "jpeg", "gif", "webp"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.editor.readFile(fileInfo);
+          this.showSpritesheetDialog();
+          await this.loadImage(fileData);
+          this.updateGrid();
+        } catch (error) {
+          this.editor.showToast(__(`Error al cargar imagen: ${error.message}||Error loading image: ${error.message}`), 5000);
+        }
+      }
+    });
+    
+    fileBrowser.show();
+  }
+
+  showSpritesheetDialog() {
+    // Create popup content
+    const content = this.createPopupContent();
+    
+    // Show popup with custom buttons
+    this.editor.showPopup(
+      __("Cargar Spritesheet||Load Spritesheet"),
+      content,
+      [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => {
+            this.cleanup();
+            this.editor.hidePopup();
+          }
+        },
+        {
+          text: __("Cargar seleccionados||Load selected"),
+          action: () => {
+            this.loadSelectedFrames();
+          }
+        }
+      ],
+      true
+    );
+    
+    // Store reference to popup buttons for enabling/disabling
+    this.popupButtons = this.editor.popupButtons;
+  }
+
+  createPopupContent() {
+    const container = document.createElement("div");
+    container.className = "spritesheet-loader-container";
+
+    // Main content area - split horizontally
+    const mainContent = document.createElement("div");
+    mainContent.className = "spritesheet-main-content";
+    container.appendChild(mainContent);
+
+    // Left side - Full spritesheet
+    const leftSide = document.createElement("div");
+    leftSide.className = "spritesheet-left-side";
+    mainContent.appendChild(leftSide);
+
+    const leftLabel = document.createElement("div");
+    leftLabel.className = "spritesheet-section-label";
+    leftLabel.textContent = __("Spritesheet Completo||Full Spritesheet");
+    leftSide.appendChild(leftLabel);
+
+    const canvasContainer = document.createElement("div");
+    canvasContainer.className = "spritesheet-canvas-container";
+    leftSide.appendChild(canvasContainer);
+
+    this.fullCanvas = document.createElement("canvas");
+    this.fullCanvas.className = "spritesheet-full-canvas";
+    canvasContainer.appendChild(this.fullCanvas);
+
+    // Add click handler to canvas
+    this.fullCanvas.addEventListener("click", (e) => this.handleCanvasClick(e));
+
+    // Right side - Frame previews and controls
+    const rightSide = document.createElement("div");
+    rightSide.className = "spritesheet-right-side";
+    mainContent.appendChild(rightSide);
+
+    // Frame previews label
+    const previewLabel = document.createElement("div");
+    previewLabel.className = "spritesheet-section-label";
+    previewLabel.textContent = __("Frames Individuales||Individual Frames");
+    rightSide.appendChild(previewLabel);
+
+    // Scrollable preview container
+    this.previewContainer = document.createElement("div");
+    this.previewContainer.className = "spritesheet-preview-container";
+    rightSide.appendChild(this.previewContainer);
+
+    // Frame count display
+    this.frameCountSpan = document.createElement("div");
+    this.frameCountSpan.className = "spritesheet-frame-count";
+    this.frameCountSpan.textContent = __("0 frames||0 frames");
+    rightSide.appendChild(this.frameCountSpan);
+
+    // Controls
+    const controlsContainer = document.createElement("div");
+    controlsContainer.className = "spritesheet-controls";
+    rightSide.appendChild(controlsContainer);
+
+    // Size inputs
+    const sizeRow = document.createElement("div");
+    sizeRow.className = "spritesheet-input-row";
+    controlsContainer.appendChild(sizeRow);
+
+    const widthLabel = document.createElement("span");
+    widthLabel.className = "spritesheet-input-label";
+    widthLabel.textContent = __("Ancho||Width") + ":";
+    sizeRow.appendChild(widthLabel);
+
+    this.widthInput = document.createElement("input");
+    this.widthInput.type = "number";
+    this.widthInput.value = this.frameWidth;
+    this.widthInput.className = "spritesheet-number-input";
+    this.widthInput.addEventListener("change", () => this.updateGrid());
+    sizeRow.appendChild(this.widthInput);
+
+    const xLabel = document.createElement("span");
+    xLabel.className = "spritesheet-x-label";
+    xLabel.textContent = "x";
+    sizeRow.appendChild(xLabel);
+
+    this.heightInput = document.createElement("input");
+    this.heightInput.type = "number";
+    this.heightInput.value = this.frameHeight;
+    this.heightInput.className = "spritesheet-number-input";
+    this.heightInput.addEventListener("change", () => this.updateGrid());
+    sizeRow.appendChild(this.heightInput);
+
+    // Offset X input
+    const offsetXRow = document.createElement("div");
+    offsetXRow.className = "spritesheet-input-row";
+    controlsContainer.appendChild(offsetXRow);
+
+    const offsetXLabel = document.createElement("span");
+    offsetXLabel.className = "spritesheet-input-label";
+    offsetXLabel.textContent = __("Offset X||Offset X") + ":";
+    offsetXRow.appendChild(offsetXLabel);
+
+    this.offsetXInput = document.createElement("input");
+    this.offsetXInput.type = "number";
+    this.offsetXInput.value = this.offsetX;
+    this.offsetXInput.className = "spritesheet-number-input";
+    this.offsetXInput.addEventListener("change", () => this.updateGrid());
+    offsetXRow.appendChild(this.offsetXInput);
+
+    // Offset Y input
+    const offsetYRow = document.createElement("div");
+    offsetYRow.className = "spritesheet-input-row";
+    controlsContainer.appendChild(offsetYRow);
+
+    const offsetYLabel = document.createElement("span");
+    offsetYLabel.className = "spritesheet-input-label";
+    offsetYLabel.textContent = __("Offset Y||Offset Y") + ":";
+    offsetYRow.appendChild(offsetYLabel);
+
+    this.offsetYInput = document.createElement("input");
+    this.offsetYInput.type = "number";
+    this.offsetYInput.value = this.offsetY;
+    this.offsetYInput.className = "spritesheet-number-input";
+    this.offsetYInput.addEventListener("change", () => this.updateGrid());
+    offsetYRow.appendChild(this.offsetYInput);
+
+    // Selection controls
+    const selectionRow = document.createElement("div");
+    selectionRow.className = "spritesheet-selection-row";
+    controlsContainer.appendChild(selectionRow);
+
+    const selectAllBtn = document.createElement("button");
+    selectAllBtn.className = "ui-button spritesheet-select-btn";
+    selectAllBtn.textContent = __("Seleccionar todo||Select All");
+    selectAllBtn.addEventListener("click", () => this.selectAllFrames());
+    selectionRow.appendChild(selectAllBtn);
+
+    const deselectAllBtn = document.createElement("button");
+    deselectAllBtn.className = "ui-button spritesheet-select-btn";
+    deselectAllBtn.textContent = __("Deseleccionar todo||Deselect All");
+    deselectAllBtn.addEventListener("click", () => this.deselectAllFrames());
+    selectionRow.appendChild(deselectAllBtn);
+
+    // Add scroll listener for lazy loading
+    this.previewContainer.addEventListener("scroll", () => {
+      if (this.scrollTimeout) {
+        clearTimeout(this.scrollTimeout);
+      }
+      this.scrollTimeout = setTimeout(() => {
+        this.updateVisibleThumbnails();
+      }, 100);
+    });
+
+    return container;
+  }
+
+  // Handle click on the main canvas
+  handleCanvasClick(e) {
+    if (!this.image || !this.frames.length) return;
+    
+    // Get click coordinates relative to canvas
+    const rect = this.fullCanvas.getBoundingClientRect();
+    const scaleX = this.fullCanvas.width / rect.width;
+    const scaleY = this.fullCanvas.height / rect.height;
+    
+    const canvasX = Math.floor((e.clientX - rect.left) * scaleX);
+    const canvasY = Math.floor((e.clientY - rect.top) * scaleY);
+    
+    // Check if click is within grid bounds
+    if (canvasX < this.offsetX || canvasY < this.offsetY) return;
+    if (canvasX >= this.offsetX + this.cols * this.frameWidth) return;
+    if (canvasY >= this.offsetY + this.rows * this.frameHeight) return;
+    
+    // Calculate which frame was clicked
+    const col = Math.floor((canvasX - this.offsetX) / this.frameWidth);
+    const row = Math.floor((canvasY - this.offsetY) / this.frameHeight);
+    const frameIndex = row * this.cols + col;
+    
+    if (frameIndex >= 0 && frameIndex < this.frames.length) {
+      // Get the corresponding preview item
+      const items = this.previewContainer.children;
+      if (items[frameIndex]) {
+        // Toggle selection
+        this.toggleFrameSelection(frameIndex, items[frameIndex]);
+      }
+    }
+  }
+
+  async loadImage(fileData) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        this.image = img;
+        this.imageUrl = fileData;
+        
+        // Set canvas size
+        this.fullCanvas.width = img.width;
+        this.fullCanvas.height = img.height;
+        
+        // Draw image
+        const ctx = this.fullCanvas.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0);
+        
+        // Store image data for frame extraction
+        this.imageData = ctx.getImageData(0, 0, img.width, img.height);
+        
+        // Auto-calculate reasonable frame size
+        this.autoDetectFrameSize();
+        
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = fileData;
+    });
+  }
+
+  autoDetectFrameSize() {
+    if (!this.image) return;
+    
+    const width = this.image.width;
+    const height = this.image.height;
+    
+    // Common frame sizes in pixel art
+    const commonSizes = [8, 12, 16, 20, 24, 28, 32, 48, 64];
+    
+    // Find the largest common size that divides evenly
+    for (const size of commonSizes.reverse()) {
+      if (width % size === 0 && height % size === 0) {
+        this.frameWidth = size;
+        this.frameHeight = size;
+        break;
+      }
+    }
+    
+    // If no match, use 16x16 as default
+    if (this.frameWidth === 16 && width % 16 !== 0) {
+      this.frameWidth = 16;
+      this.frameHeight = 16;
+    }
+    
+    // Update inputs
+    if (this.widthInput) {
+      this.widthInput.value = this.frameWidth;
+      this.heightInput.value = this.frameHeight;
+    }
+  }
+
+  updateGrid() {
+    // Get values from inputs
+    this.frameWidth = parseInt(this.widthInput.value) || 16;
+    this.frameHeight = parseInt(this.heightInput.value) || 16;
+    this.offsetX = parseInt(this.offsetXInput.value) || 0;
+    this.offsetY = parseInt(this.offsetYInput.value) || 0;
+    
+    if (!this.image) return;
+    
+    // Calculate grid dimensions
+    const availableWidth = this.image.width - this.offsetX;
+    const availableHeight = this.image.height - this.offsetY;
+    
+    this.cols = Math.floor(availableWidth / this.frameWidth);
+    this.rows = Math.floor(availableHeight / this.frameHeight);
+    this.totalFrames = this.cols * this.rows;
+    
+    // Update frame count
+    this.frameCountSpan.textContent = __(`${this.totalFrames} frames||${this.totalFrames} frames`);
+    
+    // Enable/disable load button
+    if (this.popupButtons && this.popupButtons.length > 1) {
+      this.popupButtons[1].disabled = this.totalFrames === 0;
+    }
+    
+    // Clear existing frames
+    this.frames = [];
+    this.thumbnailCanvases = [];
+    this.previewContainer.innerHTML = "";
+    this.selectedFrames.clear();
+    
+    // Create frame previews
+    for (let row = 0; row < this.rows; row++) {
+      for (let col = 0; col < this.cols; col++) {
+        const frameIndex = row * this.cols + col;
+        this.createFramePreview(frameIndex, col, row);
+      }
+    }
+    
+    // Draw grid overlay on full canvas
+    this.drawGridOverlay();
+    
+    // Update visible thumbnails
+    this.updateVisibleThumbnails();
+  }
+
+  createFramePreview(index, col, row) {
+    // Calculate frame position
+    const x = this.offsetX + col * this.frameWidth;
+    const y = this.offsetY + row * this.frameHeight;
+    
+    // Store frame data
+    this.frames[index] = {
+      index,
+      x, y,
+      width: this.frameWidth,
+      height: this.frameHeight,
+      col, row
+    };
+    
+    // Create preview item
+    const item = document.createElement("div");
+    item.className = "frame-preview-item";
+    if (this.selectedFrames.has(index)) {
+      item.classList.add("selected");
+    }
+    item.dataset.index = index;
+    
+    // Click to select/deselect
+    item.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleFrameSelection(index, item);
+    });
+    
+    // Thumbnail canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = this.thumbnailWidth;
+    canvas.height = this.thumbnailHeight;
+    canvas.className = "frame-thumbnail-canvas";
+    
+    // Store for lazy loading
+    this.thumbnailCanvases[index] = {
+      canvas,
+      item,
+      x, y,
+      loaded: false
+    };
+    
+    // Frame info
+    const info = document.createElement("div");
+    info.className = "frame-info";
+    info.textContent = `${index + 1}: ${col},${row}`;
+    
+    item.appendChild(canvas);
+    item.appendChild(info);
+    
+    this.previewContainer.appendChild(item);
+  }
+
+  updateVisibleThumbnails() {
+    if (!this.previewContainer) return;
+    
+    const containerRect = this.previewContainer.getBoundingClientRect();
+    const items = this.previewContainer.children;
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const rect = item.getBoundingClientRect();
+      
+      // Check if item is visible in scroll container
+      const isVisible = rect.top < containerRect.bottom && rect.bottom > containerRect.top;
+      
+      if (isVisible && this.thumbnailCanvases[i] && !this.thumbnailCanvases[i].loaded) {
+        this.renderThumbnail(i);
+      }
+    }
+  }
+
+  renderThumbnail(index) {
+    const thumb = this.thumbnailCanvases[index];
+    if (!thumb || thumb.loaded || !this.imageData) return;
+    
+    const frame = this.frames[index];
+    if (!frame) return;
+    
+    const ctx = thumb.canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, thumb.canvas.width, thumb.canvas.height);
+    
+    // Create temporary canvas with frame data
+    const frameCanvas = document.createElement("canvas");
+    frameCanvas.width = this.frameWidth;
+    frameCanvas.height = this.frameHeight;
+    const frameCtx = frameCanvas.getContext("2d");
+    frameCtx.imageSmoothingEnabled = false;
+    
+    // Put image data
+    const frameData = this.editor.ctx.createImageData(this.frameWidth, this.frameHeight);
+    for (let fy = 0; fy < this.frameHeight; fy++) {
+      for (let fx = 0; fx < this.frameWidth; fx++) {
+        const srcX = frame.x + fx;
+        const srcY = frame.y + fy;
+        const srcIndex = (srcY * this.image.width + srcX) * 4;
+        const dstIndex = (fy * this.frameWidth + fx) * 4;
+        
+        frameData.data[dstIndex] = this.imageData.data[srcIndex];
+        frameData.data[dstIndex + 1] = this.imageData.data[srcIndex + 1];
+        frameData.data[dstIndex + 2] = this.imageData.data[srcIndex + 2];
+        frameData.data[dstIndex + 3] = this.imageData.data[srcIndex + 3];
+      }
+    }
+    frameCtx.putImageData(frameData, 0, 0);
+    
+    // Draw scaled to thumbnail
+    ctx.drawImage(frameCanvas, 0, 0, this.frameWidth, this.frameHeight, 0, 0, thumb.canvas.width, thumb.canvas.height);
+    
+    thumb.loaded = true;
+  }
+
+  drawGridOverlay() {
+    const ctx = this.fullCanvas.getContext("2d");
+    
+    // Restore original image
+    ctx.clearRect(0, 0, this.fullCanvas.width, this.fullCanvas.height);
+    ctx.drawImage(this.image, 0, 0);
+    
+    // Draw grid
+    ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+    ctx.lineWidth = 1;
+    
+    // Vertical lines
+    for (let col = 0; col <= this.cols; col++) {
+      const x = this.offsetX + col * this.frameWidth;
+      ctx.beginPath();
+      ctx.moveTo(x, this.offsetY);
+      ctx.lineTo(x, this.offsetY + this.rows * this.frameHeight);
+      ctx.stroke();
+    }
+    
+    // Horizontal lines
+    for (let row = 0; row <= this.rows; row++) {
+      const y = this.offsetY + row * this.frameHeight;
+      ctx.beginPath();
+      ctx.moveTo(this.offsetX, y);
+      ctx.lineTo(this.offsetX + this.cols * this.frameWidth, y);
+      ctx.stroke();
+    }
+    
+    // Highlight selected frames
+    ctx.fillStyle = "rgba(255, 255, 0, 0.2)";
+    this.selectedFrames.forEach(index => {
+      const frame = this.frames[index];
+      if (frame) {
+        ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+      }
+    });
+  }
+
+  toggleFrameSelection(index, item) {
+    if (this.selectedFrames.has(index)) {
+      this.selectedFrames.delete(index);
+      item.classList.remove("selected");
+    } else {
+      this.selectedFrames.add(index);
+      item.classList.add("selected");
+    }
+    
+    // Update grid overlay
+    this.drawGridOverlay();
+  }
+
+  selectAllFrames() {
+    for (let i = 0; i < this.frames.length; i++) {
+      this.selectedFrames.add(i);
+    }
+    
+    // Update UI
+    const items = this.previewContainer.children;
+    for (let i = 0; i < items.length; i++) {
+      items[i].classList.add("selected");
+    }
+    
+    this.drawGridOverlay();
+  }
+
+  deselectAllFrames() {
+    this.selectedFrames.clear();
+    
+    // Update UI
+    const items = this.previewContainer.children;
+    for (let i = 0; i < items.length; i++) {
+      items[i].classList.remove("selected");
+    }
+    
+    this.drawGridOverlay();
+  }
+
+  loadSelectedFrames() {
+    if (this.selectedFrames.size === 0) {
+      this.editor.showToast(__("Selecciona al menos un frame||Select at least one frame"), 2000);
+      return;
+    }
+    
+    // Ask if user wants new project or add to current
+    this.showLoadOptionDialog();
+  }
+
+  showLoadOptionDialog() {
+    this.editor.showPopup(
+      __("Cargar Frames||Load Frames"),
+      __("¿Cómo quieres cargar los frames?||How do you want to load the frames?"),
+      [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => this.editor.hidePopup()
+        },
+        {
+          text: __("Nuevo Proyecto||New Project"),
+          action: () => {
+            this.editor.hidePopup();
+            this.createNewProjectFromFrames();
+          }
+        },
+        {
+          text: __("Añadir al proyecto||Add to project"),
+          action: () => {
+            this.editor.hidePopup();
+            this.addFramesToProject();
+          }
+        }
+      ]
+    );
+  }
+
+  createNewProjectFromFrames() {
+    if (this.selectedFrames.size === 0) return;
+    
+    // Sort selected frames by index
+    const sortedIndices = Array.from(this.selectedFrames).sort((a, b) => a - b);
+    
+    // Create new project with first frame's dimensions
+    const firstFrame = this.frames[sortedIndices[0]];
+    this.editor.newProject(firstFrame.width, firstFrame.height);
+
+    // Add each selected frame as a new frame
+    sortedIndices.forEach(index => {
+      const frame = this.frames[index];
+      this.addFrameToProject(frame);
+    });
+    
+    // Remove first frame
+    this.editor.removeFrame(0, true);
+    
+    // Set current frame to first
+    this.editor.project.currentFrame = 0;
+    
+    // Update UI
+    this.editor.updateFramesUI();
+    this.editor.render();
+    
+    this.editor.showToast(__(`${sortedIndices.length} frames cargados||${sortedIndices.length} frames loaded`));
+    this.cleanup();
+    this.editor.hidePopup();
+  }
+
+  addFramesToProject() {
+    if (this.selectedFrames.size === 0) return;
+    
+    // Check if frame dimensions match current project
+    const firstFrame = this.frames[Array.from(this.selectedFrames)[0]];
+    if (firstFrame.width !== this.editor.project.width || firstFrame.height !== this.editor.project.height) {
+      this.editor.showPopup(
+        __("Dimensiones diferentes||Different dimensions"),
+        __(`Los frames tienen tamaño ${firstFrame.width}x${firstFrame.height} pero el proyecto actual es ${this.editor.project.width}x${this.editor.project.height}. ¿Redimensionar proyecto?||Frames are ${firstFrame.width}x${firstFrame.height} but current project is ${this.editor.project.width}x${this.editor.project.height}. Resize project?`),
+        [
+          {
+            text: __("Cancelar||Cancel"),
+            class: "cancel",
+            action: () => this.editor.hidePopup()
+          },
+          {
+            text: __("Redimensionar||Resize"),
+            action: () => {
+              this.editor.hidePopup();
+              this.editor.resizeCanvas(0, 0, firstFrame.width, firstFrame.height, true);
+              this.performAddFrames();
+            }
+          },
+          {
+            text: __("Mantener tamaño||Keep size"),
+            action: () => {
+              this.editor.hidePopup();
+              this.performAddFrames();
+            }
+          }
+        ]
+      );
+    } else {
+      this.performAddFrames();
+    }
+  }
+
+  performAddFrames() {
+    // Sort selected frames
+    const sortedIndices = Array.from(this.selectedFrames).sort((a, b) => a - b);
+    
+    // Add frames
+    sortedIndices.forEach(index => {
+      const frame = this.frames[index];
+      this.addFrameToProject(frame);
+    });
+    
+    // Update UI
+    this.editor.updateFramesUI();
+    this.editor.render();
+    
+    this.editor.showToast(__(`${sortedIndices.length} frames añadidos||${sortedIndices.length} frames added`));
+    this.cleanup();
+    this.editor.hidePopup();
+  }
+
+  addFrameToProject(frameData) {
+    // Create new frame
+    const newFrame = {
+      layers: []
+    };
+    
+    // Copy layers from current frame structure
+    const currentFrame = this.editor.project.frames[this.editor.project.currentFrame];
+    for (let i = 0; i < currentFrame.layers.length; i++) {
+      const layer = currentFrame.layers[i];
+      const newLayer = this.editor.createBlankLayer(
+        this.editor.project.width, 
+        this.editor.project.height, 
+        layer.name
+      );
+      newLayer.visible = layer.visible;
+      newFrame.layers.push(newLayer);
+    }
+    
+    // Draw spritesheet frame on first layer
+    const targetLayer = newFrame.layers[0];
+    const ctx = targetLayer.ctx;
+    
+    // Create image data from spritesheet
+    const imageData = this.editor.ctx.createImageData(this.frameWidth, this.frameHeight);
+    for (let y = 0; y < this.frameHeight; y++) {
+      for (let x = 0; x < this.frameWidth; x++) {
+        const srcX = frameData.x + x;
+        const srcY = frameData.y + y;
+        const srcIndex = (srcY * this.image.width + srcX) * 4;
+        const dstIndex = (y * this.frameWidth + x) * 4;
+        
+        // Copy pixel data
+        for (let c = 0; c < 4; c++) {
+          imageData.data[dstIndex + c] = this.imageData.data[srcIndex + c];
+        }
+      }
+    }
+    
+    // Handle different dimensions
+    if (this.frameWidth !== this.editor.project.width || this.frameHeight !== this.editor.project.height) {
+      // Create temporary canvas with frame size
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = this.frameWidth;
+      tempCanvas.height = this.frameHeight;
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCtx.imageSmoothingEnabled = false;
+      tempCtx.putImageData(imageData, 0, 0);
+      
+      // Calculate centering position
+      const centerX = Math.floor((this.editor.project.width - this.frameWidth) / 2);
+      const centerY = Math.floor((this.editor.project.height - this.frameHeight) / 2);
+      
+      // Draw centered
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.drawImage(tempCanvas, centerX, centerY);
+    } else {
+      ctx.putImageData(imageData, 0, 0);
+    }
+    
+    // Add frame to project
+    this.editor.project.frames.push(newFrame);
+    this.editor.project.frameTimes.push(this.editor.defaultFrameTime);
+  }
+
+  cleanup() {
+    // Clean up resources
+    this.image = null;
+    this.imageData = null;
+    this.frames = [];
+    this.selectedFrames.clear();
+    this.thumbnailCanvases = [];
+  }
+}
+
+// Undo History Manager 
+class HistoryManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.history = [];
+    this.historyIndex = -1;
+    this.maxHistoryLength = Infinity;
+    this.currentBatch = null;
+  }
+
+  // Start a new batch of operations (for grouping multiple changes)
+  startBatch(type, description) {
+    if (this.currentBatch) {
+      this.endBatch();
+    }
+    this.currentBatch = {
+      type: type,
+      description: description,
+      timestamp: Date.now(),
+      operations: []
+    };
+  }
+
+  // End the current batch and add to history
+  endBatch() {
+    if (this.currentBatch && this.currentBatch.operations.length > 0) {
+      this.addToHistory(this.currentBatch);
+    }
+    this.currentBatch = null;
+  }
+
+  // Add a change to history
+  addChange(change) {
+    if (this.currentBatch) {
+      this.currentBatch.operations.push(change);
+    } else {
+      this.addToHistory({
+        type: change.type,
+        description: change.description,
+        timestamp: Date.now(),
+        operations: [change]
+      });
+    }
+  }
+
+  // Add entry to history
+  addToHistory(entry) {
+    // Remove any history after current index
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    
+    // Add new entry
+    this.history.push(entry);
+    this.historyIndex++;
+    
+    // Limit history size
+    if (this.history.length > this.maxHistoryLength) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+  }
+
+  // Undo/Redo
+  undo() {
+    if (this.historyIndex < 0) return null;
+    
+    const entry = this.history[this.historyIndex];
+    this.applyHistoryEntry(entry, true);
+    this.historyIndex--;
+    
+    return {
+      entry,
+      message: __(`(Deshacer|Undo) '${entry.description}'`)
+    };
+  }
+  
+  redo() {
+    if (this.historyIndex >= this.history.length - 1) return null;
+    
+    this.historyIndex++;
+    const entry = this.history[this.historyIndex];
+    this.applyHistoryEntry(entry, false);
+    
+    return {
+      entry,
+      message: __(`(Rehacer|Redo) '${entry.description}'`)
+    };
+  }
+
+  // Apply a history entry (undo or redo)
+  applyHistoryEntry(entry, isUndo, project) {
+    const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
+    
+    if (!project) project = this.editor.project;
+    
+    operations.forEach(operation => {
+      switch (operation.type) {
+        case 'draw':
+          this.applyDrawOperation(project, operation, isUndo);
+          break;
+        case 'add_frame':
+          this.applyAddFrameOperation(project, operation, isUndo);
+          break;
+        case 'remove_frame':
+          this.applyRemoveFrameOperation(project, operation, isUndo);
+          break;
+        case 'duplicate_frame':
+          this.applyDuplicateFrameOperation(project, operation, isUndo);
+          break;
+        case 'edit_frame':
+          this.applyEditFrameOperation(project, operation, isUndo);
+          break;
+        case 'move_frame':
+          this.applyMoveFrameOperation(project, operation, isUndo);
+          break;
+        case 'change_animation_fps':
+          this.applyChangeFPSOperation(project, operation, isUndo);
+          break;
+        case 'add_layer':
+          this.applyAddLayerOperation(project, operation, isUndo);
+          break;
+        case 'remove_layer':
+          this.applyRemoveLayerOperation(project, operation, isUndo);
+          break;
+        case 'duplicate_layer':
+          this.applyDuplicateLayerOperation(project, operation, isUndo);
+          break;
+        case 'rename_layer':
+          this.applyRenameLayerOperation(project, operation, isUndo);
+          break;
+        case 'merge_layers':
+          this.applyMergeLayersOperation(project, operation, isUndo);
+          break;
+        case 'change_layer_visibility':
+          this.applyLayerVisibilityOperation(project, operation, isUndo);
+          break;
+        case 'move_layer':
+          this.applyMoveLayerOperation(project, operation, isUndo);
+          break;
+        case 'transform':
+          this.applyTransformOperation(project, operation, isUndo);
+          break;
+        case 'color_adjustment':
+          this.applyColorAdjustmentOperation(project, operation, isUndo);
+          break;
+        case 'resize_canvas':
+          this.applyResizeCanvasOperation(project, operation, isUndo);
+          break;
+      }
+    });
+    
+    // Update UI after applying operations
+    this.editor.updateFramesUI();
+    this.editor.updateLayersUI();
+    this.editor.render();
+  }
+
+  // Specific operation handlers
+  applyDrawOperation(project, operation, isUndo) {
+    const { frameIndex, layerIndex, pixels } = operation;
+    const frame = project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    const ctx = layer.ctx;
+    
+    pixels.forEach(pixel => {
+      const { x, y, oldColor, newColor } = pixel;
+      const colorToApply = isUndo ? oldColor : newColor;
+      
+      if (colorToApply === 'transparent') {
+        ctx.clearRect(x, y, 1, 1);
+      } else {
+        ctx.fillStyle = colorToApply;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    });
+  }
+
+  applyAddFrameOperation(project, operation, isUndo) {
+    if (isUndo) {
+      // Remove the frame that was added
+      project.frames.splice(operation.index, 1);
+      project.frameTimes.splice(operation.index, 1);
+      project.currentFrame = Math.min(operation.index, project.frames.length - 1);
+    } else {
+      // Add the frame back
+      const newFrame = {
+        layers: operation.layers.map(layerData => {
+          const layer = this.editor.createBlankLayer(project.width, project.height, layerData.name);
+          layer.visible = layerData.visible;
+          
+          // Restore layer content if available
+          if (layerData.imageData) {
+            const ctx = layer.ctx;
+            const imageData = new ImageData(
+              new Uint8ClampedArray(layerData.imageData),
+              project.width,
+              project.height
+            );
+            ctx.putImageData(imageData, 0, 0);
+          }
+          
+          return layer;
+        })
+      };
+      
+      project.frames.splice(operation.index, 0, newFrame);
+      project.frameTimes.splice(operation.index, 0, operation.frameTime);
+      project.currentFrame = operation.index;
+    }
+  }
+
+  applyRemoveFrameOperation(project, operation, isUndo) {
+    this.applyAddFrameOperation(project, operation, !isUndo);
+  }
+  
+  applyDuplicateFrameOperation(project, operation, isUndo) {
+    if (isUndo) {
+      // Remove the duplicated frame
+      project.frames.splice(operation.index, 1);
+      project.frameTimes.splice(operation.index, 1);
+      project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
+    } else {
+      // Restore the duplicated frame
+      const newFrame = {
+        layers: operation.layers.map(layerData => {
+          const layer = this.editor.createBlankLayer(project.width, project.height, layerData.name);
+          layer.visible = layerData.visible;
+          
+          if (layerData.imageData) {
+            const ctx = layer.ctx;
+            const imageData = new ImageData(
+              new Uint8ClampedArray(layerData.imageData),
+              project.width,
+              project.height
+            );
+            ctx.putImageData(imageData, 0, 0);
+          }
+          
+          return layer;
+        })
+      };
+      
+      project.frames.splice(operation.index, 0, newFrame);
+      project.frameTimes.splice(operation.index, 0, operation.frameTime);
+      project.currentFrame = operation.index;
+    }
+  }
+
+  applyEditFrameOperation(project, operation, isUndo) {
+    const { frameIndex, property, oldValue, newValue } = operation;
+    
+    if (property === 'time') {
+      project.frameTimes[frameIndex] = isUndo ? oldValue : newValue;
+    }
+  }
+
+  applyMoveFrameOperation(project, operation, isUndo) {
+    const { fromIndex, toIndex } = operation;
+    
+    if (isUndo) {
+      // Move back to original position
+      const frame = project.frames.splice(toIndex, 1)[0];
+      const frameTime = project.frameTimes.splice(toIndex, 1)[0];
+      project.frames.splice(fromIndex, 0, frame);
+      project.frameTimes.splice(fromIndex, 0, frameTime);
+    } else {
+      // Move to new position again
+      const frame = project.frames.splice(fromIndex, 1)[0];
+      const frameTime = project.frameTimes.splice(fromIndex, 1)[0];
+      project.frames.splice(toIndex, 0, frame);
+      project.frameTimes.splice(toIndex, 0, frameTime);
+    }
+  }
+
+  applyChangeFPSOperation(project, operation, isUndo) {
+    project.frameTimes = isUndo ? operation.oldFrameTimes : operation.newFrameTimes;
+    
+    const fps = isUndo ? operation.oldFPS : operation.newFPS;
+    
+    project.currentFrameTime = 1000 / operation.newFPS;
+    
+    this.editor.fpsInput.value = fps;
+  }
+
+  applyAddLayerOperation(project, operation, isUndo) {
+    const { frameIndex, layerIndex, layerData } = operation;
+    const frame = project.frames[frameIndex];
+    
+    if (isUndo) {
+      // Remove the added layer
+      frame.layers.splice(layerIndex, 1);
+      project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+    } else {
+      // Add the layer back
+      const layer = this.editor.createBlankLayer(project.width, project.height, layerData.name);
+      layer.visible = layerData.visible;
+      
+      if (layerData.imageData) {
+        const ctx = layer.ctx;
+        const imageData = new ImageData(
+          new Uint8ClampedArray(layerData.imageData),
+          project.width,
+          project.height
+        );
+        ctx.putImageData(imageData, 0, 0);
+      }
+      
+      frame.layers.splice(layerIndex, 0, layer);
+
+      project.currentLayer = layerIndex;
+    }
+  }
+
+  applyRemoveLayerOperation(project, operation, isUndo) {
+    // Apply 'Add Layer' operation in reverse
+    this.applyAddLayerOperation(project, operation, !isUndo);
+  }
+  
+  applyDuplicateLayerOperation(project, operation, isUndo) {
+    const { frameIndex, layerIndex, layerData } = operation;
+    const frame = this.editor.project.frames[frameIndex];
+    
+    if (isUndo) {
+      // Remove the duplicated layer
+      frame.layers.splice(layerIndex, 1);
+      this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+    } else {
+      // Restore the duplicated layer
+      const layer = this.editor.createBlankLayer(
+        this.editor.project.width, 
+        this.editor.project.height,
+        layerData.name
+      );
+      layer.visible = layerData.visible;
+      
+      if (layerData.imageData) {
+        const ctx = layer.ctx;
+        const imageData = new ImageData(
+          new Uint8ClampedArray(layerData.imageData),
+          this.editor.project.width,
+          this.editor.project.height
+        );
+        ctx.putImageData(imageData, 0, 0);
+      }
+      
+      frame.layers.splice(layerIndex, 0, layer);
+      this.editor.project.currentLayer = layerIndex;
+    }
+  }
+  
+  applyRenameLayerOperation(project, operation, isUndo) {
+    const { layerIndex, previousName, newName } = operation;
+    
+    // Rename the layer in all frames
+    project.frames.forEach(frame => {
+      const layer = frame.layers[layerIndex];
+      
+      layer.name = isUndo ? previousName : newName;
+    });
+  }
+  
+  applyMergeLayersOperation(project, operation, isUndo) {
+    const { frameIndex, sourceIndex, targetIndex, sourceData, targetData } = operation;
+    const frame = projectframes[frameIndex];
+    
+    if (isUndo) {
+      // Restore both layers to their original state
+      const sourceLayer = this.editor.createBlankLayer(project.width, project.height, sourceData.name);
+      sourceLayer.visible = sourceData.visible;
+      
+      const sourceImageData = new ImageData(
+        new Uint8ClampedArray(sourceData.imageData),
+        project.width,
+        project.height
+      );
+      sourceLayer.ctx.putImageData(sourceImageData, 0, 0);
+      
+      const targetLayer = frame.layers[targetIndex];
+      targetLayer.ctx.clearRect(0, 0, project.width, project.height);
+      
+      const targetImageData = new ImageData(
+        new Uint8ClampedArray(targetData.imageData),
+        project.width,
+        project.height
+      );
+      targetLayer.ctx.putImageData(targetImageData, 0, 0);
+      
+      // Reinsert source layer at original position
+      frame.layers.splice(sourceIndex, 0, sourceLayer);
+      
+      // Adjust current layer if needed
+      if (sourceIndex <= project.currentLayer) {
+        project.currentLayer++;
+      }
+      
+    } else {
+      // Perform merge again
+      const sourceLayer = frame.layers[sourceIndex];
+      const targetLayer = frame.layers[targetIndex];
+      
+      targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+      frame.layers.splice(sourceIndex, 1);
+      
+      if (sourceIndex < project.currentLayer) {
+        project.currentLayer--;
+      } else if (sourceIndex === project.currentLayer) {
+        project.currentLayer = targetIndex;
+      }
+    }
+  }
+
+  applyLayerVisibilityOperation(project, operation, isUndo) {
+    const { frameIndex, layerIndex, visible } = operation;
+    const frame = project.frames[frameIndex];
+    frame.layers[layerIndex].visible = isUndo ? !visible : visible;
+  }
+
+  applyMoveLayerOperation(project, operation, isUndo) {
+    const { frameIndex, fromIndex, toIndex } = operation;
+    const frame = project.frames[frameIndex];
+    
+    if (isUndo) {
+      // Move back to original position
+      const layer = frame.layers.splice(toIndex, 1)[0];
+      frame.layers.splice(fromIndex, 0, layer);
+    } else {
+      // Move to new position again
+      const layer = frame.layers.splice(fromIndex, 1)[0];
+      frame.layers.splice(toIndex, 0, layer);
+    }
+  }
+
+  applyTransformOperation(project, operation, isUndo) {
+    const { frameIndex, layerIndex, transformType, transformData } = operation;
+    const frame = project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    const ctx = layer.ctx;
+    
+    // We'll store the entire image data for transformations
+    // This is still more efficient than full project snapshots
+    // But we can optimize this in the future
+    
+    ctx.clearRect(0, 0, project.width, project.height);
+    
+    const imageData = new ImageData(
+      new Uint8ClampedArray(isUndo ? transformData.oldImageData : transformData.newImageData),
+      project.width,
+      project.height
+    );
+    
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  applyColorAdjustmentOperation(project, operation, isUndo) {
+    const { frameIndex, layerIndex, adjustmentType, adjustmentData } = operation;
+    const frame = project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    const ctx = layer.ctx;
+    
+    // Similar to transform, store the image data for color adjustments
+    const imageData = new ImageData(
+      new Uint8ClampedArray(isUndo ? adjustmentData.oldImageData : adjustmentData.newImageData),
+      project.width,
+      project.height
+    );
+    
+    ctx.putImageData(imageData, 0, 0);
+  }
+  
+  applyResizeCanvasOperation(project, operation, isUndo) {
+    const { oldWidth, oldHeight, newWidth, newHeight, cropX, cropY, framesData } = operation;
+    
+    // Store current frame/layer indices
+    const currentFrame = project.currentFrame;
+    const currentLayer = project.currentLayer;
+    
+    // Determine which dimensions to use
+    const targetWidth = isUndo ? oldWidth : newWidth;
+    const targetHeight = isUndo ? oldHeight : newHeight;
+    
+    // Resize project dimensions first
+    project.width = targetWidth;
+    project.height = targetHeight;
+    this.editor.resetCanvasSize();
+    
+    // Restore/transform each layer
+    project.frames.forEach((frame, fIndex) => {
+      // Make sure we have data for this frame
+      const frameData = framesData && framesData[fIndex];
+      if (!frameData) return;
+      
+      frame.layers.forEach((layer, lIndex) => {
+        const layerData = frameData.layers && frameData.layers[lIndex];
+        if (!layerData) return;
+        
+        // Ensure we have valid image data array
+        const expectedLength = 4 * oldWidth * oldHeight;
+        let imageDataArray = layerData.imageData;
+        
+        // If the array length doesn't match, create a blank array of correct size
+        if (!imageDataArray || imageDataArray.length !== expectedLength) {
+          imageDataArray = new Array(expectedLength).fill(0);
+        }
+        
+        if (isUndo) {
+          // Undo: restore original size and content
+          const imageData = new ImageData(
+            new Uint8ClampedArray(imageDataArray),
+            oldWidth,
+            oldHeight
+          );
+          
+          // Create temp canvas with original size
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = oldWidth;
+          tempCanvas.height = oldHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.putImageData(imageData, 0, 0);
+          
+          // Resize layer canvas to original size
+          layer.canvas.width = oldWidth;
+          layer.canvas.height = oldHeight;
+          
+          // Draw back to resized canvas
+          layer.ctx.clearRect(0, 0, oldWidth, oldHeight);
+          layer.ctx.drawImage(tempCanvas, 0, 0);
+        } else {
+          // Redo: crop to new size
+          const imageData = new ImageData(
+            new Uint8ClampedArray(imageDataArray),
+            oldWidth,
+            oldHeight
+          );
+          
+          // Create temp canvas with original content
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = oldWidth;
+          tempCanvas.height = oldHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.putImageData(imageData, 0, 0);
+          
+          // Resize layer canvas to new size
+          layer.canvas.width = newWidth;
+          layer.canvas.height = newHeight;
+          
+          // Draw cropped area
+          layer.ctx.clearRect(0, 0, newWidth, newHeight);
+          layer.ctx.drawImage(tempCanvas, -cropX, -cropY);
+        }
+      });
+    });
+    
+    // Restore frame/layer indices
+    project.currentFrame = Math.min(currentFrame, project.frames.length - 1);
+    project.currentLayer = Math.min(currentLayer, 
+      project.frames[project.currentFrame].layers.length - 1);
+    
+    // Update transform and render
+    this.editor.updateCanvasTransform();
+    this.editor.render();
+  }
+  
+  // Generate timelapse by replaying history
+  async generateTimelapse(fps, scale, progressCallback) {
+    // Create a temporary project to replay history
+    const tempProject = this.editor.getNewProjectData(this.editor.project.width, this.editor.project.height);
+    const tempFrameTimes = [...this.editor.project.frameTimes];
+    
+    // Get canvas for rendering
+    const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas(tempProject.width * scale, tempProject.height * scale);
+    
+    // Set up media recording
+    const stream = tempCanvas.captureStream();
+    const recorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 8000000
+    });
+    
+    const chunks = [];
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    
+    return new Promise((resolve) => {
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        resolve(blob);
+      };
+      
+      recorder.start();
+      
+      // Replay history to create timelapse
+      this.replayHistoryForTimelapse(
+        tempProject, 
+        tempFrameTimes, 
+        tempCanvas, 
+        tempCtx, 
+        scale, 
+        fps, 
+        progressCallback,
+        () => {
+          setTimeout(() => recorder.stop(), 1000 / fps);
+        }
+      );
+    });
+  }
+
+  async replayHistoryForTimelapse(project, frameTimes, canvas, ctx, scale, fps, progressCallback, onComplete) {
+    const frameInterval = 1000 / fps;
+    let currentHistoryIndex = 0;
+    let lastFrameIndex = project.currentFrame || 0;
+    
+    const renderFrame = async () => {
+      if (currentHistoryIndex >= this.history.length) {
+        onComplete();
+        return;
+      }
+      
+      // Apply next history entry
+      const entry = this.history[currentHistoryIndex];
+      this.applyHistoryEntryToProject(entry, project, frameTimes, false);
+      
+      // Check if frame has changed
+      const currentFrameIndex = project.currentFrame || 0;
+      const frameChanged = currentFrameIndex !== lastFrameIndex;
+      lastFrameIndex = currentFrameIndex;
+      
+      // Always clear the canvas completely for each frame
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw background
+      if (!this.editor.transparentBackground) {
+        ctx.fillStyle = this.editor.secondaryColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      
+      // Create temporary canvas for the frame layers layers
+      const layerCanvas = document.createElement('canvas');
+      layerCanvas.width = project.width;
+      layerCanvas.height = project.height;
+      const layerCtx = this.editor.getCanvasContext(layerCanvas);
+      
+      // Draw current frame
+      const frame = project.frames[currentFrameIndex];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        if (layer.visible) {
+          // Clear the temporary canvas
+          layerCtx.clearRect(0, 0, project.width, project.height);
+          
+          // If we have image data, put it on the canvas
+          if (layer.imageData) {
+            const imageData = new ImageData(
+              new Uint8ClampedArray(layer.imageData),
+              project.width,
+              project.height
+            );
+            layerCtx.putImageData(imageData, 0, 0);
+          } else if (layer.canvas) {
+            // If we have a canvas, draw it
+            layerCtx.drawImage(layer.canvas, 0, 0);
+          }
+          
+          // Draw scaled to the main canvas
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(
+            layerCanvas, 
+            0, 0, project.width, project.height,
+            0, 0, canvas.width, canvas.height
+          );
+        }
+      }
+      
+      // Update progress
+      progressCallback(Math.floor((currentHistoryIndex / this.history.length) * 100), canvas.toDataURL());
+      
+      currentHistoryIndex++;
+      
+      // Schedule next frame
+      if (currentHistoryIndex < this.history.length) {
+        setTimeout(renderFrame, frameInterval);
+      } else {
+        setTimeout(() => {
+          onComplete();
+        }, frameInterval);
+      }
+    };
+    
+    // Start rendering
+    renderFrame();
+  }
+
+  // Project-specific operation handlers (similar to the main ones but for a target project) used to generate timelapse
+  applyHistoryEntryToProject(entry, project, frameTimes, isUndo) {
+    const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
+    
+    operations.forEach(operation => {
+      switch (operation.type) {
+        case 'add_frame':
+          this.applyAddFrameToProject(operation, project, frameTimes, isUndo);
+          break;
+        case 'remove_frame':
+          this.applyRemoveFrameToProject(operation, project, frameTimes, isUndo);
+          break;
+        case 'edit_frame':
+          if (operation.property === 'time') {
+            frameTimes[operation.frameIndex] = isUndo ? operation.oldValue : operation.newValue;
+          }
+          break;
+        case 'move_frame':
+          this.applyMoveFrameToProject(operation, project, frameTimes, isUndo);
+          break;
+        case 'change_animation_fps':
+          // This affects the global FPS, so we might not need to apply it per project
+          break;
+        case 'add_layer':
+          this.applyAddLayerToProject(operation, project, isUndo);
+          break;
+        case 'remove_layer':
+          this.applyRemoveLayerToProject(operation, project, isUndo);
+          break;
+        case 'change_layer_visibility':
+          const frame = project.frames[operation.frameIndex];
+          if (frame && frame.layers[operation.layerIndex]) {
+            frame.layers[operation.layerIndex].visible = isUndo ? !operation.visible : operation.visible;
+          }
+          break;
+        case 'move_layer':
+          this.applyMoveLayerToProject(operation, project, isUndo);
+          break;
+        case 'transform':
+          this.applyTransformToProject(operation, project, isUndo);
+          break;
+        case 'color_adjustment':
+          this.applyColorAdjustmentToProject(operation, project, isUndo);
+          break;
+        case 'draw':
+          this.applyDrawToProject(operation, project, isUndo);
+          break;
+      }
+    });
+  }
+  
+  applyAddFrameToProject(operation, project, frameTimes, isUndo) {
+    if (isUndo) {
+      project.frames.splice(operation.index, 1);
+      frameTimes.splice(operation.index, 1);
+    } else {
+      const newFrame = {
+        layers: operation.layers.map(layerData => {
+          const canvas = document.createElement('canvas');
+          const ctx = this.editor.getCanvasContext(canvas);
+          const layer = {
+            canvas: canvas,
+            ctx: ctx,
+            visible: layerData.visible,
+            name: layerData.name
+          };
+          layer.canvas.width = project.width;
+          layer.canvas.height = project.height;
+          
+          if (layerData.imageData) {
+            const ctx = layer.ctx;
+            const imageData = new ImageData(
+              new Uint8ClampedArray(layerData.imageData),
+              project.width,
+              project.height
+            );
+            ctx.putImageData(imageData, 0, 0);
+          }
+          
+          return layer;
+        })
+      };
+      
+      project.frames.splice(operation.index, 0, newFrame);
+      frameTimes.splice(operation.index, 0, operation.frameTime);
+    }
+  }
+
+  applyRemoveFrameToProject(operation, project, frameTimes, isUndo) {
+    if (isUndo) {
+      const restoredFrame = {
+        layers: operation.layers.map(layerData => {
+          const canvas = document.createElement('canvas');
+          const ctx = this.editor.getCanvasContext(canvas);
+          const layer = {
+            canvas: canvas,
+            ctx: ctx,
+            visible: layerData.visible,
+            name: layerData.name
+          };
+          layer.canvas.width = project.width;
+          layer.canvas.height = project.height;
+          
+          if (layerData.imageData) {
+            const ctx = layer.ctx;
+            ctx.putImageData(
+              new ImageData(
+                new Uint8ClampedArray(layerData.imageData),
+                project.width,
+                project.height
+              ),
+              0, 0
+            );
+          }
+          
+          return layer;
+        })
+      };
+      
+      project.frames.splice(operation.index, 0, restoredFrame);
+      frameTimes.splice(operation.index, 0, operation.frameTime);
+    } else {
+      project.frames.splice(operation.index, 1);
+      frameTimes.splice(operation.index, 1);
+    }
+  }
+
+  applyMoveFrameToProject(operation, project, frameTimes, isUndo) {
+    const { fromIndex, toIndex } = operation;
+    
+    if (isUndo) {
+      const frame = project.frames.splice(toIndex, 1)[0];
+      const frameTime = frameTimes.splice(toIndex, 1)[0];
+      project.frames.splice(fromIndex, 0, frame);
+      frameTimes.splice(fromIndex, 0, frameTime);
+    } else {
+      const frame = project.frames.splice(fromIndex, 1)[0];
+      const frameTime = frameTimes.splice(fromIndex, 1)[0];
+      project.frames.splice(toIndex, 0, frame);
+      frameTimes.splice(toIndex, 0, frameTime);
+    }
+  }
+
+  applyAddLayerToProject(operation, project, isUndo) {
+    const { frameIndex, layerIndex, layerData } = operation;
+    const frame = project.frames[frameIndex];
+    
+    if (isUndo) {
+      frame.layers.splice(layerIndex, 1);
+    } else {
+      const canvas = document.createElement('canvas');
+      const ctx = this.editor.getCanvasContext(canvas);
+      const layer = {
+        canvas: canvas,
+        ctx: ctx,
+        visible: layerData.visible,
+        name: layerData.name
+      };
+      layer.canvas.width = project.width;
+      layer.canvas.height = project.height;
+      
+      if (layerData.imageData) {
+        const ctx = layer.ctx;
+        const imageData = new ImageData(
+          new Uint8ClampedArray(layerData.imageData),
+          project.width,
+          project.height
+        );
+        ctx.putImageData(imageData, 0, 0);
+      }
+      
+      frame.layers.splice(layerIndex, 0, layer);
+    }
+  }
+
+  applyRemoveLayerToProject(operation, project, isUndo) {
+    const { frameIndex, layerIndex, layerData } = operation;
+    const frame = project.frames[frameIndex];
+    
+    if (isUndo) {
+      const canvas = document.createElement('canvas');
+      const ctx = this.editor.getCanvasContext(canvas);
+      const layer = {
+        canvas: canvas,
+        ctx: ctx,
+        visible: layerData.visible,
+        name: layerData.name
+      };
+      layer.canvas.width = project.width;
+      layer.canvas.height = project.height;
+      
+      if (layerData.imageData) {
+        const ctx = layer.ctx;
+        ctx.putImageData(
+          new ImageData(
+            new Uint8ClampedArray(layerData.imageData),
+            project.width,
+            project.height
+          ),
+          0, 0
+        );
+      }
+      
+      frame.layers.splice(layerIndex, 0, layer);
+    } else {
+      frame.layers.splice(layerIndex, 1);
+    }
+  }
+
+  applyMoveLayerToProject(operation, project, isUndo) {
+    const { frameIndex, fromIndex, toIndex } = operation;
+    const frame = project.frames[frameIndex];
+    
+    if (isUndo) {
+      const layer = frame.layers.splice(toIndex, 1)[0];
+      frame.layers.splice(fromIndex, 0, layer);
+    } else {
+      const layer = frame.layers.splice(fromIndex, 1)[0];
+      frame.layers.splice(toIndex, 0, layer);
+    }
+  }
+
+  applyTransformToProject(operation, project, isUndo) {
+    const { frameIndex, layerIndex, transformData } = operation;
+    const frame = project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    
+    if (!layer.canvas) {
+      layer.canvas = document.createElement('canvas');
+      layer.canvas.width = project.width;
+      layer.canvas.height = project.height;
+    }
+    
+    const ctx = layer.ctx;
+    const imageData = new ImageData(
+      new Uint8ClampedArray(isUndo ? transformData.oldImageData : transformData.newImageData),
+      transformData.oldWidth || project.width,
+      transformData.oldHeight || project.height
+    );
+    
+    ctx.putImageData(imageData, 0, 0);
+    
+    // Update dimensions if they changed
+    if (transformData.newWidth && transformData.newHeight) {
+      layer.canvas.width = isUndo ? transformData.oldWidth : transformData.newWidth;
+      layer.canvas.height = isUndo ? transformData.oldHeight : transformData.newHeight;
+    }
+  }
+  
+  applyColorAdjustmentToProject(operation, project, isUndo) {
+    const { frameIndex, layerIndex, adjustmentData } = operation;
+    const frame = project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    
+    if (!layer.canvas) {
+      layer.canvas = document.createElement('canvas');
+      layer.canvas.width = project.width;
+      layer.canvas.height = project.height;
+    }
+    
+    const ctx = layer.ctx;
+    const imageData = new ImageData(
+      new Uint8ClampedArray(isUndo ? adjustmentData.oldImageData : adjustmentData.newImageData),
+      project.width,
+      project.height
+    );
+    
+    ctx.putImageData(imageData, 0, 0);
+  }
+  
+  applyDrawToProject(operation, project, isUndo) {
+    const { frameIndex, layerIndex, pixels } = operation;
+    const frame = project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    
+    project.currentFrame  = frameIndex;
+    project.currentLayer = layerIndex
+    
+    if (!layer.canvas) {
+      layer.canvas = document.createElement('canvas');
+      layer.canvas.width = project.width;
+      layer.canvas.height = project.height;
+    }
+    
+    const ctx = layer.ctx;
+    
+    pixels.forEach(pixel => {
+      const { x, y, oldColor, newColor } = pixel;
+      const colorToApply = isUndo ? oldColor : newColor;
+      
+      if (colorToApply === 'transparent') {
+        ctx.clearRect(x, y, 1, 1);
+      } else {
+        ctx.fillStyle = colorToApply;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    });
+  }
+  
+  // Serialize history for saving
+  serialize() {
+    return JSON.stringify({
+      history: this.history,
+      historyIndex: this.historyIndex
+    });
+  }
+
+  // Deserialize history from loaded data
+  deserialize(data) {
+    try {
+      const parsed = JSON.parse(data);
+      this.history = parsed.history || [];
+      this.historyIndex = parsed.historyIndex || -1;
+      return true;
+    } catch (error) {
+      console.error('Error deserializing history:', error);
+      return false;
+    }
+  }
+
+  // Clear history
+  clear() {
+    this.history = [];
+    this.historyIndex = -1;
+    this.currentBatch = null;
+  }
+}
+
+// Collaboration Manager
+class CollabManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.ws = null;
+    this.host = HOST;
+    this.sessionId = null;
+    this.sessionName = '';
+    this.memberId = null;
+    this.memberName = this.editor.collabMemberName;
+    this.memberColor = this.editor.collabMemberColor;
+    this.isHost = false;
+    this.isConnected = false;
+    this.manualDisconnect = false;
+    this.chatVisible = false;
+    
+    // Members tracking
+    this.members = new Map();
+    
+    // Permissions
+    this.permissions = {
+      undoRedo: 'host',
+      addRemoveFrames: 'everyone',
+      addRemoveLayers: 'everyone',
+      draw: 'everyone',
+      chat: 'everyone'
+    };
+    
+    // Visible cursors tracking
+    this.cursors = new Map();
+    this.cursorContainer = null;
+    
+    // Current trace being drawn
+    this.currentTrace = null;
+    this.tracePoints = [];
+    
+    // Chat
+    this.chatMessages = [];
+    
+    // Throttle cursor updates
+    this.lastCursorSend = 0;
+    this.CURSOR_THROTTLE = 50;
+    
+    // Initialize
+    this.initUI();
+  }
+
+  getColorHex(colorName) {
+    const colors = {
+      red: '#ff4444',
+      blue: '#4444ff',
+      green: '#44ff44',
+      yellow: '#ffff44',
+      orange: '#ff5722',
+      purple: '#aa44ff',
+      pink: '#ff44aa',
+      cyan: '#44ffff',
+      brown: '#8b4513',
+      gray: '#888888',
+      lime: '#aaff44',
+      indigo: '#4b0082'
+    };
+    return colors[colorName] || '#ffffff';
+  }
+  
+  wrapMemberName(member, displayName) {
+    return `<span style="color:${this.getColorHex(member.color)}">${displayName || member.name}</span>`;
+  }
+
+  initUI() {
+    // Create cursor container
+    this.cursorContainer = document.createElement('div');
+    this.cursorContainer.className = 'collab-cursor-container';
+    this.editor.uiLayer.appendChild(this.cursorContainer);
+    
+    // Create Chat button
+    this.chatButton = document.createElement('button');
+    this.chatButton.className = 'collab-chat-button';
+    this.chatButton.textContent = "Chat";
+    this.chatButton.addEventListener("click", () => this.openChat());
+    this.editor.animationPanel.appendChild(this.chatButton);
+
+    // Create chat container
+    this.chatContainer = document.createElement('div');
+    this.chatContainer.className = 'collab-chat-container';
+    
+    // Chat messages area
+    this.chatMessagesDiv = document.createElement('div');
+    this.chatMessagesDiv.className = 'collab-chat-messages';
+    this.chatContainer.appendChild(this.chatMessagesDiv);
+    
+    // Close button
+    const closeButton = document.createElement("div");
+    closeButton.className = "panel-close collab-chat-close";
+    closeButton.innerHTML = "&times;";
+    closeButton.addEventListener("click", () => this.closeChat());
+    this.chatContainer.appendChild(closeButton);
+    
+    // Chat input
+    const chatInputDiv = document.createElement('div');
+    chatInputDiv.className = 'collab-chat-input-container';
+    
+    this.chatInput = document.createElement('input');
+    this.chatInput.type = 'text';
+    this.chatInput.placeholder = __('Escribe un mensaje...||Type a message...');
+    this.chatInput.className = 'collab-chat-input';
+    this.chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && this.chatInput.value.trim()) {
+        this.sendChatMessage(this.chatInput.value.trim());
+        this.chatInput.value = '';
+      }
+    });
+    
+    const sendBtn = document.createElement('button');
+    sendBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"/>
+      </svg>
+    `;
+    sendBtn.className = 'collab-chat-send';
+    sendBtn.addEventListener('click', () => {
+      if (this.chatInput.value.trim()) {
+        this.sendChatMessage(this.chatInput.value.trim());
+        this.chatInput.value = '';
+      }
+    });
+    
+    chatInputDiv.appendChild(this.chatInput);
+    chatInputDiv.appendChild(sendBtn);
+    this.chatContainer.appendChild(chatInputDiv);
+    
+    this.editor.animationPanel.appendChild(this.chatContainer);
+
+    // Ping indicator
+    this.pingIndicator = document.createElement('div');
+    this.pingIndicator.className = 'collab-ping-indicator';
+    this.pingIndicator.innerHTML = `
+      <span class="ping-dot" style="background-color: #44ff44;"></span>
+      <span class="ping-value">---</span>
+    `;
+    this.editor.uiLayer.appendChild(this.pingIndicator);
+
+    // Session overlay
+    this.createSessionOverlay();
+  }
+
+  createSessionOverlay() {
+    this.sessionOverlay = document.createElement('div');
+    this.sessionOverlay.className = "collab-session-overlay";
+    
+    // Header
+    const header = document.createElement('div');
+    header.className = "collab-session-header";
+    
+    const title = document.createElement('h2');
+    title.className = "collab-session-title";
+    title.textContent = __('Sesión Colaborativa||Collaborative Session');
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = "collab-close-btn";
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', () => {
+      this.sessionOverlay.style.display = 'none';
+    });
+    
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+    
+    // Content
+    this.sessionContent = document.createElement('div');
+    this.sessionContent.className = "collab-session-content";
+    
+    this.sessionOverlay.appendChild(header);
+    this.sessionOverlay.appendChild(this.sessionContent);
+    document.body.appendChild(this.sessionOverlay);
+  }
+
+  hookEditorMethods() {
+    const self = this;
+    
+    // Store original methods
+    const originalAddFrame = this.editor.addFrame;
+    const originalRemoveFrame = this.editor.removeFrame;
+    const originalMoveFrame = this.editor.moveFrame;
+    const originalAddLayer = this.editor.addLayer;
+    const originalRemoveLayer = this.editor.removeLayer;
+    const originalMoveLayer = this.editor.moveLayer;
+    const originalSetLayerVisibility = this.editor.setLayerVisibility;
+    const originalUndo = this.editor.undo;
+    const originalRedo = this.editor.redo;
+    
+    this.editor._originalAddFrame = originalAddFrame;
+    this.editor._originalRemoveFrame = originalRemoveFrame;
+    this.editor._originalMoveFrame = originalMoveFrame;
+    this.editor._originalAddLayer = originalAddLayer;
+    this.editor._originalRemoveLayer = originalRemoveLayer;
+    this.editor._originalMoveLayer = originalMoveLayer;
+    this.editor._originalSetLayerVisibility = originalSetLayerVisibility;
+    this.editor._originalUndo = originalUndo;
+    this.editor._originalRedo = originalRedo;
+    
+    // Hook into drawing by intercepting tool methods
+    this.hookToolMethods();
+    
+    // Hook into frame methods
+    this.editor.addFrame = function(...args) {
+      const result = originalAddFrame.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveFrames')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    this.editor.removeFrame = function(...args) {
+      const result = originalRemoveFrame.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveFrames')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    this.editor.moveFrame = function(...args) {
+      const result = originalMoveFrame.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveFrames')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    // Hook into layer methods
+    this.editor.addLayer = function(...args) {
+      const result = originalAddLayer.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveLayers')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    this.editor.removeLayer = function(...args) {
+      const result = originalRemoveLayer.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveLayers')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    this.editor.moveLayer = function(...args) {
+      const result = originalMoveLayer.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveLayers')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    this.editor.setLayerVisibility = function(...args) {
+      const result = originalSetLayerVisibility.call(this, ...args);
+      if (self.isConnected && self.canPerformAction('addRemoveLayers')) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    // Hook into undo/redo
+    this.editor.undo = function() {
+      if (self.isConnected && !self.isHost && !self.canPerformAction('undoRedo')) {
+        self.editor.showToast(__('No tienes permiso para deshacer'), 1000);
+        return;
+      }
+      const result = originalUndo.call(this);
+      if (self.isConnected && self.isHost) {
+        self.sendFullState();
+      }
+      return result;
+    };
+    
+    this.editor.redo = function() {
+      if (self.isConnected && !self.isHost && !self.canPerformAction('undoRedo')) {
+        self.editor.showToast(__('No tienes permiso para rehacer'), 1000);
+        return;
+      }
+      const result = originalRedo.call(this);
+      if (self.isConnected && self.isHost) {
+        self.sendFullState();
+      }
+      return result;
+    };
+  }
+
+  hookToolMethods() {
+    const self = this;
+    
+    const tools = this.editor.tools;
+    
+    Object.keys(tools).forEach(toolName => {
+      // Store original tool methods
+      const tool = tools[toolName];
+      const originalOnDown = tool.onDown;
+      const originalOnMove = tool.onMove;
+      const originalOnUp = tool.onUp;
+      
+      tool.originalOnDown = originalOnDown;
+      tool.originalOnMove = originalOnMove;
+      tool.originalOnUp = originalOnUp;
+      
+      tool.onDown = function(x, y) {
+        // Start new trace
+        if (self.isConnected && self.canPerformAction('draw')) {
+          self.currentTrace = {
+            tool: toolName,
+            brushSize: self.editor.brushSize,
+            color: self.editor.getColor(),
+            points: [{ x, y }],
+            frame: self.editor.project.currentFrame,
+            layer: self.editor.project.currentLayer
+          };
+          self.tracePoints = [{ x, y }];
+        }
+        
+        if (originalOnDown) {
+          originalOnDown.call(self.editor, x, y);
+        }
+      };
+      
+      tool.onMove = function(x, y) {
+        // Add to current trace
+        if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
+          self.currentTrace.points.push({ x, y });
+          
+          // Send cursor update (throttled)
+          self.sendCursorUpdate(x, y, true);
+        }
+        
+        if (originalOnMove) {
+          originalOnMove.call(self.editor, x, y);
+        }
+      };
+      
+      tool.onUp = function(x, y, startX, startY) {
+        // Complete the trace and send it
+        if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
+          // Add final point if different
+          const lastPoint = self.currentTrace.points[self.currentTrace.points.length - 1];
+          if (lastPoint.x !== x || lastPoint.y !== y) {
+            self.currentTrace.points.push({ x, y });
+          }
+          
+          self.sendTraceComplete(self.currentTrace);
+          self.currentTrace = null;
+          self.sendCursorUpdate(0, 0, false);
+        }
+        
+        if (originalOnUp) {
+          originalOnUp.call(self.editor, x, y, startX, startY);
+        }
+      };
+    });
+  }
+  
+  restoreEditorMethods() {
+    this.editor.addFrame = this.editor._originalAddFrame;
+    this.editor.removeFrame = this.editor._originalRemoveFrame;
+    this.editor.moveFrame = this.editor._originalMoveFrame;
+    this.editor.addLayer = this.editor._originalAddLayer;
+    this.editor.removeLayer = this.editor._originalRemoveLayer;
+    this.editor.moveLayer = this.editor._originalMoveLayer;
+    this.editor.setLayerVisibility = this.editor._originalSetLayerVisibility;
+    this.editor.undo = this.editor._originalUndo;
+    this.editor.redo = this.editor._originalRedo;
+    
+    const tools = this.editor.tools;
+    
+    Object.keys(tools).forEach(toolName => {
+      const tool = tools[toolName];
+
+      tool.onDown = tool.originalOnDown;
+      tool.onMove = tool.originalOnMove;
+      tool.onUp = tool.originalOnUp;
+    });
+  }
+  
+  updateMemberName(newName) {
+    this.sendMessage({
+      type: 'name_update',
+      oldName: this.memberName,
+      newName: newName
+    });
+    
+    this.memberName = newName;
+  }
+  
+  updateMemberColor(newColor) {
+    this.sendMessage({
+      type: 'color_update',
+      oldColor: this.memberColor,
+      newColor: newColor
+    });
+    
+    this.memberColor = newColor;
+  }
+
+  connectWebSocket() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    
+    this.editor.showLoadingScreen(__('Conectando...||Connecting...'));
+    
+    this.ws = new WebSocket(this.host);
+    
+    this.ws.onopen = () => {
+      console.log('WebSocket connected');
+      this.editor.hideLoadingScreen();
+      this.manualDisconnect = false;
+      this.startPingInterval();
+    };
+    
+    this.ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        this.handleMessage(message);
+      } catch (error) {
+        console.error('Error parsing message:', error);
+      }
+    };
+    
+    this.ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      this.handleDisconnect();
+    };
+    
+    this.ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      this.editor.hideLoadingScreen();
+      this.editor.showToast(__('Error de conexión||Connection error'), 3000);
+    };
+  }
+
+  sendMessage(message) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    }
+  }
+
+  handleMessage(message) {
+    switch (message.type) {
+      case 'session_created':
+        this.handleSessionCreated(message);
+        break;
+      case 'session_joined':
+        this.handleSessionJoined(message);
+        break;
+      case 'member_joined':
+        this.handleMemberJoined(message.member);
+        break;
+      case 'member_left':
+        this.handleMemberLeft(message.memberId, message.memberName);
+        break;
+      case 'member_kicked':
+        this.handleMemberKicked(message.memberId, message.memberName);
+        break;
+      case 'you_were_kicked':
+        this.handleYouWereKicked();
+        break;
+      case 'trace_complete':
+        this.handleTraceComplete(message);
+        break;
+      case 'cursor_update':
+        this.handleRemoteCursor(message);
+        break;
+      case 'name_update':
+        this.handleNameUpdate(message);
+        break;
+      case 'color_update':
+        this.handleColorUpdate(message);
+        break;
+      case 'chat_message':
+        this.handleChatMessage(message);
+        break;
+      case 'full_state':
+        this.handleFullState(message);
+        break;
+      case 'session_ended':
+        this.handleSessionEnded(message.reason);
+        break;
+      case 'pong':
+        this.handlePong(message.timestamp);
+        break;
+    }
+  }
+
+  handleSessionCreated(message) {
+    this.sessionId = message.sessionId;
+    this.sessionName = message.sessionName;
+    this.memberId = message.memberId;
+    this.isHost = true;
+    this.isConnected = true;
+    
+    this.clearChatMessages();
+    
+    this.members.clear();
+    this.members.set(this.memberId, {
+      id: this.memberId,
+      name: this.memberName,
+      color: this.memberColor,
+      isHost: true
+    });
+    
+    this.chatButton.style.display = 'flex';
+    this.pingIndicator.style.display = 'flex';
+    this.sendFullState();
+    this.renderSessionMenu();
+    this.sessionOverlay.style.display = 'flex';
+    
+    this.hookEditorMethods();
+    
+    this.editor.showToast(__('Sesión creada||Session created'), 2000);
+  }
+
+  handleSessionJoined(message) {
+    this.sessionId = message.sessionId;
+    this.sessionName = message.sessionName;
+    this.memberId = message.memberId;
+    this.isHost = message.isHost;
+    this.isConnected = true;
+    
+    this.members.clear();
+    message.members.forEach(member => {
+      this.members.set(member.id, member);
+    });
+    
+    this.clearChatMessages();
+    
+    // Load project state if available
+    if (message.projectData) {
+      this.applyFullState(message.projectData);
+    }
+    
+    this.chatButton.style.display = 'flex';
+    this.pingIndicator.style.display = 'flex';
+    this.renderSessionMenu();
+    this.sessionOverlay.style.display = 'flex';
+    
+    this.hookEditorMethods();
+    
+    this.editor.showToast(__('Conectado a la sesión||Connected to the session'), 2000);
+  }
+
+  handleMemberJoined(member) {
+    if (member.id === this.memberId) return;
+    this.members.set(member.id, member);
+    this.editor.showToast(`${this.wrapMemberName(member)} ${__('se unió||joined')}`, 2000);
+    if (this.isHost) {
+      this.sendFullState(member.id);
+    }
+    this.renderSessionMenu();
+  }
+
+  handleMemberLeft(memberId, memberName) {
+    const member = this.members.get(memberId);
+    if (member) {
+      this.members.delete(memberId);
+      this.removeUserCursor(memberId);
+      this.editor.showToast(`${this.wrapMemberName(member, member.name || memberName)} ${__('salió||left')}`, 2000);
+      this.renderSessionMenu();
+    }
+  }
+
+  handleMemberKicked(memberId, memberName) {
+    const member = this.members.get(memberId);
+    if (member) {
+      this.members.delete(memberId);
+      this.removeUserCursor(memberId);
+      this.editor.showToast(`${member.name || memberName} ${__('fue expulsado')}`, 3000);
+      this.renderSessionMenu();
+    }
+  }
+
+  handleYouWereKicked() {
+    this.manualDisconnect = false;
+    this.disconnect();
+    this.editor.showToast(__('Has sido expulsado de la sesión'), 4000);
+  }
+
+  handleTraceComplete(message) {
+    const { memberId, data } = message;
+    const member = this.members.get(memberId);
+    
+    if (!member || memberId === this.memberId) return;
+    
+    // Show name tag at the last point
+    const lastPoint = data.points[data.points.length - 1];
+    this.showCursor(memberId, member.name, member.color, lastPoint.x, lastPoint.y);
+    
+    // Apply the trace using the editor's drawing methods
+    this.applyTrace(data);
+  }
+
+  applyTrace(trace) {
+    const { tool, brushSize, color, points, frame, layer } = trace;
+    
+    const frameObj = this.editor.project?.frames[frame];
+    if (!frameObj) return;
+    
+    const layerObj = frameObj.layers[layer];
+    if (!layerObj) return;
+    
+    const ctx = layerObj.ctx;
+    
+    // Store original brush size and color
+    const originalBrushSize = this.editor.brushSize;
+    const originalSelectedColor = this.editor.selectedColor;
+    const originalPrimaryColor = this.editor.primaryColor;
+    
+    // Temporarily set for drawing
+    this.editor.brushSize = brushSize;
+    this.editor.selectedColor = 'primary';
+    this.editor.primaryColor = color;
+    
+    // Get the tool
+    const toolObj = this.editor.tools[tool];
+    if (!toolObj) return;
+    
+    // Need to temporarily set the current tool to draw properly
+    const originalTool = this.editor.currentTool;
+    this.editor.currentTool = toolObj;
+    
+    // Draw the trace using the tool's original methods
+    if (points.length === 1) {
+      // Single point (click)
+      if (toolObj.originalOnDown) {
+        toolObj.originalOnDown.call(this.editor, points[0].x, points[0].y);
+      }
+      if (toolObj.originalOnUp) {
+        toolObj.originalOnUp.call(this.editor, points[0].x, points[0].y);
+      }
+    } else {
+      // Stroke with multiple points
+      if (toolObj.originalOnDown) {
+        toolObj.originalOnDown.call(this.editor, points[0].x, points[0].y);
+      }
+      
+      // Draw the stroke
+      for (let i = 1; i < points.length; i++) {
+        if (toolObj.originalOnMove) {
+          toolObj.originalOnMove.call(this.editor, points[i].x, points[i].y);
+        }
+      }
+      
+      if (toolObj.originalOnUp) {
+        toolObj.originalOnUp.call(this.editor, points[points.length - 1].x, points[points.length - 1].y);
+      }
+    }
+    
+    // Restore original values
+    this.editor.brushSize = originalBrushSize;
+    this.editor.selectedColor = originalSelectedColor;
+    this.editor.primaryColor = originalPrimaryColor;
+    this.editor.currentTool = originalTool;
+    
+    // Force a render to show the drawing
+    this.editor.render();
+  }
+  
+  handleRemoteCursor(message) {
+    const { memberId, x, y, active } = message;
+    const member = this.members.get(memberId);
+    
+    if (!member || memberId === this.memberId) return;
+    
+    if (active) {
+      this.showCursor(memberId, member.name, member.color, x, y);
+    } else {
+      this.hideCursor(memberId);
+    }
+  }
+  
+  handleNameUpdate(message) {
+    const { memberId, oldName, newName } = message;
+    const member = this.members.get(memberId);
+    
+    if (!member || memberId === this.memberId) return;
+    
+    member.name = newName;
+    
+    this.editor.showToast(`${this.wrapMemberName(member, oldName)}</span> ${__("(ha cambiado su nombre a|has changed name to)")} ${this.wrapMemberName(member, newName)}`);
+  }
+  
+  handleColorUpdate(message) {
+    const { memberId, oldColor, newColor } = message;
+    const member = this.members.get(memberId);
+    
+    if (!member || memberId === this.memberId) return;
+    
+    member.color = newColor;
+    
+    this.editor.showToast(`${this.wrapMemberName(member)}</span> ${__("(ha cambiado su color|has changed color)")}`);
+  }
+
+  handleChatMessage(message) {
+    this.chatMessages.push(message);
+    this.addMessageHtml(message);
+    if (!this.chatVisible) {
+      this.chatButton.classList.add('new-message');
+    }
+    this.scrollMessagesToBottom();
+  }
+
+  handleFullState(message) {
+    if (message.memberId === this.memberId) return;
+    this.applyFullState(message.state);
+    this.editor.showOperationMessage(__('Proyecto sincronizado||Project synchronized'), 1000);
+  }
+
+  handleSessionEnded(reason) {
+    this.disconnect(false);
+    this.editor.showToast(reason || __('La sesión ha terminado'), 3000);
+  }
+
+  handlePong(timestamp) {
+    const ping = Date.now() - timestamp;
+    this.updatePingIndicator(ping);
+  }
+
+  handleDisconnect() {
+    this.isConnected = false;
+    this.stopPingInterval();
+    this.cleanupDisconnect();
+  }
+
+  cleanupDisconnect() {
+    this.isConnected = false;
+    this.sessionId = null;
+    this.sessionName = '';
+    this.isHost = false;
+    this.members.clear();
+    this.removeAllCursors();
+    this.currentTrace = null;
+    this.chatButton.style.display = 'none';
+    this.chatContainer.style.display = 'none';
+    this.pingIndicator.style.display = 'none';
+    this.sessionOverlay.style.display = 'none';
+    
+    this.restoreEditorMethods();
+    
+    if (!this.manualDisconnect) {
+      this.editor.showToast(__('Desconectado'), 2000);
+    }
+  }
+
+  sendTraceComplete(trace) {
+    this.sendMessage({
+      type: 'trace_complete',
+      data: trace
+    });
+  }
+
+  sendCursorUpdate(x, y, active) {
+    const now = Date.now();
+    if (now - this.lastCursorSend < this.CURSOR_THROTTLE) return;
+    this.lastCursorSend = now;
+    
+    this.sendMessage({
+      type: 'cursor_update',
+      x: Math.round(x),
+      y: Math.round(y),
+      active: active
+    });
+  }
+
+  sendChatMessage(text) {
+    this.sendMessage({
+      type: 'chat_message',
+      message: text
+    });
+  }
+
+  sendFullState(toMemberId) {
+    if (!this.isHost || !this.isConnected) return;
+    
+    const state = this.getFullState();
+    this.sendMessage({
+      type: 'full_state',
+      state: state,
+      toMemberId: toMemberId || null
+    });
+  }
+
+  getFullState() {
+    const state = {
+      width: this.editor.project.width,
+      height: this.editor.project.height,
+      frames: [],
+      currentFrame: this.editor.project.currentFrame,
+      currentLayer: this.editor.project.currentLayer
+    };
+    
+    for (let f = 0; f < this.editor.project.frames.length; f++) {
+      const frame = this.editor.project.frames[f];
+      const frameData = { layers: [] };
+      
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, state.width, state.height);
+        
+        frameData.layers.push({
+          name: layer.name,
+          visible: layer.visible,
+          imageData: Array.from(imageData.data)
+        });
+      }
+      
+      state.frames.push(frameData);
+    }
+    
+    return state;
+  }
+
+  applyFullState(state) {
+    const project = {
+      width: state.width,
+      height: state.height,
+      frames: [],
+      currentFrame: state.currentFrame,
+      currentLayer: state.currentLayer
+    };
+    
+    for (let f = 0; f < state.frames.length; f++) {
+      const frameData = state.frames[f];
+      const frame = { layers: [] };
+      
+      for (let l = 0; l < frameData.layers.length; l++) {
+        const layerData = frameData.layers[l];
+        const canvas = document.createElement('canvas');
+        canvas.width = state.width;
+        canvas.height = state.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (layerData.imageData) {
+          const imageData = new ImageData(
+            new Uint8ClampedArray(layerData.imageData),
+            state.width,
+            state.height
+          );
+          ctx.putImageData(imageData, 0, 0);
+        }
+        
+        frame.layers.push({
+          canvas: canvas,
+          ctx: ctx,
+          name: layerData.name,
+          visible: layerData.visible
+        });
+      }
+      
+      project.frames.push(frame);
+    }
+    
+    this.editor.project = project;
+    this.editor.resetCanvasSize();
+    this.editor.render();
+  }
+
+  createSession(sessionName, password) {
+    this.memberName = this.editor.collabMemberName;
+    this.memberColor = this.editor.collabMemberColor;
+    
+    this.connectWebSocket();
+    
+    const checkConnection = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        clearInterval(checkConnection);
+        this.sendMessage({
+          type: 'create_session',
+          sessionName: sessionName,
+          password: password || undefined,
+          userName: this.memberName,
+          userColor: this.memberColor
+        });
+      }
+    }, 100);
+  }
+
+  joinSession(sessionId, password) {
+    this.memberName = this.editor.collabMemberName;
+    this.memberColor = this.editor.collabMemberColor;
+    
+    this.connectWebSocket();
+    
+    const checkConnection = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        clearInterval(checkConnection);
+        this.sendMessage({
+          type: 'join_session',
+          sessionId: sessionId,
+          password: password || undefined,
+          userName: this.memberName,
+          userColor: this.memberColor
+        });
+      }
+    }, 100);
+  }
+
+  disconnect(manualDisconnect = true) {
+    this.manualDisconnect = manualDisconnect;
+    if (this.ws) {
+      this.sendMessage({ type: 'leave_session' });
+      this.ws.close();
+    }
+    this.cleanupDisconnect();
+  }
+
+  kickMember(memberId) {
+    if (!this.isHost) return;
+    
+    this.sendMessage({
+      type: 'kick_member',
+      memberId: memberId
+    });
+  }
+
+  showCursor(memberId, name, color, canvasX, canvasY) {
+    const screenPos = this.canvasToScreen(canvasX, canvasY);
+    if (!screenPos) return;
+    
+    let cursor = this.cursors.get(memberId);
+    
+    if (!cursor) {
+      cursor = document.createElement('div');
+      cursor.className = "collab-cursor-item";
+      
+      cursor.innerHTML = `
+        <div class="collab-cursor-ping"></div>
+        <div class="collab-cursor-name"></div>
+      `;
+      
+      this.cursorContainer.appendChild(cursor);
+      this.cursors.set(memberId, cursor);
+    }
+    
+    cursor.style.left = `${screenPos.x}px`;
+    cursor.style.top = `${screenPos.y}px`;
+    cursor.querySelector('div:first-child').style.borderColor = this.getColorHex(color);
+    cursor.querySelector('div:last-child').textContent = name;
+    cursor.querySelector('div:last-child').style.backgroundColor = this.getColorHex(color);
+    cursor.style.opacity = '1';
+    
+    cursor.isVisible = true;
+    cursor.lastUpdate = Date.now();
+    
+    if (!cursor._interval) {
+      cursor._interval = setInterval(() => {
+        if (cursor.isVisible && Date.now() - cursor.lastUpdate >= 2000) {
+          this.hideCursor(memberId);
+        }
+      }, 200);
+    }
+  }
+
+  hideCursor(memberId) {
+    const cursor = this.cursors.get(memberId);
+    if (cursor) {
+      cursor.style.opacity = '0';
+      cursor.lastUpdate = Date.now();
+      cursor.isVisible = false;
+    }
+  }
+
+  removeUserCursor(memberId) {
+    const cursor = this.cursors.get(memberId);
+    if (cursor) {
+      cursor.remove();
+      clearInterval(cursor._interval);
+      this.cursors.delete(memberId);
+    }
+  }
+
+  removeAllCursors() {
+    this.cursors.forEach(cursor => cursor.remove());
+    this.cursors.clear();
+  }
+  
+  openChat() {
+    this.chatButton.style.display = 'none';
+    this.chatButton.classList.remove('new-message');
+    this.chatContainer.style.display = 'flex';
+    this.chatVisible = true;
+  }
+  
+  closeChat() {
+    this.chatButton.style.display = 'block';
+    this.chatContainer.style.display = 'none';
+    this.chatVisible = false;
+  }
+
+  canvasToScreen(canvasX, canvasY) {
+    if (!this.editor.project) return null;
+    
+    const rect = this.editor.canvasContainer.getBoundingClientRect();
+    
+    const screenX = rect.left + rect.width / 2 + 
+                   (canvasX - this.editor.project.width / 2) * this.editor.scale + 
+                   this.editor.posX;
+    const screenY = rect.top + rect.height / 2 + 
+                   (canvasY - this.editor.project.height / 2) * this.editor.scale + 
+                   this.editor.posY;
+    
+    return { x: screenX, y: screenY };
+  }
+  
+  renderSessionMenu() {
+    this.sessionContent.innerHTML = '';
+    
+    // Session info
+    const infoCard = document.createElement('div');
+    infoCard.style.cssText = `
+      background-color: var(--ui-color);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    `;
+    
+    infoCard.innerHTML = `
+      <div style="margin-bottom: 12px;">
+        <span style="color: var(--text-dim);">${__('Sala||Room')}:</span>
+        <span style="color: var(--text-color); font-weight: bold; margin-left: 8px;">${this.sessionName || __('Sala sin nombre||Unnamed room')}</span>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <span style="color: var(--text-dim);">${__('Miembros||Members')}:</span>
+        <span style="color: var(--text-color); font-weight: bold; margin-left: 8px;">${this.members.size}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="color: var(--text-dim);">${__('ID||ID')}:</span>
+        <span style="color: var(--text-color); font-family: monospace; background: var(--bg-color); padding: 4px 8px; border-radius: 4px; flex: 1; font-size: 12px;">${this.sessionId || 'Unknown'}</span>
+        <button id="copyIdBtn" style="background: var(--ui-highlight); border: none; border-radius: 4px; color: var(--text-color); padding: 4px 8px; cursor: pointer;">
+          ${__('Copiar||Copy')}
+        </button>
+      </div>
+    `;
+    
+    const copyBtn = infoCard.querySelector('#copyIdBtn');
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(this.sessionId);
+      this.editor.showToast(__('ID copiado||ID copied'), 1000);
+    });
+    
+    this.sessionContent.appendChild(infoCard);
+    
+    // Members list
+    const membersSection = document.createElement('div');
+    membersSection.style.cssText = `
+      background-color: var(--ui-color);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    `;
+    
+    membersSection.innerHTML = `<h3 style="margin: 0 0 12px 0;">${__('Miembros||Members')}</h3>`;
+    
+    const membersList = document.createElement('div');
+    membersList.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+    
+    this.members.forEach(member => {
+      const memberItem = document.createElement('div');
+      memberItem.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+        background-color: ${member.id === this.memberId ? 'var(--primary-color)' : 'var(--bg-color)'};
+        border-radius: 6px;
+        color: ${member.id === this.memberId ? 'white' : 'var(--text-color)'};
+      `;
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.style.cssText = `font-weight: bold; display: flex; align-items: center; gap: 8px;`;
+      nameSpan.style.color = member.id === this.memberId ? 'white' : this.getColorHex(member.color);
+      
+      const nameText = document.createElement('span');
+      nameText.textContent = member.name;
+      nameSpan.appendChild(nameText);
+      
+      if (member.isHost) {
+        const hostBadge = document.createElement('span');
+        hostBadge.style.cssText = `
+          background-color: gold;
+          color: black;
+          font-size: 10px;
+          font-weight: bold;
+          padding: 2px 6px;
+          border-radius: 3px;
+        `;
+        hostBadge.textContent = 'HOST';
+        nameSpan.appendChild(hostBadge);
+      }
+      
+      if (member.id === this.memberId) {
+        const youBadge = document.createElement('span');
+        youBadge.style.cssText = `
+          background-color: rgba(255,255,255,0.3);
+          color: white;
+          font-size: 10px;
+          font-weight: bold;
+          padding: 2px 6px;
+          border-radius: 3px;
+        `;
+        youBadge.textContent = __('TÚ||YOU');
+        nameSpan.appendChild(youBadge);
+      }
+      
+      memberItem.appendChild(nameSpan);
+      
+      // Kick button for host
+      if (this.isHost && member.id !== this.memberId) {
+        const kickBtn = document.createElement('button');
+        kickBtn.textContent = __('Expulsar||Kick');
+        kickBtn.style.cssText = `
+          background-color: #ff4444;
+          border: none;
+          border-radius: 4px;
+          color: white;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: filter 0.2s;
+        `;
+        kickBtn.addEventListener('mouseenter', () => {
+          kickBtn.style.filter = 'brightness(1.2)';
+        });
+        kickBtn.addEventListener('mouseleave', () => {
+          kickBtn.style.filter = 'none';
+        });
+        kickBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.confirmKickMember(member);
+        });
+        memberItem.appendChild(kickBtn);
+      }
+      
+      membersList.appendChild(memberItem);
+    });
+    
+    membersSection.appendChild(membersList);
+    this.sessionContent.appendChild(membersSection);
+    
+    // Disconnect button
+    const disconnectBtn = document.createElement('button');
+    disconnectBtn.style.cssText = `
+      width: 100%;
+      padding: 12px;
+      background-color: ${this.isHost ? '#ff4444' : 'var(--ui-highlight)'};
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: filter 0.2s;
+    `;
+    disconnectBtn.textContent = this.isHost ? __('Terminar sesión||End Session') : __('Desconectar||Disconnect');
+    disconnectBtn.addEventListener('mouseenter', () => {
+      disconnectBtn.style.filter = 'brightness(1.2)';
+    });
+    disconnectBtn.addEventListener('mouseleave', () => {
+      disconnectBtn.style.filter = 'none';
+    });
+    disconnectBtn.addEventListener('click', () => {
+      this.editor.showPopup(
+        this.isHost ? __('Terminar sesión||End Session') : __('Desconectar||Disconnect'),
+        this.isHost ? __('¿Terminar la sesión para todos?||End session for everyone?') : __('¿Desconectarse de la sesión?||Disconnect from session?'),
+        [
+          {
+            text: __('Cancelar||Cancel'),
+            class: 'cancel',
+            action: () => this.editor.hidePopup()
+          },
+          {
+            text: __('Sí||Yes'),
+            action: () => {
+              this.disconnect();
+              this.sessionOverlay.style.display = 'none';
+              this.editor.hidePopup();
+            }
+          }
+        ]
+      );
+    });
+    
+    this.sessionContent.appendChild(disconnectBtn);
+  }
+
+  renderSessionMenu() {
+    this.sessionContent.innerHTML = '';
+    
+    // Session info
+    const infoCard = document.createElement('div');
+    infoCard.className = "collab-info-card";
+    
+    infoCard.innerHTML = `
+      <div class="collab-info-item">
+        <span class="collab-info-label">${__('Sala||Room')}:</span>
+        <span class="collab-info-value">${this.sessionName || __('Sala sin nombre||Unnamed room')}</span>
+      </div>
+      <div class="collab-info-item">
+        <span class="collab-info-label">${__('Miembros||Members')}:</span>
+        <span class="collab-info-value">${this.members.size}</span>
+      </div>
+      <div class="collab-info-item">
+        <span style="collab-info-label">${__('ID||ID')}:</span>
+        <span class="collab-info-value token">${this.sessionId || 'Unknown'}</span>
+        <button id="copyIdBtn" class="collab-copy-btn">
+          ${__('Copiar||Copy')}
+        </button>
+      </div>
+    `;
+    
+    const copyBtn = infoCard.querySelector('#copyIdBtn');
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(this.sessionId);
+      this.editor.showToast(__('ID copiado||ID copied'), 1000);
+    });
+    
+    this.sessionContent.appendChild(infoCard);
+    
+    // Members list
+    const membersSection = document.createElement('div');
+    membersSection.className = "collab-members-section";
+    
+    membersSection.innerHTML = `<h3>${__('Miembros||Members')}</h3>`;
+    
+    const membersList = document.createElement('div');
+    membersList.className = "collab-members-list";
+    
+    this.members.forEach(member => {
+      const memberItem = document.createElement('div');
+      memberItem.className = member.id === this.memberId ? "collab-member-item current-user" : "collab-member-item";
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.className = "collab-member-name";
+      nameSpan.style.color = member.id === this.memberId ? 'white' : this.getColorHex(member.color);
+      
+      const nameText = document.createElement('span');
+      nameText.textContent = member.name;
+      nameSpan.appendChild(nameText);
+      
+      if (member.isHost) {
+        const hostBadge = document.createElement('span');
+        hostBadge.className = "collab-host-badge";
+        hostBadge.textContent = 'HOST';
+        nameSpan.appendChild(hostBadge);
+      }
+      
+      if (member.id === this.memberId) {
+        const youBadge = document.createElement('span');
+        youBadge.className = "collab-you-badge";
+        youBadge.textContent = __('TÚ||YOU');
+        nameSpan.appendChild(youBadge);
+      }
+      
+      memberItem.appendChild(nameSpan);
+      
+      // Kick button for host
+      if (this.isHost && member.id !== this.memberId) {
+        const kickBtn = document.createElement('button');
+        kickBtn.textContent = __('Expulsar||Kick');
+        kickBtn.className = "collab-kick-button";
+        kickBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.confirmKickMember(member);
+        });
+        memberItem.appendChild(kickBtn);
+      }
+      
+      membersList.appendChild(memberItem);
+    });
+    
+    membersSection.appendChild(membersList);
+    this.sessionContent.appendChild(membersSection);
+    
+    // Disconnect button
+    const disconnectBtn = document.createElement('button');
+    disconnectBtn.className = this.isHost ? "collab-disconnect-btn danger" : "collab-disconnect-btn";
+    disconnectBtn.textContent = this.isHost ? __('Terminar sesión||End Session') : __('Desconectar||Disconnect');
+    disconnectBtn.addEventListener('click', () => {
+      this.editor.showPopup(
+        this.isHost ? __('Terminar sesión||End Session') : __('Desconectar||Disconnect'),
+        this.isHost ? __('¿Terminar la sesión para todos?||End session for everyone?') : __('¿Desconectarse de la sesión?||Disconnect from session?'),
+        [
+          {
+            text: __('Cancelar||Cancel'),
+            class: 'cancel',
+            action: () => this.editor.hidePopup()
+          },
+          {
+            text: __('Sí||Yes'),
+            action: () => {
+              this.disconnect();
+              this.sessionOverlay.style.display = 'none';
+              this.editor.hidePopup();
+            }
+          }
+        ]
+      );
+    });
+    
+    this.sessionContent.appendChild(disconnectBtn);
+  }
+
+  confirmKickMember(member) {
+    this.editor.showPopup(
+      __('Expulsar miembro||Kick member'),
+      `${__('¿Expulsar a||Kick')} ${this.wrapMemberName(member)}?`,
+      [
+        {
+          text: __('Cancelar||Cancel'),
+          class: 'cancel',
+          action: () => this.editor.hidePopup()
+        },
+        {
+          text: __('Expulsar||Kick'),
+          action: () => {
+            this.kickMember(member.id);
+            this.editor.hidePopup();
+          }
+        }
+      ]
+    );
+  }
+  
+  clearChatMessages() {
+    this.chatMessages = [];
+    this.renderChatMessages();
+  }
+
+  renderChatMessages() {
+    this.chatMessagesDiv.innerHTML = '';
+    this.chatMessages.forEach(msg => this.addMessageHtml(msg));
+    this.scrollMessagesToBottom();
+  }
+  
+  addMessageHtml(msg) {
+    const msgEl = document.createElement('div');
+    msgEl.className = "collab-chat-message";
+    msgEl.innerHTML = `
+      <span class="collab-chat-name" style="color: ${this.getColorHex(msg.memberColor)};">${this.escapeHtml(msg.memberName || 'Unknown')}:</span>
+      <span class="collab-chat-text"> ${this.escapeHtml(msg.message)}</span>
+    `;
+    this.chatMessagesDiv.appendChild(msgEl);
+  }
+  
+  scrollMessagesToBottom() {
+    this.chatMessagesDiv.scrollTop = this.chatMessagesDiv.scrollHeight;
+  }
+
+  updatePingIndicator(ping) {
+    const dot = this.pingIndicator.querySelector('.ping-dot');
+    const value = this.pingIndicator.querySelector('.ping-value');
+    
+    let color = '#44ff44';
+    if (ping > 100) color = '#ffff44';
+    if (ping > 200) color = '#ff8844';
+    if (ping > 300) color = '#ff4444';
+    
+    if (dot) dot.style.backgroundColor = color;
+    if (value) value.textContent = `${ping}ms`;
+  }
+
+  startPingInterval() {
+    this.pingInterval = setInterval(() => {
+      this.sendMessage({ type: 'ping', timestamp: Date.now() });
+    }, 5000);
+  }
+
+  stopPingInterval() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+  }
+
+  canPerformAction(action) {
+    if (!this.isConnected) return true;
+    if (this.isHost) return true;
+    return this.permissions && this.permissions[action] === 'everyone';
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+}
+
+// Handles multiple palettes, loading, saving, and Lospec import
+class PaletteManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.palettes = [];
+    this.currentPaletteId = null;
+    this.recentColors = JSON.parse(localStorage.getItem("recentColors")) || [];
+    
+    this.init();
+  }
+
+  init() {
+    this.loadPalettes();
+  }
+
+  getDefaultPalettes() {
+    return [
+      {
+        id: "nes",
+        name: "NES",
+        colors: [
+          "#7c7c7c", "#bcbcbc", "#fcfcfc", "#a80020",
+          "#e40058", "#f85898", "#f8a4c0", "#940084",
+          "#d800cc", "#f878f8", "#f8b8f8", "#4428bc",
+          "#6844fc", "#9878f8", "#d8b8f8", "#0000bc", 
+          "#0000fc", "#6888fc", "#b8b8f8", "#0058f8",
+          "#0078f8", "#3cbcfc", "#a4e4fc", "#004058", 
+          "#008888", "#00e8d8", "#00fcfc", "#007800", 
+          "#00a800", "#00b800", "#b8f8d8", "#006800", 
+          "#00a844", "#58f898", "#b8f8b8", "#005800", 
+          "#58d854", "#b8f818", "#d8f878", "#503000", 
+          "#ac7c00", "#f8b800", "#fce0a8", "#a81000", 
+          "#fca044", "#f8d878", "#f0d0b0", "#881400", 
+          "#f83800", "#e45c10", "#f87858", "#080808", 
+          "#787878", "#000000"
+        ]
+      },
+      {
+        id: "gb-original",
+        name: "Game Boy",
+        colors: ["#071821", "#306850", "#86c06c", "#e0f8cf"]
+      },
+      {
+        id: "gb-pocket",
+        name: "Game Boy Pocket",
+        colors: ["#111111", "#555555", "#aaaaaa", "#eeeeee"]
+      },
+      {
+        id: "commodore-64",
+        name: "Commodore 64",
+        colors: [
+          "#000000", "#ffffff", "#68372b", "#70a4b2", 
+          "#6f3d86", "#588d43", "#352879", "#b8c76f",
+          "#6f4f25", "#433900", "#9a6759", "#444444", 
+          "#6c6c6c", "#9ad284", "#6c5eb5", "#959595"
+        ]
+      },
+      {
+        id: "tic-80",
+        name: "TIC-80 (SWEETIE-16)",
+        colors: [
+          "#1a1c2c", "#5d275d", "#b13e53", "#ef7d57", 
+          "#ffcd75", "#a7f070", "#38b764", "#257179",
+          "#29366f", "#3b5dc9", "#41a6f6", "#73eff7", 
+          "#f4f4f4", "#94b0c2", "#566c86", "#333c57"
+        ]
+      },
+      {
+        id: "pico-8",
+        name: "PICO-8",
+        colors: [
+          "#000000", "#1d2b53", "#7e2553", "#008751", 
+          "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8",
+          "#ff004d", "#ffa300", "#ffec27", "#00e436", 
+          "#29adff", "#83769c", "#ff77a8", "#ffccaa"
+        ]
+      },
+      {
+        id: "arne-16",
+        name: "Arne 16",
+        colors: [
+          "#000000", "#9d9d9d", "#ffffff", "#be2633", 
+          "#e06f8b", "#2c3e2b", "#7e8c6d", "#e0cdaa", 
+          "#2f2e2e", "#4c4c4c", "#d6a13b", "#f5f2b0", 
+          "#3b4e8f", "#617fce", "#8ba2d9", "#cacaca"
+        ]
+      },
+      {
+        id: "endesga-32",
+        name: "ENDESGA 32",
+        colors: [
+          "#222034", "#45283c", "#663931", "#8f563b", 
+          "#df7126", "#d9a066", "#eec39a", "#fbf236", 
+          "#99e550", "#6abe30", "#37946e", "#4b692f", 
+          "#524b24", "#323c39", "#3f3f74", "#306082", 
+          "#5b6ee1", "#639bff", "#5fcde4", "#cbd3b5", 
+          "#a7a36b", "#9b7031", "#6b4c2c", "#4a2824", 
+          "#412e28", "#372126", "#1b1d2b", "#1e1918", 
+          "#0c0f1a", "#05060f", "#b94629", "#ce6a39"
+        ]
+      },
+      {
+        id: "aap-64",
+        name: "AAP-64",
+        colors: [
+          "#000000", "#141414", "#282828", "#3c3c3c", 
+          "#505050", "#646464", "#787878", "#8c8c8c", 
+          "#a0a0a0", "#b4b4b4", "#c8c8c8", "#dcdcdc", 
+          "#f0f0f0", "#ffffff", "#1e2a3a", "#2c3e4e", 
+          "#3a5262", "#486676", "#567a8a", "#648e9e", 
+          "#72a2b2", "#80b6c6", "#8ecada", "#9cdede", 
+          "#aae2e2", "#b8e6e6", "#c6eaea", "#d4eeee", 
+          "#e2f2f2", "#f0f6f6"
+        ]
+      },
+      {
+        id: "cga",
+        name: "CGA",
+        colors: [
+          "#000000", "#00aa00", "#aa0000", "#aa5500",
+          "#ffffff"
+        ]
+      },
+      {
+        id: "ega",
+        name: "EGA",
+        colors: [
+          "#000000", "#0000aa", "#00aa00", "#00aaaa",
+          "#aa0000", "#aa00aa", "#aa5500", "#aaaaaa",
+          "#555555", "#5555ff", "#55ff55", "#55ffff", 
+          "#ff5555", "#ff55ff", "#ffff55", "#ffffff"
+        ]
+      },
+      {
+        // Based on GBA's 15-bit RGB: 5 bits per channel
+        id: "gba",
+        name: "GB 15-bit",
+        colors: [
+          "#000000", "#111111", "#222222", "#333333",
+          "#444444", "#555555", "#666666", "#777777",
+          "#888888", "#999999", "#aaaaaa", "#bbbbbb",
+          "#cccccc", "#dddddd", "#eeeeee", "#ffffff",
+          "#7a2b2b", "#9a3a3a", "#ba4a4a", "#da5a5a",
+          "#fa6a6a", "#2b5a2b", "#3a6a3a", "#4a7a4a",
+          "#5a8a5a", "#6a9a6a", "#2b2b7a", "#3a3a9a",
+          "#4a4aba", "#5a5ada", "#6a6afa", "#7a2b7a",
+          "#9a3a9a", "#ba4aba", "#da5ada", "#fa6afa",
+          "#2b7a7a", "#3a9a9a", "#4ababa", "#5adada",
+          "#6afafa"
+        ]
+      },
+      {
+        id: "futuristic-green",
+        name: "Futuristic Green",
+        colors: [
+          "#0a0f0a", "#0f1a0f", "#1a2a1a", "#2a3f2a",
+          "#3f553f", "#557055", "#709070", "#8fb58f",
+          "#b0d0b0", "#c8e6c8", "#e0f5e0", "#f0fff0",
+          "#00ff00", "#33ff33", "#66ff66", "#99ff99", 
+          "#ccffcc", "#ffff00", "#ccff33", "#99ff66", 
+          "#66ff99", "#33ffcc", "#00ffff"
+        ]
+      },
+      {
+        id: "futuristic-blue",
+        name: "Futuristic Blue",
+        colors: [
+          "#0a0a1a", "#0a0f2a", "#0f1a3f", "#1a2a55",
+          "#2a3f6a", "#3f5580", "#557095", "#7090aa", 
+          "#8fb5c0", "#b0d0d5", "#c8e6ea", "#e0f5f5", 
+          "#00aaff", "#33bbff", "#66ccff", "#99ddff", 
+          "#cceeff", "#ffffff", "#00ccff", "#33ddff", 
+          "#66eaff", "#99f2ff", "#ccf9ff"
+        ]
+      },
+      {
+        id: "sunset",
+        name: "Sunset",
+        colors: [
+          "#282b39", "#3a2e3f", "#633b4a", "#ab4f63", 
+          "#d6726c", "#f1a67a", "#fad68f", "#fcf1bc", 
+          "#b2e1e8", "#7fb3cd", "#5585b2", "#394779", 
+          "#1f2f46", "#121e2c", "#0d121f"
+        ]
+      },
+      {
+        id: "dreamcast",
+        name: "Dreamcast",
+        colors: [
+          "#000000", "#111111", "#222222", "#333333", 
+          "#444444", "#555555", "#666666", "#777777", 
+          "#888888", "#999999", "#aaaaaa", "#bbbbbb", 
+          "#cccccc", "#dddddd", "#eeeeee", "#ffffff", 
+          "#7a2b2b", "#9a3a3a", "#ba4a4a", "#da5a5a", 
+          "#fa6a6a", "#2b5a2b", "#3a6a3a", "#4a7a4a", 
+          "#5a8a5a", "#6a9a6a", "#2b2b7a", "#3a3a9a", 
+          "#4a4aba", "#5a5ada", "#6a6afa", "#7a2b7a"
+        ]
+      }
+    ];
+  }
+  
+  loadPalettes() {
+    try {
+      const saved = localStorage.getItem("palettes");
+      if (saved) {
+        this.palettes = JSON.parse(saved);
+        // Ensure each palette has an id
+        this.palettes.forEach(p => {
+          if (!p.id) p.id = 'palette_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        });
+      } else {
+        this.palettes = this.getDefaultPalettes();
+      }
+      this.currentPaletteId = this.palettes[0]?.id || null;
+      this.savePalettes();
+    } catch (e) {
+      console.warn("Failed to load palettes:", e);
+      this.palettes = this.getDefaultPalettes();
+      this.currentPaletteId = this.palettes[0].id;
+    }
+  }
+
+  savePalettes() {
+    localStorage.setItem("palettes", JSON.stringify(this.palettes));
+  }
+
+  getCurrentPalette() {
+    return this.palettes.find(p => p.id === this.currentPaletteId) || this.palettes[0];
+  }
+
+  getCurrentColors() {
+    const palette = this.getCurrentPalette();
+    return palette ? palette.colors : [];
+  }
+
+  addPalette(name, colors = []) {
+    const newPalette = {
+      id: 'palette_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      name: name || __('Nueva paleta||New palette'),
+      colors: [...colors],
+      createdAt: Date.now()
+    };
+    this.palettes.push(newPalette);
+    this.currentPaletteId = newPalette.id;
+    this.savePalettes();
+    return newPalette;
+  }
+
+  removePalette(id) {
+    const index = this.palettes.findIndex(p => p.id === id);
+    if (index === -1) return;
+    
+    this.palettes.splice(index, 1);
+    
+    if (this.palettes.length === 0) {
+      this.palettes = [this.getDefaultPalette()];
+    }
+    
+    if (this.currentPaletteId === id) {
+      this.currentPaletteId = this.palettes[0].id;
+    }
+    
+    this.savePalettes();
+  }
+
+  renamePalette(id, newName) {
+    const palette = this.palettes.find(p => p.id === id);
+    if (palette) {
+      palette.name = newName;
+      this.savePalettes();
+    }
+  }
+
+  setCurrentPalette(id) {
+    if (this.palettes.find(p => p.id === id)) {
+      this.currentPaletteId = id;
+      this.savePalettes();
+    }
+  }
+
+  addColorToPalette(paletteId, color) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette && !palette.colors.includes(color)) {
+      palette.colors.push(color);
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  removeColorFromPalette(paletteId, index) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette && palette.colors[index]) {
+      palette.colors.splice(index, 1);
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  moveColorInPalette(paletteId, fromIndex, toIndex) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette && fromIndex >= 0 && toIndex >= 0 && fromIndex < palette.colors.length && toIndex < palette.colors.length) {
+      const color = palette.colors.splice(fromIndex, 1)[0];
+      palette.colors.splice(toIndex, 0, color);
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  updatePaletteColors(paletteId, colors) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette) {
+      palette.colors = [...colors];
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  addToRecent(color) {
+    this.recentColors = [color, ...this.recentColors.filter(c => c !== color)].slice(0, 20);
+    localStorage.setItem("recentColors", JSON.stringify(this.recentColors));
+  }
+
+  getRecentColors() {
+    return this.recentColors;
+  }
+
+  // Lospec API integration
+  async importFromLospec(slug) {
+    const url = `https://lospec.com/palette-list/${slug}.json`;
+    
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(__('Paleta no encontrada||Palette not found'));
+        }
+        throw new Error(__('Error al cargar paleta||Error loading palette'));
+      }
+      
+      const data = await response.json();
+      
+      if (!data.name || !data.colors || !Array.isArray(data.colors)) {
+        throw new Error(__('Formato de paleta inválido||Invalid palette format'));
+      }
+      
+      const colors = data.colors.map(c => c.startsWith('#') ? c : '#' + c);
+      
+      return {
+        name: data.name,
+        author: data.author,
+        colors: colors,
+        slug: slug
+      };
+    } catch (error) {
+      console.error('Lospec import error:', error);
+      throw error;
+    }
+  }
+
+  showLospecImportDialog() {
+    const content = document.createElement("div");
+    content.className = "lospec-import-dialog";
+    
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = __("Slug de la paleta (ej: greyt-bit)||Palette slug (e.g., greyt-bit)");
+    content.appendChild(input);
+    
+    this.editor.showPopup(
+      __("Importar de Lospec||Import from Lospec"),
+      content,
+      [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => this.editor.hidePopup()
+        },
+        {
+          text: __("Importar||Import"),
+          action: async () => {
+            const slug = input.value.trim().toLowerCase();
+            if (!slug) {
+              this.editor.showToast(__("Ingresa un slug válido||Enter a valid slug"), 2000);
+              return;
+            }
+            
+            try {
+              const paletteData = await this.importFromLospec(slug);
+              const existing = this.palettes.find(p => p.name.toLowerCase() === paletteData.name.toLowerCase());
+              
+              if (existing) {
+                this.editor.showPopup(
+                  __("Paleta existente||Existing palette"),
+                  __(`La paleta "${paletteData.name}" ya existe. ¿Deseas reemplazarla?||Palette "${paletteData.name}" already exists. Do you want to replace it?`),
+                  [
+                    {
+                      text: __("Cancelar||Cancel"),
+                      class: "cancel",
+                      action: () => this.editor.hidePopup()
+                    },
+                    {
+                      text: __("Reemplazar||Replace"),
+                      action: () => {
+                        this.updatePaletteColors(existing.id, paletteData.colors);
+                        this.editor.colorPicker?.updatePaletteGrid();
+                        this.editor.hidePopup();
+                        this.editor.showToast(__(`Paleta "${paletteData.name}" actualizada||Palette "${paletteData.name}" updated`));
+                      }
+                    }
+                  ]
+                );
+              } else {
+                this.addPalette(paletteData.name, paletteData.colors);
+                this.editor.colorPicker?.updatePaletteGrid();
+                this.editor.showToast(__(`Paleta "${paletteData.name}" importada||Palette "${paletteData.name}" imported`));
+                this.editor.hidePopup();
+              }
+            } catch (error) {
+              this.editor.showToast(error.message, 3000);
+            }
+          }
+        }
+      ]
+    );
+    
+    setTimeout(() => input.focus(), 100);
+  }
+
+  showPaletteManagerDialog() {
+    const container = document.createElement("div");
+    container.className = "palette-manager-container";
+    
+    const listContainer = document.createElement("div");
+    listContainer.className = "palette-manager-list";
+    container.appendChild(listContainer);
+    
+    const renderList = () => {
+      listContainer.innerHTML = "";
+      
+      this.palettes.forEach(palette => {
+        const isActice = palette.id === this.currentPaletteId;
+        
+        const item = document.createElement("div");
+        item.className = `palette-manager-item ${isActice ? 'active' : ''}`;
+        
+        if (isActice) {
+          activeItem = item;
+        }
+        
+        const preview = document.createElement("div");
+        preview.className = "palette-manager-preview";
+        palette.colors.slice(0, 8).forEach(color => {
+          const swatch = document.createElement("div");
+          swatch.className = "palette-manager-swatch";
+          swatch.style.backgroundColor = color;
+          preview.appendChild(swatch);
+        });
+        
+        const info = document.createElement("div");
+        info.className = "palette-manager-info";
+        
+        const nameSpan = document.createElement("div");
+        nameSpan.className = "palette-manager-name";
+        nameSpan.textContent = palette.name;
+        info.appendChild(nameSpan);
+        
+        const countSpan = document.createElement("div");
+        countSpan.className = "palette-manager-count";
+        countSpan.textContent = `${palette.colors.length} ${__("colores||colors")}`;
+        info.appendChild(countSpan);
+        
+        const actions = document.createElement("div");
+        actions.className = "palette-manager-actions";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "ui-button palette-manager-btn";
+        editBtn.innerHTML = '<div class="icon icon-settings"></div>';
+        editBtn.title = __("Editar||Edit");
+        editBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.showPaletteEditor(palette.id);
+        });
+        actions.appendChild(editBtn);
+        
+        const exportBtn = document.createElement("button");
+        exportBtn.className = "ui-button palette-manager-btn";
+        exportBtn.innerHTML = '<div class="icon icon-download"></div>';
+        exportBtn.title = __("Exportar||Export");
+        exportBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.exportPaletteToFile(palette.id);
+        });
+        actions.appendChild(exportBtn);
+        
+        if (this.palettes.length > 1) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "ui-button palette-manager-btn";
+          deleteBtn.innerHTML = '<div class="icon icon-close"></div>';
+          deleteBtn.title = __("Eliminar||Delete");
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.editor.showPopup(
+              __("Eliminar paleta||Delete palette"),
+              __(`¿Eliminar la paleta "${palette.name}"?||Delete palette "${palette.name}"?`),
+              [
+                {
+                  text: __("Cancelar||Cancel"),
+                  class: "cancel",
+                  action: () => {
+                    this.editor.hidePopup();
+                    this.showPaletteManagerDialog();
+                  }
+                },
+                {
+                  text: __("Eliminar||Delete"),
+                  action: () => {
+                    this.removePalette(palette.id);
+                    renderList();
+                    this.editor.colorPicker?.updatePaletteGrid();
+                    this.editor.hidePopup();
+                    this.showPaletteManagerDialog();
+                  }
+                }
+              ]
+            );
+          });
+          actions.appendChild(deleteBtn);
+        }
+        
+        item.appendChild(preview);
+        item.appendChild(info);
+        item.appendChild(actions);
+        
+        item.addEventListener("click", () => {
+          this.setCurrentPalette(palette.id);
+          this.editor.colorPicker?.updatePaletteGrid();
+          this.editor.hidePopup();
+        });
+        
+        listContainer.appendChild(item);
+        
+      });
+    };
+    
+    renderList();
+    
+    const actionRow = document.createElement("div");
+    actionRow.className = "palette-manager-actions-row";
+    
+    const newBtn = document.createElement("button");
+    newBtn.className = "ui-button highlight palette-manager-action-btn";
+    newBtn.innerHTML = __("Nueva paleta||New palette");
+    newBtn.addEventListener("click", () => {
+      const name = prompt(__("Nombre de la paleta||Palette name"), __("Mi paleta||My palette"));
+      if (name) {
+        this.addPalette(name);
+        renderList();
+        this.editor.colorPicker?.updatePaletteGrid();
+      }
+    });
+    actionRow.appendChild(newBtn);
+    
+    const importBtn = document.createElement("button");
+    importBtn.className = "ui-button highlight palette-manager-action-btn";
+    importBtn.innerHTML = "JSON";
+    importBtn.addEventListener("click", () => {
+      this.showImportJsonDialog();
+    });
+    actionRow.appendChild(importBtn);
+    
+    const lospecBtn = document.createElement("button");
+    lospecBtn.className = "ui-button highlight palette-manager-action-btn";
+    lospecBtn.innerHTML = "Lospec";
+    lospecBtn.addEventListener("click", () => {
+      this.editor.hidePopup();
+      this.showLospecImportDialog();
+    });
+    actionRow.appendChild(lospecBtn);
+    
+    container.appendChild(actionRow);
+    
+    this.editor.showPopup(
+      __("Gestor de paletas||Palette Manager"),
+      container,
+      [
+        {
+          text: __("Cerrar||Close"),
+          action: () => this.editor.hidePopup()
+        }
+      ]
+    );
+  }
+
+  showPaletteEditor(paletteId) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (!palette) return;
+    
+    const container = document.createElement("div");
+    container.className = "palette-editor-container";
+    
+    // Name row
+    const nameRow = document.createElement("div");
+    nameRow.className = "palette-editor-name-row";
+    
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = palette.name;
+    nameInput.className = "palette-editor-name-input";
+    nameRow.appendChild(nameInput);
+    
+    nameInput.addEventListener("change", () => {
+      if (nameInput.value.trim()) {
+        this.renamePalette(paletteId, nameInput.value.trim());
+        this.editor.colorPicker?.updatePaletteGrid();
+        this.editor.showToast(__("Paleta renombrada||Palette renamed"));
+      }
+    });
+    
+    container.appendChild(nameRow);
+    
+    // Use the same palette-grid class as main color picker
+    const colorsGrid = document.createElement("div");
+    colorsGrid.className = "palette-grid";
+    colorsGrid.style.maxHeight = "300px";
+    colorsGrid.style.overflowY = "auto";
+    container.appendChild(colorsGrid);
+    
+    // Create delete zone for drag-to-delete
+    const deleteZone = document.createElement("div");
+    deleteZone.className = "delete-zone palette-delete-zone";
+    deleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    
+    // Delete zone events
+    let draggedIndex = null;
+    
+    deleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      deleteZone.classList.add("drag-over");
+    });
+    
+    deleteZone.addEventListener("dragleave", () => {
+      deleteZone.classList.remove("drag-over");
+    });
+    
+    deleteZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      deleteZone.classList.remove("drag-over");
+      if (draggedIndex !== null) {
+        this.removeColorFromPalette(paletteId, draggedIndex);
+        renderColors();
+        this.editor.colorPicker?.updatePaletteGrid();
+        draggedIndex = null;
+      }
+    });
+    
+    const renderColors = () => {
+      colorsGrid.innerHTML = "";
+      
+      palette.colors.forEach((color, index) => {
+        const colorElement = document.createElement("div");
+        colorElement.className = "palette-color";
+        colorElement.style.backgroundColor = color;
+        colorElement.style.cursor = "grab";
+        colorElement.draggable = true;
+        colorElement.dataset.index = index;
+        
+        // Click to select color
+        colorElement.addEventListener("click", () => {
+          this.editor.colorPicker?.updateSlidersFromHex(color);
+        });
+        
+        // Drag events
+        colorElement.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", index.toString());
+          draggedIndex = index;
+          colorElement.classList.add("dragging");
+          colorElement.style.cursor = "grabbing";
+          deleteZone.classList.add("visible");
+        });
+        
+        colorElement.addEventListener("dragend", () => {
+          colorElement.classList.remove("dragging");
+          colorElement.style.cursor = "grab";
+          deleteZone.classList.remove("visible", "drag-over");
+          draggedIndex = null;
+        });
+        
+        colorElement.addEventListener("dragover", (e) => {
+          e.preventDefault();
+        });
+        
+        colorElement.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+          const toIndex = index;
+          if (fromIndex !== toIndex) {
+            this.moveColorInPalette(paletteId, fromIndex, toIndex);
+            renderColors();
+            this.editor.colorPicker?.updatePaletteGrid();
+          }
+        });
+        
+        colorsGrid.appendChild(colorElement);
+      });
+      
+      // Add color button
+      const addButton = document.createElement("div");
+      addButton.className = "palette-add-button";
+      addButton.innerHTML = "+";
+      addButton.title = __("Añadir color||Add new color");
+      addButton.style.cursor = "pointer";
+      addButton.addEventListener("click", () => {
+        this.editor.showHexColorInputDialog().then(color => {
+          this.addColorToPalette(paletteId, color);
+          renderColors();
+          this.editor.colorPicker?.updatePaletteGrid();
+        }).catch(() => {});
+      });
+      colorsGrid.appendChild(addButton);
+    };
+    
+    renderColors();
+    container.appendChild(deleteZone);
+    
+    this.editor.showPopup(
+      palette.name,
+      container,
+      [
+        {
+          text: __("Cerrar||Close"),
+          action: () => {
+            this.editor.hidePopup();
+            this.showPaletteManagerDialog();
+          }
+        }
+      ]
+    );
+  }
+  
+  exportPaletteToFile(paletteId) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (!palette) return;
+    
+    const jsonData = JSON.stringify({
+      name: palette.name,
+      colors: palette.colors,
+      exportedAt: new Date().toISOString()
+    }, null, 2);
+    
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${palette.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    this.editor.showToast(__(`Paleta "${palette.name}" exportada||Palette "${palette.name}" exported`));
+  }
+
+  showImportJsonDialog() {
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Importar paleta JSON||Import JSON palette"),
+      mode: "open",
+      fileTypes: ["json"],
+      onConfirm: async (fileInfo) => {
+        try {
+          const fileData = await this.editor.readFile(fileInfo);
+          const data = JSON.parse(fileData);
+          
+          if (!data.name || !data.colors || !Array.isArray(data.colors)) {
+            throw new Error(__('Formato inválido||Invalid format'));
+          }
+          
+          const existing = this.palettes.find(p => p.name === data.name);
+          if (existing) {
+            const newName = `${data.name} (${__('copia||copy')})`;
+            this.addPalette(newName, data.colors);
+            this.editor.showToast(__(`Paleta importada como "${newName}"||Palette imported as "${newName}"`));
+          } else {
+            this.addPalette(data.name, data.colors);
+            this.editor.showToast(__(`Paleta "${data.name}" importada||Palette "${data.name}" imported`));
+          }
+          
+          this.editor.colorPicker?.updatePaletteGrid();
+          this.editor.hidePopup();
+        } catch (error) {
+          this.editor.showToast(error.message, 3000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+}
+
+// Handles all color picker UI and logic
+class ColorPicker {
+  constructor(editor) {
+    this.editor = editor;
+    
+    // Color state
+    this.selectedColorTab = 'rgb';
+    this.colorPickerPreviewColor = editor.primaryColor;
+    this.isColorPicking = false;
+    this.colorPickStartX = 0;
+    this.colorPickStartY = 0;
+    this.colorPickLine = null;
+    this.colorPickStartPos = null;
+    this.colorPickTimeout = null;
+    this.colorPickStartTime = null;
+    
+    // UI Elements
+    this.overlay = null;
+    this.colorPicker = null;
+    this.rgbTab = null;
+    this.hsvTab = null;
+    this.paletteTab = null;
+    this.rgbContent = null;
+    this.hsvContent = null;
+    this.paletteContent = null;
+    this.currentColorPreview = null;
+    this.recentColorsGrid = null;
+    this.paletteGrid = null;
+    this.deleteZone = null;
+    this.floatingColors = new Map();
+    this.floatingColorsDeleteZone = null;
+    
+    this.init();
+  }
+
+  init() {
+    this.createColorPicker();
+    this.createFloatingColorsDeleteZone();
+    this.initColorPickerDrag();
+    if (this.editor.autoLoadRecentFloatingColors) {
+      this.loadFloatingColors(JSON.parse(localStorage.getItem("floatingColors")) || []);
+    }
+  }
+
+  createColorPicker() {
+    // Create overlay
+    this.overlay = document.createElement("div");
+    this.overlay.className = "color-picker-overlay";
+    this.overlay.style.display = "none";
+    this.editor.uiLayer.appendChild(this.overlay);
+    
+    this.overlay.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.overlay.classList.add("drag-over");
+    });
+    
+    this.overlay.addEventListener("dragleave", () => {
+      this.overlay.classList.remove("drag-over");
+    });
+    
+    this.overlay.addEventListener("drop", (e) => {
+      e.preventDefault();
+      this.overlay.classList.remove("drag-over");
+      const index = parseInt(e.dataTransfer.getData("text/plain"));
+      const currentPalette = this.editor.paletteManager.getCurrentPalette();
+      const color = currentPalette?.colors[index];
+      if (color && this.floatingColorsDeleteZone) {
+        this.addFloatingPaletteColor(color, e.clientX, e.clientY);
+      }
+    });
+        
+    // Create picker
+    this.colorPicker = document.createElement("div");
+    this.colorPicker.className = "color-picker";
+    this.overlay.appendChild(this.colorPicker);
+    
+    // Block overlay events
+    this.colorPicker.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    this.colorPicker.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    this.colorPicker.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    
+    // Header
+    const header = document.createElement("div");
+    header.className = "color-picker-header";
+    this.colorPicker.appendChild(header);
+    
+    const title = document.createElement("div");
+    title.className = "color-picker-title";
+    title.textContent = __("Recoge Color||Color Picker");
+    header.appendChild(title);
+    
+    const closeBtn = document.createElement("div");
+    closeBtn.className = "panel-close color-picker-close";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.addEventListener("click", () => this.hide());
+    header.appendChild(closeBtn);
+    
+    // Tabs
+    const tabs = document.createElement("div");
+    tabs.className = "color-picker-tabs";
+    this.colorPicker.appendChild(tabs);
+    
+    this.rgbTab = this.createTab("RGB", () => this.showTab("rgb"));
+    this.hsvTab = this.createTab("HSV", () => this.showTab("hsv"));
+    this.paletteTab = this.createTab(__("Paleta||Palette"), () => this.showTab("palette"));
+    
+    // Content
+    const content = document.createElement("div");
+    content.className = "color-picker-content";
+    this.colorPicker.appendChild(content);
+    
+    // RGB Tab
+    this.rgbContent = document.createElement("div");
+    this.rgbContent.className = "color-picker-tab-content rgb-content";
+    content.appendChild(this.rgbContent);
+    this.createColorSlider("r", __("Rojo||Red"), 0, 255, this.rgbContent);
+    this.createColorSlider("g", __("Verde||Green"), 0, 255, this.rgbContent);
+    this.createColorSlider("b", __("Azul||Blue"), 0, 255, this.rgbContent);
+    
+    // HSV Tab
+    this.hsvContent = document.createElement("div");
+    this.hsvContent.className = "color-picker-tab-content hsv-content";
+    content.appendChild(this.hsvContent);
+    this.createColorSlider("h", __("Tono||Hue"), 0, 360, this.hsvContent);
+    this.createColorSlider("s", __("Saturación||Saturation"), 0, 100, this.hsvContent, "%");
+    this.createColorSlider("v", __("Valor||Value"), 0, 100, this.hsvContent, "%");
+    
+    // Palette Tab
+    this.paletteContent = document.createElement("div");
+    this.paletteContent.className = "color-picker-tab-content palette-content";
+    content.appendChild(this.paletteContent);
+    
+    const paletteActions = document.createElement("div");
+    paletteActions.className = "palette-actions";
+    this.paletteContent.appendChild(paletteActions);
+    
+    const loadBtn = this.editor.createButton("load-palette", "icon-folder", () => this.loadPalette());
+    loadBtn.textContent = __("Cargar||Load");
+    paletteActions.appendChild(loadBtn);
+    
+    const saveBtn = this.editor.createButton("save-palette", "icon-save", () => this.savePalette());
+    saveBtn.textContent = __("Guardar||Save");
+    paletteActions.appendChild(saveBtn);
+    
+    const manageBtn = this.editor.createButton("manage-palettes", "icon-settings", () => {
+      this.editor.paletteManager.showPaletteManagerDialog();
+    });
+    manageBtn.textContent = __("Gestionar||Manage");
+    paletteActions.appendChild(manageBtn);
+    
+    this.paletteGrid = document.createElement("div");
+    this.paletteGrid.className = "palette-grid";
+    this.paletteContent.appendChild(this.paletteGrid);
+    
+    // Recent Colors
+    const recentContainer = document.createElement("div");
+    recentContainer.className = "recent-colors";
+    this.colorPicker.appendChild(recentContainer);
+    
+    const recentTitle = document.createElement("div");
+    recentTitle.className = "recent-colors-title";
+    recentTitle.textContent = __("Colores Recientes||Recent Colors");
+    recentContainer.appendChild(recentTitle);
+    
+    this.recentColorsGrid = document.createElement("div");
+    this.recentColorsGrid.className = "recent-colors-grid";
+    recentContainer.appendChild(this.recentColorsGrid);
+    
+    // Footer
+    const footer = document.createElement("div");
+    footer.className = "color-picker-footer";
+    this.colorPicker.appendChild(footer);
+    
+    this.currentColorPreview = document.createElement("div");
+    this.currentColorPreview.className = "current-color-preview";
+    this.currentColorPreview.addEventListener("click", () => this.showHexInputDialog());
+    footer.appendChild(this.currentColorPreview);
+    
+    const confirmBtn = this.editor.createButton("confirm-color", null, () => this.confirmSelection());
+    confirmBtn.textContent = __("Usar color||Pick color");
+    footer.appendChild(confirmBtn);
+    
+    // Delete zone
+    this.deleteZone = document.createElement("div");
+    this.deleteZone.className = "delete-zone palette-delete-zone";
+    this.deleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.overlay.appendChild(this.deleteZone);
+    
+    this.setupDeleteZoneEvents();
+    
+    // Show RGB tab by default
+    this.showTab("rgb");
+    this.updatePaletteGrid();
+  }
+
+  createFloatingColorsDeleteZone() {
+    this.floatingColorsDeleteZone = document.createElement("div");
+    this.floatingColorsDeleteZone.className = "delete-zone";
+    this.floatingColorsDeleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.editor.overlayLayer.appendChild(this.floatingColorsDeleteZone);
+    
+    this.floatingColorsDeleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.floatingColorsDeleteZone.classList.add("drag-over");
+    });
+    
+    this.floatingColorsDeleteZone.addEventListener("dragleave", () => {
+      this.floatingColorsDeleteZone.classList.remove("drag-over");
+    });
+  }
+
+  createTab(name, onClick) {
+    const tab = document.createElement("div");
+    tab.className = "color-picker-tab";
+    tab.textContent = name;
+    tab.addEventListener("click", onClick);
+    this.colorPicker.querySelector(".color-picker-tabs").appendChild(tab);
+    return tab;
+  }
+
+  createColorSlider(channel, label, min, max, container, suffix = "") {
+    const sliderContainer = document.createElement("div");
+    sliderContainer.className = "color-slider-container";
+    
+    const labelElement = document.createElement("label");
+    labelElement.textContent = label;
+    sliderContainer.appendChild(labelElement);
+    
+    const controls = document.createElement("div");
+    controls.className = "slider-controls";
+    sliderContainer.appendChild(controls);
+    
+    const decreaseBtn = document.createElement("button");
+    decreaseBtn.className = "slider-btn decrease";
+    decreaseBtn.innerHTML = "&minus;";
+    decreaseBtn.addEventListener("click", () => this.adjustChannel(channel, -1));
+    controls.appendChild(decreaseBtn);
+    
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = min;
+    slider.max = max;
+    slider.value = channel === "r" ? 255 : 0;
+    slider.className = `color-slider ${channel}-slider`;
+    slider.addEventListener("input", e => this.handleSliderChange(channel, e.target.value));
+    controls.appendChild(slider);
+    
+    const increaseBtn = document.createElement("button");
+    increaseBtn.className = "slider-btn increase";
+    increaseBtn.innerHTML = "+";
+    increaseBtn.addEventListener("click", () => this.adjustChannel(channel, 1));
+    controls.appendChild(increaseBtn);
+    
+    const valueInput = document.createElement("input");
+    valueInput.type = "number";
+    valueInput.min = min;
+    valueInput.max = max;
+    valueInput.value = channel === "r" ? 255 : 0;
+    valueInput.className = `color-value ${channel}-value`;
+    valueInput.addEventListener("change", e => this.handleValueChange(channel, e.target.value));
+    controls.appendChild(valueInput);
+    
+    const suffixElement = document.createElement("span");
+    suffixElement.className = "suffix";
+    suffixElement.textContent = suffix;
+    controls.appendChild(suffixElement);
+    
+    container.appendChild(sliderContainer);
+  }
+
+  setupDeleteZoneEvents() {
+    this.deleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteZone.classList.add("drag-over");
+    });
+    
+    this.deleteZone.addEventListener("dragleave", () => {
+      this.deleteZone.classList.remove("drag-over");
+    });
+    
+    this.deleteZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteZone.classList.remove("drag-over");
+      const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+      this.removeColorFromPalette(fromIndex);
+    });
+  }
+
+  showTab(tabName) {
+    const tabContents = this.colorPicker.querySelectorAll(".color-picker-tab-content");
+    tabContents.forEach(content => content.style.display = "none");
+    
+    const tabs = this.colorPicker.querySelectorAll(".color-picker-tab");
+    tabs.forEach(tab => tab.classList.remove("active"));
+    
+    if (tabName === "rgb") {
+      this.rgbContent.style.display = "block";
+      this.rgbTab.classList.add("active");
+      this.updateSlidersFromHex(this.colorPickerPreviewColor);
+    } else if (tabName === "hsv") {
+      this.hsvContent.style.display = "block";
+      this.hsvTab.classList.add("active");
+      this.updateSlidersFromHex(this.colorPickerPreviewColor);
+    } else if (tabName === "palette") {
+      this.paletteContent.style.display = "block";
+      this.paletteTab.classList.add("active");
+      this.updatePaletteGrid();
+    }
+  }
+
+  updateSlidersFromHex(hex) {
+    if (!hex) return;
+    
+    const rgb = this.hexToRgb(hex);
+    this.updateSlider("r", rgb.r);
+    this.updateSlider("g", rgb.g);
+    this.updateSlider("b", rgb.b);
+    
+    const hsv = this.rgbToHsv(rgb.r, rgb.g, rgb.b);
+    this.updateSlider("h", hsv.h);
+    this.updateSlider("s", hsv.s);
+    this.updateSlider("v", hsv.v);
+    
+    this.currentColorPreview.style.backgroundColor = hex;
+    this.colorPickerPreviewColor = hex;
+  }
+
+  updateSlider(channel, value) {
+    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
+    const valueInput = this.colorPicker.querySelector(`.${channel}-value`);
+    if (slider) slider.value = value;
+    if (valueInput) valueInput.value = value;
+  }
+
+  handleSliderChange(channel, value) {
+    this.updateSlider(channel, value);
+    this.updateColorFromSliders(channel === "r" || channel === "g" || channel === "b");
+  }
+
+  handleValueChange(channel, value) {
+    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
+    const min = parseInt(slider.min);
+    const max = parseInt(slider.max);
+    value = Math.max(min, Math.min(max, parseInt(value) || 0));
+    this.updateSlider(channel, value);
+    this.updateColorFromSliders();
+  }
+
+  adjustChannel(channel, delta) {
+    const valueInput = this.colorPicker.querySelector(`.${channel}-value`);
+    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
+    const min = parseInt(slider.min);
+    const max = parseInt(slider.max);
+    let newValue = parseInt(valueInput.value) + delta;
+    newValue = Math.max(min, Math.min(max, newValue));
+    this.updateSlider(channel, newValue);
+    this.updateColorFromSliders();
+  }
+
+  updateColorFromSliders(rgbMode = true) {
+    if (rgbMode) {
+      const r = parseInt(this.colorPicker.querySelector(".r-value").value);
+      const g = parseInt(this.colorPicker.querySelector(".g-value").value);
+      const b = parseInt(this.colorPicker.querySelector(".b-value").value);
+      const hex = this.rgbToHex(r, g, b);
+      this.colorPickerPreviewColor = hex;
+      this.currentColorPreview.style.backgroundColor = hex;
+    } else {
+      const h = parseInt(this.colorPicker.querySelector(".h-value").value);
+      const s = parseInt(this.colorPicker.querySelector(".s-value").value);
+      const v = parseInt(this.colorPicker.querySelector(".v-value").value);
+      const rgb = this.hsvToRgb(h, s, v);
+      const hex = this.rgbToHex(rgb.r, rgb.g, rgb.b);
+      this.colorPickerPreviewColor = hex;
+      this.currentColorPreview.style.backgroundColor = hex;
+    }
+  }
+
+  confirmSelection() {
+    const hex = this.colorPickerPreviewColor;
+    if (!hex) return;
+    
+    if (this.editor.selectedColor === "primary") {
+      this.editor.primaryColor = hex;
+    } else {
+      this.editor.secondaryColor = hex;
+    }
+    
+    this.editor.updateColorIndicator();
+    this.editor.paletteManager.addToRecent(hex);
+    this.updateRecentColorsGrid();
+    this.hide();
+  }
+
+  updatePaletteGrid() {
+    if (!this.paletteGrid) return;
+    
+    this.paletteGrid.innerHTML = "";
+    const currentPalette = this.editor.paletteManager.getCurrentPalette();
+    if (!currentPalette) return;
+    
+    for (let i = 0; i < currentPalette.colors.length; i++) {
+      const color = currentPalette.colors[i];
+      const colorElement = document.createElement("div");
+      colorElement.className = "palette-color";
+      colorElement.style.backgroundColor = color;
+      colorElement.style.cursor = "grab";
+      colorElement.draggable = true;
+      colorElement.dataset.index = i;
+      
+      colorElement.addEventListener("click", () => {
+        this.updateSlidersFromHex(color);
+      });
+      
+      colorElement.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", i.toString());
+        colorElement.classList.add("dragging");
+        colorElement.style.cursor = "grabbing";
+        this.deleteZone.classList.add("visible");
+      });
+      
+      colorElement.addEventListener("dragend", () => {
+        colorElement.classList.remove("dragging");
+        colorElement.style.cursor = "grab";
+        this.deleteZone.classList.remove("visible");
+      });
+      
+      colorElement.addEventListener("dragover", e => e.preventDefault());
+      
+      colorElement.addEventListener("drop", e => {
+        e.preventDefault();
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+        const toIndex = i;
+        if (fromIndex !== toIndex) {
+          this.editor.paletteManager.moveColorInPalette(currentPalette.id, fromIndex, toIndex);
+          this.updatePaletteGrid();
+        }
+      });
+      
+      this.paletteGrid.appendChild(colorElement);
+    }
+    
+    const addButton = document.createElement("div");
+    addButton.className = "palette-add-button";
+    addButton.innerHTML = "+";
+    addButton.title = __("Añadir color||Add new color");
+    addButton.style.cursor = "pointer";
+    addButton.addEventListener("click", () => {
+      this.showHexInputDialog().then(color => {
+        this.editor.paletteManager.addColorToPalette(currentPalette.id, color);
+        this.updatePaletteGrid();
+        this.editor.showToast(__("Color añadido a la paleta||Color added to palette"));
+      }).catch(() => {});
+    });
+    this.paletteGrid.appendChild(addButton);
+  }
+
+  updateRecentColorsGrid() {
+    if (!this.recentColorsGrid) return;
+    
+    this.recentColorsGrid.innerHTML = "";
+    const recent = this.editor.paletteManager.getRecentColors();
+    
+    recent.forEach(color => {
+      const colorElement = document.createElement("div");
+      colorElement.className = "recent-color";
+      colorElement.style.backgroundColor = color;
+      colorElement.addEventListener("click", () => {
+        this.updateSlidersFromHex(color);
+      });
+      this.recentColorsGrid.appendChild(colorElement);
+    });
+  }
+
+  removeColorFromPalette(index) {
+    const currentPalette = this.editor.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.editor.paletteManager.removeColorFromPalette(currentPalette.id, index);
+      this.updatePaletteGrid();
+      this.editor.showToast(__("Color quitado de la paleta||Color removed from palette"));
+    }
+  }
+
+  loadPalette() {
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Cargar paleta||Load palette"),
+      mode: "open",
+      fileTypes: ["pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.editor.readFile(fileInfo);
+          this.editor.parsePalFile(fileData);
+          this.updatePaletteGrid();
+          this.editor.showToast(__("Paleta cargada||Palette loaded successfully"));
+        } catch (error) {
+          this.editor.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+
+  savePalette() {
+    const currentPalette = this.editor.paletteManager.getCurrentPalette();
+    if (!currentPalette || currentPalette.colors.length === 0) {
+      this.editor.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
+      return;
+    }
+    
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Guardar paleta||Save palette"),
+      mode: "saveAs",
+      fileTypes: ["pal"],
+      defaultType: "pal",
+      defaultName: currentPalette.name || "palette",
+      onConfirm: async fileInfo => {
+        try {
+          const palContent = this.editor.generatePalFile();
+          await this.editor.saveFile(fileInfo.name, "pal", palContent);
+          this.editor.showToast(__("Paleta guardada||Palette saved successfully"));
+        } catch (error) {
+          this.editor.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+
+  initColorPickerDrag() {
+    this.colorPickLine = document.createElement("div");
+    this.colorPickLine.className = "color-pick-line";
+    this.colorPickLine.style.display = "none";
+    this.editor.uiLayer.appendChild(this.colorPickLine);
+    
+    this.editor.colorIndicator.addEventListener("mousedown", (e) => this.handleColorPickStart(e));
+    document.addEventListener("mousemove", (e) => this.handleColorPickMove(e));
+    document.addEventListener("mouseup", (e) => this.handleColorPickEnd(e));
+    
+    this.editor.colorIndicator.addEventListener("touchstart", (e) => this.handleColorPickStart(e), { passive: false });
+    document.addEventListener("touchmove", (e) => this.handleColorPickMove(e), { passive: false });
+    document.addEventListener("touchend", (e) => this.handleColorPickEnd(e));
+    document.addEventListener("touchcancel", (e) => this.handleColorPickEnd(e));
+    
+    this.editor.colorIndicator.addEventListener("click", (e) => {
+      if (!this.isColorPicking && !this.colorPickTimeout) {
+        this.toggleSelectedColor();
+      }
+    });
+  }
+
+  handleColorPickStart(e) {
+    if (this.editor.isDrawing || this.editor.isPanning) return;
+    
+    if (e.type.startsWith("touch")) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    this.colorPickStartTime = Date.now();
+    this.colorPickStartPos = {
+      x: e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX,
+      y: e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY
+    };
+    
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+    
+    this.colorPickTimeout = setTimeout(() => {
+      if (!this.isColorPicking) {
+        this.isColorPicking = true;
+        this.editor.colorIndicator.classList.add("dragging");
+        
+        const rect = this.editor.colorIndicator.getBoundingClientRect();
+        this.colorPickStartX = rect.left + rect.width / 2;
+        this.colorPickStartY = rect.top + rect.height / 2;
+        
+        this.colorPickLine.style.display = "block";
+        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, this.colorPickStartPos.x, this.colorPickStartPos.y);
+      }
+    }, 200);
+  }
+
+  handleColorPickMove(e) {
+    if (!this.colorPickStartPos) return;
+    
+    if (e.type.startsWith("touch")) {
+      e.preventDefault();
+    }
+    
+    let clientX, clientY;
+    if (e.type.startsWith("touch")) {
+      if (!e.touches || e.touches.length === 0) return;
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    if (!this.isColorPicking) {
+      const movedDistance = Math.hypot(clientX - this.colorPickStartPos.x, clientY - this.colorPickStartPos.y);
+      
+      if (movedDistance > 10 && this.colorPickTimeout) {
+        clearTimeout(this.colorPickTimeout);
+        this.colorPickTimeout = null;
+        this.isColorPicking = true;
+        this.editor.colorIndicator.classList.add("dragging");
+        
+        const rect = this.editor.colorIndicator.getBoundingClientRect();
+        this.colorPickStartX = rect.left + rect.width / 2;
+        this.colorPickStartY = rect.top + rect.height / 2;
+        
+        this.colorPickLine.style.display = "block";
+        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
+      }
+      return;
+    }
+    
+    this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
+  }
+
+  handleColorPickEnd(e) {
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+    
+    let clientX, clientY;
+    if (e.type.startsWith("touchend") || e.type.startsWith("touchcancel")) {
+      if (!e.changedTouches || e.changedTouches.length === 0) {
+        this.cleanupColorPicking();
+        return;
+      }
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    if (!this.isColorPicking) {
+      const isShortTap = Date.now() - this.colorPickStartTime < 300;
+      const movedDistance = this.colorPickStartPos ? 
+        Math.hypot(clientX - this.colorPickStartPos.x, clientY - this.colorPickStartPos.y) : 0;
+      
+      if (isShortTap && movedDistance < 15) {
+        this.toggleSelectedColor();
+      }
+      
+      this.colorPickStartPos = null;
+      return;
+    }
+    
+    const rect = this.editor.canvasContainer.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+      const canvasPos = this.editor.getCanvasPosition(clientX, clientY);
+      if (canvasPos) {
+        this.editor.pickColor(canvasPos.x, canvasPos.y);
+      }
+    }
+    
+    this.cleanupColorPicking();
+  }
+
+  cleanupColorPicking() {
+    this.isColorPicking = false;
+    this.colorPickStartPos = null;
+    this.colorPickLine.style.display = "none";
+    this.editor.colorIndicator.classList.remove("dragging");
+    
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+  }
+
+  updateColorPickLine(startX, startY, endX, endY) {
+    const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+    const angle = (Math.atan2(endY - startY, endX - startX) * 180) / Math.PI;
+    
+    this.colorPickLine.style.width = `${length}px`;
+    this.colorPickLine.style.left = `${startX}px`;
+    this.colorPickLine.style.top = `${startY}px`;
+    this.colorPickLine.style.transform = `rotate(${angle}deg)`;
+    this.colorPickLine.style.transformOrigin = "0 0";
+  }
+
+  toggleSelectedColor() {
+    this.editor.selectedColor = this.editor.selectedColor === "primary" ? "secondary" : "primary";
+    this.editor.updateColorIndicator();
+  }
+
+  show() {
+    const color = this.editor.selectedColor === "primary" ? this.editor.primaryColor : this.editor.secondaryColor;
+    this.updateSlidersFromHex(color);
+    this.updateRecentColorsGrid();
+    this.updatePaletteGrid();
+    this.overlay.style.display = "flex";
+  }
+
+  hide() {
+    this.overlay.style.display = "none";
+  }
+
+  isVisible() {
+    return this.overlay.style.display === "flex";
+  }
+
+  showHexInputDialog() {
+    const content = document.createElement("div");
+    content.className = "hex-input-dialog";
+    
+    const textInput = document.createElement("input");
+    textInput.type = "text";
+    textInput.value = this.colorPickerPreviewColor;
+    textInput.placeholder = "#RRGGBB";
+    textInput.className = "hex-input-text";
+    content.appendChild(textInput);
+    
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = this.colorPickerPreviewColor;
+    colorInput.className = "hex-input-color";
+    colorInput.addEventListener("change", () => {
+      textInput.value = colorInput.value;
+    });
+    content.appendChild(colorInput);
+    
+    textInput.addEventListener("input", () => {
+      if (this.isValidHex(textInput.value)) {
+        let val = textInput.value;
+        if (!val.startsWith("#")) val = "#" + val;
+        colorInput.value = val;
+      }
+    });
+    
+    return new Promise((resolve, reject) => {
+      this.editor.showPopup(__("Entrada Hexadecimal||Hex Input"), content, [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => {
+            this.editor.hidePopup();
+            reject();
+          }
+        },
+        {
+          text: __("Seleccionar||Select"),
+          action: () => {
+            if (this.isValidHex(textInput.value)) {
+              let hex = textInput.value;
+              if (!hex.startsWith("#")) hex = "#" + hex;
+              this.editor.hidePopup();
+              resolve(hex);
+            } else {
+              this.editor.showToast(__("Expresión hexadecimal inválida||Invalid HEX color expression"));
+              reject();
+            }
+          }
+        }
+      ]);
+    });
+  }
+    
+  loadFloatingColors(colors) {
+    if (!colors) return;
+    if (!colors.length || !colors.forEach) return;
+    this.removeAllFloatingPaletteColors();
+    colors.forEach(entry => {
+      this.addFloatingPaletteColor(entry.color, entry.x, entry.y);
+    });
+  }
+  
+  addFloatingPaletteColor(color, clientX, clientY) {
+    const colorElement = document.createElement("div");
+    colorElement.className = "palette-color floating";
+    colorElement.style.backgroundColor = color;
+    colorElement.style.cursor = "grab";
+    colorElement.style.position = "fixed";
+    colorElement.style.width = "30px";
+    colorElement.style.height = "30px";
+    colorElement.style.borderRadius = "4px";
+    colorElement.style.boxShadow = "0 0 5px rgba(0, 0, 0, 0.5)";
+    colorElement.style.transition = "all 0.1s";
+    
+    const id = `color_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    colorElement.dataset.color = color;
+    colorElement.dataset.id = id;
+    colorElement.dataset.x = clientX;
+    colorElement.dataset.y = clientY;
+    
+    colorElement.style.top = `${clientY}px`;
+    colorElement.style.left = `${clientX}px`;
+    colorElement.style.touchAction = "none";
+    colorElement.style.userSelect = "none";
+    
+    // Click to select color
+    colorElement.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.editor.updateColorSlidersFromHex(color);
+    });
+    
+    // Pointer event handlers for smooth dragging
+    let isDragging = false;
+    let startX, startY;
+    let startLeft, startTop;
+    
+    const onPointerDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      colorElement.setPointerCapture(e.pointerId);
+      
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = parseFloat(colorElement.style.left) || 0;
+      startTop = parseFloat(colorElement.style.top) || 0;
+      
+      colorElement.style.cursor = "grabbing";
+      colorElement.classList.add("dragging");
+      if (this.floatingColorsDeleteZone) {
+        this.floatingColorsDeleteZone.classList.add("visible");
+      }
+    };
+    
+    const onPointerMove = (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      const newLeft = startLeft + deltaX;
+      const newTop = startTop + deltaY;
+      
+      colorElement.style.left = `${newLeft}px`;
+      colorElement.style.top = `${newTop}px`;
+      colorElement.dataset.x = newLeft;
+      colorElement.dataset.y = newTop;
+      
+      if (this.floatingColorsDeleteZone) {
+        const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
+        const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom;
+        
+        if (isOverDelete) {
+          this.floatingColorsDeleteZone.classList.add("drag-over");
+        } else {
+          this.floatingColorsDeleteZone.classList.remove("drag-over");
+        }
+      }
+    };
+    
+    const onPointerUp = (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      if (this.floatingColorsDeleteZone) {
+        const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
+        const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom;
+        
+        if (isOverDelete) {
+          this.removeFloatingPaletteColor(colorElement.dataset.id);
+        } else {
+          this.saveFloatingColors();
+        }
+      }
+      
+      isDragging = false;
+      colorElement.style.cursor = "grab";
+      colorElement.classList.remove("dragging");
+      if (this.floatingColorsDeleteZone) {
+        this.floatingColorsDeleteZone.classList.remove("visible", "drag-over");
+      }
+      
+      colorElement.releasePointerCapture(e.pointerId);
+    };
+    
+    colorElement.addEventListener("pointerdown", onPointerDown);
+    colorElement.addEventListener("pointermove", onPointerMove);
+    colorElement.addEventListener("pointerup", onPointerUp);
+    colorElement.addEventListener("pointercancel", onPointerUp);
+    colorElement.addEventListener("contextmenu", (e) => e.preventDefault());
+    
+    this.editor.overlayLayer.appendChild(colorElement);
+    this.floatingColors.set(id, colorElement);
+    this.saveFloatingColors();
+  }
+  
+  removeFloatingPaletteColor(id) {
+    const element = this.floatingColors.get(id);
+    if (element) {
+      element.remove();
+      this.floatingColors.delete(id);
+      this.saveFloatingColors();
+    }
+  }
+  
+  removeAllFloatingPaletteColors() {
+    this.floatingColors.forEach((element, id) => {
+      if (element) element.remove();
+    });
+    this.floatingColors.clear();
+    this.saveFloatingColors();
+  }
+  
+  saveFloatingColors() {
+    localStorage.setItem("floatingColors", this.getFloatingColorsData());
+  }
+  
+  getFloatingColorsData() {
+    return JSON.stringify(
+      Array.from(this.floatingColors).map(entry => entry[1]).map(element => {
+        return {
+          color: element.dataset.color,
+          x: element.dataset.x,
+          y: element.dataset.y
+        };
+      })
+    );
+  }
+
+  // Color conversion utilities
+  rgbToHex(r, g, b) {
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return { r, g, b };
+  }
+
+  rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, v = max;
+    const d = max - min;
+    s = max === 0 ? 0 : d / max;
+    
+    if (max === min) {
+      h = 0;
+    } else {
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    
+    return {
+      h: Math.round(h * 360),
+      s: Math.round(s * 100),
+      v: Math.round(v * 100)
+    };
+  }
+
+  hsvToRgb(h, s, v) {
+    h /= 360; s /= 100; v /= 100;
+    let r, g, b;
+    
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+    
+    switch (i % 6) {
+      case 0: r = v; g = t; b = p; break;
+      case 1: r = q; g = v; b = p; break;
+      case 2: r = p; g = v; b = t; break;
+      case 3: r = p; g = q; b = v; break;
+      case 4: r = t; g = p; b = v; break;
+      case 5: r = v; g = p; b = q; break;
+    }
+    
+    return {
+      r: Math.round(r * 255),
+      g: Math.round(g * 255),
+      b: Math.round(b * 255)
+    };
+  }
+
+  isValidHex(text) {
+    return /^#?([a-f\d]{3}|[a-f\d]{6})$/i.test(text);
+  }
+}
+
+// File Browser class
+class FileBrowser {
+  constructor(options = {}) {
+    // Default options
+    this.options = {
+      container: document.body,
+      onConfirm: null,
+      onCancel: null,
+      onError: null,
+      fileTypes: ["pxl", "png", "jpg", "jpeg"],
+      defaultType: "pxl",
+      allowMultiple: false,
+      mode: "open", // 'open', 'save', 'saveAs'
+      defaultName: "untitled"
+    };
+    
+    this.mimeMap = {
+      pxl: "text/plain, application/json, application/octet-stream",
+      pal: "text/plain, application/octet-stream",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      psd: "applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
+      txt: "text/plain, application/octet-stream",
+      project: "application/*",
+      default: "*"
+    };
+    
+    Object.assign(this.options, options);
+
+    // State
+    this.selectedFile = null;
+    this.selectedType = this.options.defaultType;
+    this.isCordova = typeof window.cordova !== "undefined";
+    this.isFilePluginAvailable = this.isCordova && typeof window.File !== "undefined";
+    this.currentDirectory = null;
+    this.currentPath = null;
+    this.workingDirectory = "";
+    this.lastMode = null;
+    this.visible = false;
+
+    // Initialize
+    this.initUI();
+  }
+
+  // UI Setup
+  initUI() {
+    // Overlay
+    this.overlay = document.createElement("div");
+    this.overlay.className = "popup-overlay";
+
+    // Dialog
+    this.dialog = document.createElement("div");
+    this.dialog.className = "popup-content";
+    this.overlay.appendChild(this.dialog);
+
+    // Title
+    this.title = document.createElement("div");
+    this.title.className = "file-browser-title";
+    this.title.textContent = this.options.title 
+                              ? this.options.title
+                              : this.options.mode === "save" 
+                                || this.options.mode === "saveAs" 
+                                  ? __("Guardar Archivo||Save File") : __("Abrir Archivo||Open File");
+    this.dialog.appendChild(this.title);
+
+    this.contentArea = document.createElement("div");
+    this.contentArea.className = "file-browser-content";
+    this.dialog.appendChild(this.contentArea);
+
+    this.buttonContainer = document.createElement("div");
+    this.buttonContainer.className = "file-browser-buttons";
+    this.dialog.appendChild(this.buttonContainer);
+
+    // Content area
+    this.initContentArea();
+
+    // Buttons
+    this.initButtons();
+
+    // Add to DOM
+    this.options.container.appendChild(this.overlay);
+  }
+
+  initContentArea() {
+    this.contentArea.innerHTML = "";
+
+    // Store references to existing elements if they exist
+    const existingFilenameInput = this.filenameInput;
+    const existingTypeSelect = this.typeSelect;
+    const existingFileList = this.fileList;
+
+    if (this.isCordova && this.isFilePluginAvailable) {
+      this.initCordovaUI();
+    } else {
+      this.initBrowserUI();
+    }
+
+    // Preserve values if elements were recreated
+    if (existingFilenameInput && this.filenameInput && existingFilenameInput.value) {
+      this.filenameInput.value = existingFilenameInput.value;
+    }
+
+    if (existingTypeSelect && this.typeSelect && existingTypeSelect.value) {
+      this.typeSelect.value = existingTypeSelect.value;
+      this.selectedType = existingTypeSelect.value;
+    }
+  }
+
+  initCordovaUI() {
+    // Set full screen
+    // this.overlay.classList.add("fullscreen");
+    
+    // Clear existing content but preserve elements if they exist
+    this.pathDisplay = this.pathDisplay || document.createElement("div");
+    this.fileList = this.fileList || document.createElement("div");
+
+    this.pathDisplay.className = "cordova-path";
+    this.fileList.className = "file-browser-list cordova-file-list";
+
+    this.contentArea.innerHTML = "";
+    this.contentArea.appendChild(this.pathDisplay);
+    this.contentArea.appendChild(this.fileList);
+
+    // For save mode, add filename input
+    if (this.options.mode === "save" || this.options.mode === "saveAs") {
+      this.filenameInput = this.filenameInput || document.createElement("input");
+      this.filenameInput.type = "text";
+      this.filenameInput.className = "file-browser-filename";
+      this.filenameInput.value = this.options.defaultName || "untitled";
+      this.contentArea.appendChild(this.filenameInput);
+
+      this.typeSelect = this.typeSelect || document.createElement("select");
+      this.typeSelect.className = "file-browser-type";
+      this.typeSelect.innerHTML = ""; // Clear existing options
+
+      this.options.fileTypes.forEach(type => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type.toUpperCase();
+        if (type === this.options.defaultType) option.selected = true;
+        this.typeSelect.appendChild(option);
+      });
+
+      this.contentArea.appendChild(this.typeSelect);
+    }
+  }
+
+  initBrowserUI() {
+    this.contentArea.innerHTML = "";
+
+    if (this.options.mode === "open") {
+      // Reuse or create file input
+      this.fileInput = this.fileInput || document.createElement("input");
+      this.fileInput.type = "file";
+      this.fileInput.style.display = "none";
+      this.fileInput.accept = this.getAccept();
+      this.fileInput.multiple = this.options.allowMultiple;
+
+      // Remove existing event listeners
+      const newFileInput = this.fileInput.cloneNode();
+      this.fileInput = newFileInput;
+
+      this.fileInput.addEventListener("change", e => this.handleFileSelect(e));
+      this.contentArea.appendChild(this.fileInput);
+
+      // Reuse or create browse button
+      const browseButton = document.createElement("button");
+      browseButton.className = "file-browser-browse";
+      browseButton.textContent = __("Escoger Archivos||Browse Files");
+      browseButton.addEventListener("click", () => this.fileInput.click());
+      this.contentArea.appendChild(browseButton);
+    } else {
+      // Reuse or create filename input
+      this.filenameInput = this.filenameInput || document.createElement("input");
+      this.filenameInput.type = "text";
+      this.filenameInput.className = "file-browser-filename";
+      this.filenameInput.value = this.options.defaultName || "untitled";
+      this.contentArea.appendChild(this.filenameInput);
+
+      // Reuse or create type select
+      this.typeSelect = this.typeSelect || document.createElement("select");
+      this.typeSelect.className = "file-browser-type";
+      this.typeSelect.innerHTML = "";
+
+      this.options.fileTypes.forEach(type => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type.toUpperCase();
+        if (type === this.options.defaultType) option.selected = true;
+        this.typeSelect.appendChild(option);
+      });
+
+      this.contentArea.appendChild(this.typeSelect);
+    }
+  }
+
+  initButtons() {
+    this.buttonContainer.innerHTML = "";
+
+    // Cancel button
+    this.cancelButton = document.createElement("button");
+    this.cancelButton.className = "file-browser-cancel";
+    this.cancelButton.textContent = __("Cancelar||Cancel");
+    this.cancelButton.addEventListener("click", () => this.handleCancel());
+    this.buttonContainer.appendChild(this.cancelButton);
+
+    // Confirm/Save button when appropriate
+    if (this.options.mode === "save" || this.options.mode === "saveAs") {
+      this.confirmButton = document.createElement("button");
+      this.confirmButton.className = "file-browser-confirm";
+      this.confirmButton.textContent = __("Guardar||Save");
+      this.confirmButton.addEventListener("click", () => this.handleConfirm());
+      this.buttonContainer.appendChild(this.confirmButton);
+    }
+  }
+
+  updateExistingUI() {
+    // Update filename input if it exists
+    if (this.filenameInput && this.options.defaultName) {
+      this.filenameInput.value = this.options.defaultName;
+    }
+
+    // Update title
+    if (this.title) {
+      this.title.textContent = this.options.title 
+                              ? this.options.title
+                              : this.options.mode === "save" 
+                                || this.options.mode === "saveAs" 
+                                  ? "Save File" : "Open File";
+    }
+
+    // Update others
+    this.initContentArea();
+    this.initButtons();
+  }
+
+  /* ====================== */
+  /* === CORDOVA METHODS == */
+  /* ====================== */
+  async loadCordovaFiles(path = this.currentPath) {
+    try {
+      this.fileList.innerHTML = '<div class="loading">Loading files...</div>';
+
+      let dirEntry;
+      if (path) {
+        dirEntry = await new Promise((resolve, reject) => {
+          window.resolveLocalFileSystemURL(path.endsWith("/") ? path : path + "/", resolve, reject);
+        });
+      } else {
+        // Use external storage if available (more likely to be visible)
+        try {
+          dirEntry = await new Promise((resolve, reject) => {
+            window.resolveLocalFileSystemURL(cordova.file.externalDataDirectory || cordova.file.dataDirectory, resolve, reject);
+          });
+        } catch (error) {
+          // Fallback to persistent storage
+          dirEntry = await new Promise((resolve, reject) => {
+            window.requestFileSystem(window.PERSISTENT || 1, 0, fs => resolve(fs.root), reject);
+          });
+        }
+      }
+
+      // Read directory
+      const reader = dirEntry.createReader();
+      const entries = await new Promise((resolve, reject) => {
+        reader.readEntries(resolve, reject);
+      });
+
+      // Update UI
+      this.currentDirectory = dirEntry;
+      this.currentPath = dirEntry.toURL();
+      this.workingDirectory = dirEntry.fullPath;
+      this.updatePathDisplay(dirEntry);
+      this.renderFileList(entries, dirEntry);
+    } catch (error) {
+      this.showError(`Error loading files: ${error.message}`);
+      if (this.options.onError) this.options.onError(error);
+      throw error;
+    }
+  }
+
+  async getDirectoryEntry(path) {
+    return new Promise((resolve, reject) => {
+      window.resolveLocalFileSystemURL(path, resolve, reject);
+    });
+  }
+
+  async getRootDirectory() {
+    if (window.PERSISTENT) {
+      return new Promise((resolve, reject) => {
+        window.requestFileSystem(window.PERSISTENT, 0, fs => resolve(fs.root), reject);
+      });
+    } else {
+      return window.cordova.file.dataDirectory;
+    }
+  }
+
+  updatePathDisplay(dirEntry) {
+    const path = dirEntry.fullPath || dirEntry.nativeURL;
+    this.pathDisplay.textContent = path;
+  }
+
+  renderFileList(entries, dirEntry) {
+    this.fileList.innerHTML = "";
+
+    // Sort entries: directories first, then files; both alphabetically by name
+    entries.sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      // Both directory or both files, sort by name case-insensitive
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+
+    if (this.isRootPath(dirEntry)) {
+      // Add native open if on root directory
+      if (this.options.mode === "open") {
+        this.addListItem({
+          text: "[File Selector]",
+          icon: "folder",
+          onClick: () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.style.display = "none";
+            input.accept = this.getAccept();
+            input.multiple = this.options.allowMultiple;
+            input.addEventListener("change", e => this.handleFileSelect(e));
+            input.addEventListener("cancel", e => this.renderFileList(entries, dirEntry));
+            input.click();
+            this.fileList.innerHTML = "";
+          }
+        });
+      }
+    } else {
+      // Add parent directory link if not root
+      this.addParentDirectoryItem(dirEntry);
+    }
+
+    // Add files and directories
+    entries.forEach(entry => {
+      if (entry.isDirectory) {
+        this.addDirectoryItem(entry);
+      } else {
+        this.addFileItem(entry);
+      }
+    });
+
+    if (this.fileList.children.length === 0) {
+      this.fileList.innerHTML = '<div class="empty">No files found</div>';
+    }
+  }
+  
+  addListItem({
+    text = "",
+    type = "directory",
+    icon = "folder",
+    onClick = null
+  }) {
+    const item = document.createElement("div");
+    item.className = `file-item ${type}`;
+
+    const iconSpan = document.createElement("span");
+    iconSpan.className = `icon ${icon}`;
+
+    const textSpan = document.createElement("span");
+    textSpan.textContent = text;
+
+    item.appendChild(iconSpan);
+    item.appendChild(textSpan);
+
+    item.addEventListener("click", () => onClick?.(item));
+    
+    item.addEventListener("touchend", () => item.scrollTo({ left: 0, behavior: "smooth" }));
+    
+    this.fileList.appendChild(item);
+  }
+
+  addParentDirectoryItem(dirEntry) {
+    const parentItem = document.createElement("div");
+    parentItem.className = "file-item directory";
+
+    // Clear innerHTML, create icon div and text span instead
+    const icon = document.createElement("span");
+    icon.className = "icon folder";
+
+    const text = document.createElement("span");
+    text.textContent = ".. (Parent Directory)";
+
+    parentItem.appendChild(icon);
+    parentItem.appendChild(text);
+
+    parentItem.addEventListener("click", () => this.goUp());
+    this.fileList.appendChild(parentItem);
+  }
+
+  addDirectoryItem(entry) {
+    const item = document.createElement("div");
+    item.className = "file-item directory";
+
+    const icon = document.createElement("span");
+    icon.className = "icon folder";
+
+    const text = document.createElement("span");
+    text.textContent = entry.name;
+
+    item.appendChild(icon);
+    item.appendChild(text);
+
+    item.addEventListener("click", () => {
+      this.loadCordovaFiles(entry.toURL());
+    });
+    
+    item.addEventListener("touchend", () => item.scrollTo({ left: 0, behavior: "smooth" }));
+    
+    this.fileList.appendChild(item);
+  }
+
+  addFileItem(entry) {
+    const ext = entry.name.split(".").pop().toLowerCase();
+    if (!this.options.fileTypes.includes(ext)) return;
+
+    const item = document.createElement("div");
+    item.className = "file-item file";
+
+    const icon = document.createElement("span");
+
+    // Decide icon based on file type
+    if (["png", "gif", "jpg", "jpeg"].includes(ext)) {
+      icon.className = "icon image-file";
+    } else if (ext === "pxl") {
+      icon.className = "icon project-file";
+    } else {
+      icon.className = "icon text-file";
+    }
+
+    const text = document.createElement("span");
+    text.textContent = entry.name;
+
+    item.appendChild(icon);
+    item.appendChild(text);
+
+    item.addEventListener("click", () => {
+      this.selectedFile = entry;
+      this.selectedType = ext;
+
+      if (this.options.mode === "open" && this.options.onConfirm) {
+        this.options.onConfirm({
+          name: entry.name,
+          type: ext,
+          entry: entry,
+          fullPath: entry.toURL()
+        });
+        this.hide();
+      } else {
+        this.filenameInput.value = entry.name;
+      }
+    });
+    this.fileList.appendChild(item);
+  }
+
+  /* ====================== */
+  /* === BROWSER METHODS == */
+  /* ====================== */
+  handleFileSelect(event) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const ext = file.name.split(".").pop().toLowerCase();
+
+    if (this.options.onConfirm) {
+      this.options.onConfirm({
+        name: file.name,
+        type: ext,
+        file: file
+      });
+    }
+    
+    event.target.value = "";
+
+    this.hide();
+  }
+
+  /* ====================== */
+  /* ==== CORE METHODS ==== */
+  /* ====================== */
+  show() {
+    // Make sure UI is initialized for current mode
+    if (this.lastMode !== this.options.mode) {
+      this.contentArea.innerHTML = "";
+      this.initContentArea();
+    }
+
+    this.overlay.classList.add("visible");
+    this.selectedFile = null;
+    this.visible = true;
+
+    // Reset or update UI elements based on mode
+    if (this.filenameInput) {
+      this.filenameInput.value = this.options.defaultName || "untitled";
+    }
+
+    if (this.typeSelect && this.options.defaultType) {
+      this.typeSelect.value = this.options.defaultType;
+      this.selectedType = this.options.defaultType;
+    }
+
+    if (this.isCordova && this.isFilePluginAvailable) {
+      this.loadCordovaFiles();
+    }
+  }
+
+  hide() {
+    this.overlay.classList.remove("visible");
+    this.visible = false;
+  }
+
+  refresh() {
+    this.contentArea.innerHTML = "";
+    this.initContentArea();
+
+    if (this.isCordova && this.isFilePluginAvailable) {
+      this.loadCordovaFiles();
+    }
+  }
+
+  goUp() {
+    if (!this.isRootPath(this.currentDirectory)) {
+      this.loadCordovaFiles(this.currentDirectory.toURL().split("/").slice(0, -2).join("/") || "/");
+    } else {
+      this.hide();
+    }
+  }
+
+  isRootPath(dirEntry) {
+    return dirEntry.fullPath == "/" || dirEntry.fullPath == cordova.file.dataDirectory;
+  }
+  
+  getAccept() {
+    const mimeStack = [];
+    this.options.fileTypes.forEach(extension => {
+      const type = this.mimeMap[extension] || this.mimeMap.default;
+      const mimes = type.split(',').map(mime => mime.trim());
+      mimes.forEach(mime => {
+        if (!mimeStack.includes(mime)) {
+          mimeStack.push(mime);
+        }
+      });
+    });
+    return mimeStack.join(', ');
+  }
+
+  updateOptions(newOptions) {
+    const oldMode = this.options.mode;
+    Object.assign(this.options, newOptions);
+    this.selectedFile = null;
+    this.selectedType = this.options.defaultType || "pxl";
+
+    // Re-initialize UI if mode changed or UI elements don't exist
+    if (oldMode !== this.options.mode || (this.options.mode === "saveAs" && !this.filenameInput) || (this.options.mode === "open" && this.isCordova && !this.fileList)) {
+      this.contentArea.innerHTML = "";
+      this.initContentArea();
+      this.updateExistingUI();
+    } else {
+      this.updateExistingUI();
+    }
+
+    this.lastMode = this.options.mode;
+  }
+
+  handleConfirm() {
+    if (this.options.mode !== "save" && this.options.mode !== "saveAs") return;
+
+    let filename = this.filenameInput ? this.filenameInput.value.trim() : this.options.defaultName;
+    if (!filename) filename = this.options.defaultName;
+
+    const fileType = this.typeSelect ? this.typeSelect.value : this.options.defaultType;
+    const fullFilename = filename.endsWith(`.${fileType}`) ? filename : `${filename}.${fileType}`;
+
+    if (this.options.onConfirm) {
+      const result = {
+        name: fullFilename,
+        type: fileType
+      };
+
+      if (this.isCordova && this.isFilePluginAvailable && this.currentDirectory) {
+        result.directory = this.currentDirectory;
+      }
+
+      this.options.onConfirm(result);
+    }
+
+    this.hide();
+  }
+
+  handleCancel() {
+    if (this.options.onCancel) {
+      this.options.onCancel();
+    }
+    this.hide();
+  }
+
+  showError(message) {
+    this.fileList.innerHTML = `<div class="error">${message}</div>`;
+  }
+
+  destroy() {
+    // Remove event listeners from file input
+    if (this.fileInput) {
+      const newFileInput = this.fileInput.cloneNode(false);
+      this.fileInput.parentNode?.replaceChild(newFileInput, this.fileInput);
+      this.fileInput = newFileInput;
+    }
+
+    // Remove overlay
+    if (this.overlay && this.overlay.parentNode) {
+      this.overlay.parentNode.removeChild(this.overlay);
+    }
+
+    this.fileBrowser = null;
+  }
+}
+
+class PixelArtEditor {
+  constructor(container) {
+    this.container = container || document.createElement("div");
+    this.container.classList.add("app-container");
+    document.body.appendChild(this.container);
+    
+    this.version = VERSION;
+
+    this.tools = {};
+    this.currentTool = null;
+    this.lastTool = null;
+    this.isDrawing = false;
+    this.isPanning = false;
+    this.brushSize = localStorage.getItem("brushSize") ? parseInt(localStorage.getItem("brushSize")) : 1;
+    this.maxBrushSize = 8;
+    this.minBrushSize = 1;
+    this.defaultWidth = 32;
+    this.defaultHeight = 32;
+    this.startX = 0;
+    this.startY = 0;
+    this.scale = 1;
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.primaryColor = localStorage.getItem("primaryColor") || "#000000";
+    this.secondaryColor = localStorage.getItem("secondaryColor") || "#ff00ff";
+    this.selectedColor = "primary";
+    this.transparentBackground = true;
+    this.project = null;
+    this.historyManager = new HistoryManager(this);
+    this.touchDistance = 0;
+    this.touchCenterX = 0;
+    this.touchCenterY = 0;
+    this.minScale = 1;
+    this.maxScale = 35;
+    this.popupOpen = false;
+    this.toolDropdownOpen = false;
+    this.toolSettingsOpen = false;
+    this.isPlaying = false;
+    this.animationInterval = null;
+    this.defaultFrameTime = 1000 / 12; // Default frame time
+    this.showMiniView = false;
+    this.useCordova = window.location.href.startsWith("file");
+    this.deviceReady = false;
+    this.isFilePluginAvailable = false;
+    this.fileBrowser = null;
+    this.defaultFileBrowserPathUrl = null;
+    this.timelapseFPS = 30;
+    this.isCanvasResizing = false;
+    this.canvasResizeState = {
+      x: 0, y : 0,
+      width: 0, height: 0
+    };
+    
+    // Some settings
+    this.registerLayerVisibilityChanges = false;
+    this.autoLoadRecentFloatingColors = false;
+    this.usePerProjectFloatingColors = false;
+    
+    // Collab Session
+    this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
+    this.collabMemberColor = localStorage.getItem('collab_user_color') || ['red', 'blue', 'green', 'yellow', 'orange', 'purple'][Math.floor(Math.random() * 6)];
+    
+    // Temporary variables
+    this.tempLine = null;
+    this.tempRect = null;
+    this.tempEllipse = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+    this.tempColor = null;
+    
+    try {
+      this.initSettings();
+      this.initUI();
+      this.initCollab();
+      this.initBrushUI();
+      this.initCanvas();
+      this.initTools();
+      this.initEventListeners();
+
+      this.gridManager = new GridManager(this);
+      this.spritesheetLoader = new SpritesheetLoader(this);
+      this.referenceManager = new ReferenceManager(this);
+      this.paletteManager = new PaletteManager(this);
+      this.colorPicker = new ColorPicker(this);
+
+      if (this.useCordova) {
+        this.initCordova();
+      }
+
+      this.newProject();
+
+      if (this.showMiniView) {
+        this.animationPreview.classList.add("visible");
+      }
+    } catch (error) {
+      console.error("Editor initialization error:", error);
+      this.showError(error);
+      throw error;
+    }
+  }
+  
+  initSettings() {
+    // Create settings manager
+    this.settings = new SettingsManager(this);
+    
+    window.settings = this.settings;
+    
+    // Define categories and settings
+    
+    // General category
+    const generalCat = this.settings.addCategory({
+      id: 'general',
+      title: 'General||General',
+      icon: 'icon-general'
+    });
+    
+    // Language setting
+    generalCat.addSetting({
+      id: 'language',
+      label: 'Idioma||Language',
+      description: 'Selecciona el idioma de la interfaz||Select interface language',
+      type: 'select',
+      defaultValue: "0",
+      options: [
+        { value: "0", label: 'Español' },
+        { value: "1", label: 'English' }
+      ],
+      needsReload: true,
+      onInit: (value, editor) => {
+        editor.settings.language = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.settings.language = value;
+        editor.settings.save();
+      }
+    });
+
+    // Theme setting
+    generalCat.addSetting({
+      id: 'theme',
+      label: 'Tema||Theme',
+      description: 'Oscuro / Claro||Dark / Light',
+      type: 'select',
+      defaultValue: 'dark',
+      options: [
+        { value: 'dark', label: 'Oscuro||Dark' },
+        { value: 'light', label: 'Claro||Light' }
+      ],
+      needsReload: false,
+      onInit: (value, editor) => {
+        document.body.classList.add(`theme-${value}`);
+      },
+      onUpdate: (value, oldValue, editor) => {
+        document.body.classList.remove(`theme-${oldValue}`);
+        document.body.classList.add(`theme-${value}`);
+      }
+    });
+
+    // Editor category
+    const editorCat = this.settings.addCategory({
+      id: 'editor',
+      title: 'Editor||Editor',
+      icon: 'icon-editor'
+    });
+
+    editorCat.addSetting({
+      id: 'autoSave',
+      label: 'Auto-guardado||Auto-save',
+      description: 'Guardar automáticamente cada 5 minutos||Auto-save every 5 minutes',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        if (value) {
+          editor.startAutoSave();
+        } else {
+          editor.stopAutoSave();
+        }
+      },
+      onUpdate: (value, oldValue, editor) => {
+        if (value) {
+          editor.startAutoSave();
+        } else {
+          editor.stopAutoSave();
+        }
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'showPreview',
+      label: 'Mostrar Vista Previa por defecto||Show Preview by default',
+      description: 'Mostrar recuadro de vista previa al iniciar la app||Show preview window at startup',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.showMiniView = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'registerLayerVisibilityChanges',
+      label: 'Registrar cambios de visibilidad||Register visibility changes',
+      description: 'Registrar cambios de visibilidad de capas en la historia de deshacer||Register layer visibility changes in undo history',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.registerLayerVisibilityChanges = value;
+      },
+      onUpdate: (value, oldScale, editor) => {
+        editor.registerLayerVisibilityChanges = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'autoLoadRecentFloatingColors',
+      label: 'Cargar colores flotantes recientes||Load recent floating colors',
+      description: 'Cargar colores flotantes recientes automáticamente al iniciar la app||Auto-load recent floating colors on startup',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.autoLoadRecentFloatingColors = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'usePerProjectFloatingColors',
+      label: 'Usar colores flotantes por proyecto||Use per project floating colors',
+      description: 'Los colores flotantes se guardan de forma independiente para cada proyecto||Floating colors are saved independently for each project',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.usePerProjectFloatingColors = value;
+      }
+    });
+    
+    // Canvas category
+    const canvasCat = this.settings.addCategory({
+      id: 'canvas',
+      title: 'Lienzo||Canvas',
+      icon: 'icon-canvas'
+    });
+
+    canvasCat.addSetting({
+      id: 'defaultWidth',
+      label: 'Ancho predeterminado||Default width',
+      description: 'Ancho por defecto para nuevos proyectos||Default width for new projects',
+      type: 'number',
+      defaultValue: 32,
+      min: 8,
+      max: 512,
+      step: 8,
+      onInit: (value, editor) => {
+        editor.defaultWidth = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.defaultWidth = value;
+      }
+    });
+
+    canvasCat.addSetting({
+      id: 'defaultHeight',
+      label: 'Alto predeterminado||Default height',
+      description: 'Alto por defecto para nuevos proyectos||Default height for new projects',
+      type: 'number',
+      defaultValue: 32,
+      min: 8,
+      max: 512,
+      step: 8,
+      onInit: (value, editor) => {
+        editor.defaultHeight = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.defaultHeight = value;
+      }
+    });
+
+    canvasCat.addSetting({
+      id: 'smooth-panning',
+      label: 'Paneo Suave||Smooth Panning',
+      description: 'Movimiento suave del lienzo||Smooth movement of the canvas',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        if (value) {
+          editor.setSmoothPanning(true);
+        } else {
+          editor.setSmoothPanning(false);
+        }
+      },
+      onUpdate: (value, oldValue, editor) => {
+        if (value) {
+          editor.setSmoothPanning(true);
+        } else {
+          editor.setSmoothPanning(false);
+        }
+      }
+    });
+
+    // Animation category
+    const animCat = this.settings.addCategory({
+      id: 'animation',
+      title: 'Animación||Animation',
+      icon: 'icon-animation'
+    });
+
+    animCat.addSetting({
+      id: 'defaultFPS',
+      label: 'FPS predeterminado||Default FPS',
+      description: 'Fotogramas por segundo para nuevas animaciones||Frames per second for new animations',
+      type: 'number',
+      defaultValue: 12,
+      min: 1,
+      max: 60,
+      step: 1,
+      onInit: (value, editor) => {
+        editor.defaultFrameTime = 1000 / value;
+      }
+    });
+
+    // Performance category
+    const perfCat = this.settings.addCategory({
+      id: 'performance',
+      title: 'Rendimiento||Performance',
+      icon: 'icon-performance'
+    });
+
+    perfCat.addSetting({
+      id: 'zoomLimit',
+      label: 'Limité de Zoom||Zoom Limit',
+      description: 'Límitar el zoom hasta cierto punto||Limit zoom to certain point',
+      type: 'boolean',
+      defaultValue: true,
+      step: 10,
+      onInit: (value, editor) => {
+        editor.minScale = value ? 1 : 0;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.minScale = value ? 1 : 0;
+      }
+    });
+    
+    perfCat.addSetting({
+      id: 'maxUndoSteps',
+      label: 'Pasos de deshacer máximos||Max undo steps',
+      description: 'Límite de historial de deshacer (0 = Ilimitado)||Undo history limit (0 = Unlimited)',
+      type: 'number',
+      defaultValue: 50,
+      min: 0,
+      max: 2000,
+      step: 10,
+      onInit: (value, editor) => {
+        editor.historyManager.maxHistoryLength = value ? value : Infinity;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.historyManager.maxHistoryLength = value ? value : Infinity;
+      }
+    });
+    
+    perfCat.addSetting({
+      id: 'maxBrushSize',
+      label: 'Tamaño máximo del pincel||Max brush size',
+      description: 'Límite del tamaño del pincel, Pinceles muy anchos pueden ralentizar la app||Brush size limit, wide brushes can slow down the app',
+      type: 'number',
+      defaultValue: 8,
+      min: 3,
+      max: 32,
+      step: 1,
+      onInit: (value, editor) => {
+        editor.maxBrushSize = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.maxBrushSize = value;
+      }
+    });
+    
+    // Collaboration category
+    const collabCat = this.settings.addCategory({
+      id: 'collab',
+      title: 'Colaboración||Collaboration',
+      icon: 'icon-collab'
+    });
+    
+    collabCat.addSetting({
+      id: 'memberName',
+      label: 'Nombre en pantalla||Display name',
+      description: 'Nombre a mostrar en sesiones colaborativas||Name to show in collaborative sessions',
+      type: 'text',
+      defaultValue: this.collabMemberName,
+      needsReload: false,
+      onInit: (value, editor) => {
+        editor.collabMemberName = value.length > 3 ? value : `user_${Math.floor(Math.random() * 10000)}`;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.collabMemberName = value.length > 3 ? value : `user_${Math.floor(Math.random() * 10000)}`;
+        this.collabManager.updateMemberName(editor.collabMemberName);
+        localStorage.setItem('collab_username', value);
+      }
+    });
+    
+    collabCat.addSetting({
+      id: 'memberColor',
+      label: 'Color||Color',
+      description: 'Color con el que se muestra tu nombre||Color with which your name is shown',
+      type: 'select',
+      defaultValue: this.collabMemberColor,
+      options: [
+        { value: 'red', label: 'Rojo||Red' },
+        { value: 'blue', label: 'Azul||Blue' },
+        { value: 'green', label: 'Verde||Green' },
+        { value: 'yellow', label: 'Amarillo||Yellow' },
+        { value: 'orange', label: 'Naranja||Orange' },
+        { value: 'purple', label: 'Púrpura||Purple' },
+        { value: 'pink', label: 'Rosa||Pink' },
+        { value: 'cyan', label: 'Cian||Cyan' },
+        { value: 'brown', label: 'Marrón||Brown' },
+        { value: 'gray', label: 'Gris||Gray' },
+        { value: 'lime', label: 'Lima||Lime' },
+        { value: 'indigo', label: 'Indigo||Indigo' }
+      ],
+      needsReload: false,
+      onInit: (value, editor) => {
+        this.collabMemberColor = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        this.collabMemberColor = value;
+        this.collabManager.memberColor = value;
+        this.collabManager.updateMemberColor(value);
+        localStorage.setItem('collab_user_color', value);
+      }
+    });
+    
+    // Initialize settings
+    this.settings.init();
+    
+    // Create settings UI
+    this.settingsUI = new SettingsUI(this.settings, this);
+  }
+  
+  initCollab() {
+    this.collabManager = new CollabManager(this);
+  }
+
+  // Auto-save functionality
+  startAutoSave() {
+    if (this.autoSaveInterval) return;
+    
+    this.autoSaveInterval = setInterval(() => {
+      if (this.project) {
+        this.saveProject(true);
+        this.showToast(__('Proyecto auto-guardado||Project auto-saved'));
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+  }
+
+  stopAutoSave() {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
+    }
+  }
+  
+  setSmoothPanning(enabled) {
+    document.body.style.setProperty("--transform-transition", enabled ? "0.2s" : "none");
+  }
+
+  initCordova() {
+    const script = document.createElement("script");
+    script.src = "cordova/cordova.js";
+    document.head.appendChild(script);
+    document.addEventListener("deviceready", () => this.onDeviceReady(), false);
+  }
+
+  onDeviceReady() {
+    this.deviceReady = true;
+
+    // Request file system permissions if needed
+    if (window.requestFileSystem) {
+      // Test file system access
+      window.requestFileSystem(
+        window.PERSISTENT || 1,
+        0,
+        fs => {
+          this.isCordova = true;
+          this.isFilePluginAvailable = true;
+          window.resolveLocalFileSystemURL(
+            cordova.file.externalRootDirectory,
+            entry => {
+              this.defaultFileBrowserPathUrl = entry.toURL();
+            },
+            error => {
+              console.warn("File system access denied:", error.code);
+              this.isFilePluginAvailable = false;
+            }
+          );
+        },
+        error => {
+          console.warn("File system access denied:", error.code);
+          this.isFilePluginAvailable = false;
+        }
+      );
+    }
+
+    // Register back key
+    document.addEventListener("backbutton", () => this.onBackButtonDown());
+  }
+
+  onBackButtonDown() {
+    if (this.popupOpen) {
+      this.hidePopup();
+    } else if (this.fileBrowser && this.fileBrowser.visible) {
+      if (this.isFilePluginAvailable) {
+        this.fileBrowser.goUp();
+      } else {
+        this.fileBrowser.hide();
+      }
+    } else if (this.colorPickerOpen) {
+      this.hideColorPicker();
+    } else if (this.menuPanel.classList.contains("visible")) {
+      this.toggleMenu();
+    } else if (this.animationPanel.classList.contains("visible")) {
+      this.togglePanel("animation");
+    } else if (this.layersPanel.classList.contains("visible")) {
+      this.togglePanel("layers");
+    } else if (this.gridManager.panelVisible) {
+      this.gridManager.hide();
+    } else if (this.settingsUI.visible) {
+      this.settingsUI.hide();
+    } else {
+      this.exitApp();
+    }
+  }
+
+  showError(error) {
+    this.errorElement.innerHTML = "";
+    this.errorElement.style.display = "flex";
+
+    const title = document.createElement("h2");
+    title.textContent = "App crash";
+    this.errorElement.appendChild(title);
+
+    const messageElement = document.createElement("p");
+    messageElement.className = "error-message";
+    this.errorElement.appendChild(messageElement);
+
+    messageElement.textContent = error.message || "An unknown error occurred";
+
+    this.loadingElement.style.display = "none";
+
+    const reloadButton = document.createElement("button");
+    reloadButton.className = "error-reload";
+    reloadButton.textContent = "Reload";
+    this.errorElement.appendChild(reloadButton);
+
+    reloadButton.addEventListener("click", () => {
+      window.location.reload();
+    });
+  }
+  
+  showCollabDialog() {
+    if (this.collabManager.isConnected) {
+      this.collabManager.sessionOverlay.style.display = 'flex';
+      this.collabManager.renderSessionMenu();
+    } else {
+      this.showCollabConnectDialog();
+    }
+  }
+  
+  showCollabConnectDialog() {
+    const content = document.createElement('div');
+    content.className = 'collab-connect-dialog';
+    content.style.cssText = `
+      min-width: 300px;
+    `;
+    
+    // Tabs
+    const tabs = document.createElement('div');
+    tabs.style.cssText = `
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border-color);
+    `;
+    
+    const createTab = document.createElement('div');
+    createTab.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid var(--primary-color);
+      color: var(--primary-color);
+    `;
+    createTab.textContent = __('Crear Sala||Create Room');
+    
+    const joinTab = document.createElement('div');
+    joinTab.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    `;
+    joinTab.textContent = __('Unirse||Join');
+    
+    tabs.appendChild(createTab);
+    tabs.appendChild(joinTab);
+    content.appendChild(tabs);
+    
+    // Create form
+    const createForm = document.createElement('div');
+    createForm.style.display = 'block';
+    createForm.innerHTML = `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Nombre de sala||Room name')}</label>
+        <input type="text" id="collab-room-name" value="${localStorage.getItem('collab_default_room') || 'Mi Sala'}" 
+               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Contraseña||Password')}</label>
+        <input type="password" id="collab-room-password" value="${localStorage.getItem('collab_default_password') || ''}" 
+               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Permisos||Permissions')}</label>
+        <select id="collab-permissions" style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+          <option value="strict">${__('Estricto||Strict')}</option>
+          <option value="balanced" selected>${__('Equilibrado||Balanced')}</option>
+          <option value="open">${__('Abierto||Open')}</option>
+        </select>
+      </div>
+    `;
+    content.appendChild(createForm);
+    
+    // Join form
+    const joinForm = document.createElement('div');
+    joinForm.style.display = 'none';
+    joinForm.innerHTML = `
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('ID de sala||Room ID')}</label>
+        <input type="text" id="collab-join-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Contraseña||Password')}</label>
+        <input type="password" id="collab-join-password" 
+               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      </div>
+    `;
+    content.appendChild(joinForm);
+    
+    // Tab switching
+    createTab.addEventListener('click', () => {
+      createTab.style.borderBottomColor = 'var(--primary-color)';
+      createTab.style.color = 'var(--primary-color)';
+      joinTab.style.borderBottomColor = 'transparent';
+      joinTab.style.color = 'var(--text-color)';
+      createForm.style.display = 'block';
+      joinForm.style.display = 'none';
+    });
+    
+    joinTab.addEventListener('click', () => {
+      joinTab.style.borderBottomColor = 'var(--primary-color)';
+      joinTab.style.color = 'var(--primary-color)';
+      createTab.style.borderBottomColor = 'transparent';
+      createTab.style.color = 'var(--text-color)';
+      joinForm.style.display = 'block';
+      createForm.style.display = 'none';
+    });
+    
+    this.showPopup(
+      __('Colaboración||Collaboration'),
+      content,
+      [
+        {
+          text: __('Cancelar||Cancel'),
+          class: 'cancel',
+          action: () => this.hidePopup()
+        },
+        {
+          text: __('Conectar||Connect'),
+          action: () => {
+            if (createForm.style.display !== 'none') {
+              // Create session
+              const roomName = document.getElementById('collab-room-name').value;
+              const password = document.getElementById('collab-room-password').value;
+              const permissionsPreset = document.getElementById('collab-permissions').value;
+              
+              let permissions;
+              switch (permissionsPreset) {
+                case 'strict':
+                  permissions = {
+                    undoRedo: 'host',
+                    addRemoveFrames: 'host',
+                    addRemoveLayers: 'host',
+                    draw: 'host',
+                    chat: 'everyone'
+                  };
+                  break;
+                case 'open':
+                  permissions = {
+                    undoRedo: 'everyone',
+                    addRemoveFrames: 'everyone',
+                    addRemoveLayers: 'everyone',
+                    draw: 'everyone',
+                    chat: 'everyone'
+                  };
+                  break;
+                default:
+                  permissions = {
+                    undoRedo: 'host',
+                    addRemoveFrames: 'everyone',
+                    addRemoveLayers: 'everyone',
+                    draw: 'everyone',
+                    chat: 'everyone'
+                  };
+              }
+              
+              this.collabManager.createSession(roomName, password, permissions);
+            } else {
+              // Join session
+              const sessionId = document.getElementById('collab-join-id').value;
+              const password = document.getElementById('collab-join-password').value;
+              
+              if (!sessionId) {
+                this.showToast(__('ID de sala requerido||Room ID required'), 2000);
+                return;
+              }
+              
+              // Warn about unsaved changes
+              this.showPopup(
+                __('Unirse a sala||Join Room'),
+                __('¿Unirse a la sala? Los cambios no guardados se perderán||Join room? Unsaved changes will be lost'),
+                [
+                  {
+                    text: __('Cancelar||Cancel'),
+                    class: 'cancel',
+                    action: () => this.hidePopup()
+                  },
+                  {
+                    text: __('Unirse||Join'),
+                    action: () => {
+                      this.collabManager.joinSession(sessionId, password);
+                      this.hidePopup();
+                    }
+                  }
+                ]
+              );
+              return;
+            }
+            this.hidePopup();
+          }
+        }
+      ]
+    );
+  }
+
+  initUI() {
+    this.loadingElement = document.createElement("div");
+    this.loadingElement.className = "loading-overlay";
+    this.container.appendChild(this.loadingElement);
+    
+    this.loadingSpinner = document.createElement("div");
+    this.loadingSpinner.className = "loading-spinner";
+    this.loadingElement.appendChild(this.loadingSpinner);
+    
+    this.loadingText = document.createElement("div");
+    this.loadingText.className = "loading-text";
+    this.loadingText.innerHTML = __("Cargando...||Loading...");
+    this.loadingElement.appendChild(this.loadingText);
+
+    this.errorElement = document.createElement("div");
+    this.errorElement.className = "editor-error";
+    this.errorElement.style.display = "none";
+    this.container.appendChild(this.errorElement);
+
+    this.editorElement = document.createElement("div");
+    this.editorElement.className = "pixel-art-editor";
+    this.container.appendChild(this.editorElement);
+
+    // Create canvas container
+    this.canvasContainer = document.createElement("div");
+    this.canvasContainer.className = "editor-canvas-container";
+    this.editorElement.appendChild(this.canvasContainer);
+    
+    // Create interactive overlay
+    this.overlayLayer = document.createElement("div");
+    this.overlayLayer.className = "editor-overlay-layer";
+    this.editorElement.appendChild(this.overlayLayer);
+    
+    // Create UI layer
+    this.uiLayer = document.createElement("div");
+    this.uiLayer.className = "editor-ui";
+    this.editorElement.appendChild(this.uiLayer);
+
+    // Top bar
+    this.topBar = document.createElement("div");
+    this.topBar.className = "ui-top-bar";
+    this.uiLayer.appendChild(this.topBar);
+
+    // Menu button
+    this.menuButton = this.createButton("menu", "icon-menu", () => this.toggleMenu());
+    this.topBar.appendChild(this.menuButton);
+
+    // Color indicator
+    this.colorIndicator = document.createElement("div");
+    this.colorIndicator.className = "color-indicator";
+    this.topBar.appendChild(this.colorIndicator);
+
+    this.colorPrimary = document.createElement("div");
+    this.colorPrimary.className = "color-primary";
+    this.colorIndicator.appendChild(this.colorPrimary);
+
+    this.colorSecondary = document.createElement("div");
+    this.colorSecondary.className = "color-secondary";
+    this.colorIndicator.appendChild(this.colorSecondary);
+
+    this.colorSelector = document.createElement("div");
+    this.colorSelector.className = "color-selector";
+    this.colorIndicator.appendChild(this.colorSelector);
+
+    this.colorIndicator.addEventListener("click", () => this.colorPicker.toggleSelectedColor());
+
+    this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.colorPicker.show());
+    this.topBar.appendChild(this.colorPickerButton);
+
+    // Bottom bar
+    this.bottomBar = document.createElement("div");
+    this.bottomBar.className = "ui-bottom-bar";
+    this.uiLayer.appendChild(this.bottomBar);
+
+    // Tool selection
+    this.toolSelectionContainer = document.createElement("div");
+    this.toolSelectionContainer.className = "tool-selection-container";
+    this.bottomBar.appendChild(this.toolSelectionContainer);
+
+    // Tool button with dropdown
+    this.toolButtonContainer = document.createElement("div");
+    this.toolButtonContainer.className = "tool-button-container";
+    this.toolSelectionContainer.appendChild(this.toolButtonContainer);
+
+    this.currentToolButton = this.createButton("current-tool", "tool-pencil", () => this.toggleToolDropdown());
+    this.toolButtonContainer.appendChild(this.currentToolButton);
+    this.currentToolButton.title = __("Herramienta Actual||Current Tool");
+
+    this.toolDropdown = document.createElement("div");
+    this.toolDropdown.className = "tool-dropdown";
+    this.toolButtonContainer.appendChild(this.toolDropdown);
+
+    // Tool settings button (visible only when tool has settings)
+    this.toolSettingsButton = this.createButton("tool-settings", "icon-settings", () => this.showToolSettings());
+    this.toolSettingsButton.title = __("Opciones de herramienta||Tool settings");
+    this.toolSettingsButton.style.display = "none";
+    this.toolSelectionContainer.appendChild(this.toolSettingsButton);
+
+    // Tool settings popup
+    this.toolSettingsPopup = document.createElement("div");
+    this.toolSettingsPopup.className = "tool-settings-popup";
+    this.toolSettingsPopup.style.display = "none";
+    this.uiLayer.appendChild(this.toolSettingsPopup);
+
+    // Add close handler
+    this.toolSettingsPopup.addEventListener("click", e => e.stopPropagation());
+
+    // Tool switcher
+    this.toolSwitcher = this.createButton("switch-tool", "icon-switch-tool", () => this.switchLastTool());
+    this.toolSwitcher.title = __("Rotar herramientas (Espacio)||Switch tools (Space)");
+    this.toolSelectionContainer.appendChild(this.toolSwitcher);
+    
+    // Animation panel toggle
+    this.animationButton = this.createButton("animation", "icon-animation", () => this.togglePanel("animation"));
+    this.animationButton.title = __("(Animación|Animation) (Ctrl + A)");
+    this.bottomBar.appendChild(this.animationButton);
+
+    // Layers panel toggle
+    this.layersButton = this.createButton("layers", "icon-layers", () => this.togglePanel("layers"));
+    this.layersButton.title = __("(Capas|Layers) (Ctrl + L)");
+    this.bottomBar.appendChild(this.layersButton);
+
+    // Grids panel toggle
+    this.gridsButton = this.createButton("grids", "icon-grids", () => this.gridManager.toggle());
+    this.gridsButton.title = __("(Cuadrículas|Grids)");
+    this.bottomBar.appendChild(this.gridsButton);
+
+    // Undo/Redo buttons
+    this.undoRedoButtons = document.createElement("div");
+    this.undoRedoButtons.className = "undo-redo-buttons";
+    this.bottomBar.appendChild(this.undoRedoButtons);
+
+    this.undoButton = this.createButton("undo", "icon-undo", () => this.undo());
+    this.undoButton.title = __("(Deshacer|Undo) (Ctrl + Z)");
+    this.undoRedoButtons.appendChild(this.undoButton);
+
+    this.redoButton = this.createButton("redo", "icon-redo", () => this.redo());
+    this.redoButton.title = __("(Rehacer|Redo) (Ctrl + Y)");
+    this.undoRedoButtons.appendChild(this.redoButton);
+
+    // Menu panel
+    this.menuPanel = document.createElement("div");
+    this.menuPanel.className = "menu-panel";
+    this.uiLayer.appendChild(this.menuPanel);
+    
+    this.menuTabs = document.createElement("div");
+    this.menuTabs.className = "menu-tabs";
+    this.menuPanel.appendChild(this.menuTabs);
+
+    this.menuContent = document.createElement("div");
+    this.menuContent.className = "menu-content";
+    this.menuPanel.appendChild(this.menuContent);
+
+    // Create menu tabs
+    this.createMenuTab("File");
+    this.createMenuTab("Edit");
+    this.createMenuTab("View");
+    this.createMenuTab("Color");
+    this.createMenuTab("Help");
+
+    // Animation panel
+    this.animationPanel = document.createElement("div");
+    this.animationPanel.className = "animation-panel";
+    this.uiLayer.appendChild(this.animationPanel);
+
+    // Timeline header with controls
+    const timelineHeader = document.createElement("div");
+    timelineHeader.className = "timeline-header";
+    this.animationPanel.appendChild(timelineHeader);
+
+    // Play/Pause button
+    this.playPauseButton = this.createButton("play-pause", "icon-play", () => this.togglePlayback());
+    timelineHeader.appendChild(this.playPauseButton);
+
+    // Prev/Next frame buttons
+    this.prevFrameButton = this.createButton("prev-frame", "icon-prev", () => this.prevFrame());
+    timelineHeader.appendChild(this.prevFrameButton);
+
+    this.nextFrameButton = this.createButton("next-frame", "icon-next", () => this.nextFrame());
+    timelineHeader.appendChild(this.nextFrameButton);
+
+    // Add Frame button
+    this.addFrameButton = this.createButton("add-frame", "icon-add", () => this.addFrame(this.project.currentFrame));
+    timelineHeader.appendChild(this.addFrameButton);
+  
+    // Duplicate Frame button
+    this.duplicateFrameButton = this.createButton("duplicate-frame", "icon-copy", () => this.duplicateFrame());
+    timelineHeader.appendChild(this.duplicateFrameButton);
+
+    // FPS control
+    const fpsControl = document.createElement("div");
+    fpsControl.className = "fps-control";
+    timelineHeader.appendChild(fpsControl);
+
+    const fpsLabel = document.createElement("span");
+    fpsLabel.textContent = "FPS:";
+    fpsControl.appendChild(fpsLabel);
+
+    this.fpsInput = document.createElement("input");
+    this.fpsInput.type = "number";
+    this.fpsInput.min = "1";
+    this.fpsInput.max = "60";
+    this.fpsInput.value = parseInt(1000 / this.defaultFrameTime);
+    this.fpsInput.addEventListener("keyup", () => {
+      const value = this.fpsInput.value;
+      if (value && value <= 60) {
+        this.fpsInput.style.backgroundColor = "var(--bg-color)";
+      } else {
+        this.fpsInput.style.backgroundColor =  "#9f0000";
+      }
+    });
+    this.fpsInput.addEventListener("change", () => {
+      const value = this.fpsInput.value;
+      if (value && value <= 60) {
+        this.updateFPS(value);
+        this.fpsInput.style.backgroundColor = "var(--bg-color)";
+      } else {
+        this.fpsInput.style.backgroundColor =  "#9f0000";
+      }
+    });
+    fpsControl.appendChild(this.fpsInput);
+
+    // Close button
+    const closeButton = document.createElement("div");
+    closeButton.className = "panel-close timeline-close";
+    closeButton.innerHTML = "&times;";
+    closeButton.addEventListener("click", () => this.togglePanel("animation"));
+    timelineHeader.appendChild(closeButton);
+
+    // Timeline content
+    this.timelineContent = document.createElement("div");
+    this.timelineContent.className = "timeline-content";
+    this.animationPanel.appendChild(this.timelineContent);
+
+    // Animation preview
+    this.animationPreview = document.createElement("canvas");
+    this.animationPreview.className = "animation-preview";
+    this.animationPreview.addEventListener("click", () => {
+      this.animationPanel.classList.add("visible");
+      this.animationButton.classList.add("active");
+    });
+    this.animationPanel.appendChild(this.animationPreview);
+
+    // Layers panel
+    this.layersPanel = document.createElement("div");
+    this.layersPanel.className = "layers-panel";
+    this.uiLayer.appendChild(this.layersPanel);
+
+    const layersHeader = document.createElement("div");
+    layersHeader.className = "panel-header";
+    this.layersPanel.appendChild(layersHeader);
+
+    const layersTitle = document.createElement("div");
+    layersTitle.className = "panel-title";
+    layersTitle.textContent = "Layers";
+    layersHeader.appendChild(layersTitle);
+
+    const layersClose = document.createElement("div");
+    layersClose.className = "panel-close";
+    layersClose.innerHTML = "&times;";
+    layersClose.addEventListener("click", () => this.togglePanel("layers"));
+    layersHeader.appendChild(layersClose);
+
+    this.layersContainer = document.createElement("div");
+    this.layersContainer.className = "layers-container";
+    this.layersPanel.appendChild(this.layersContainer);
+
+    const layerActions = document.createElement("div");
+    layerActions.className = "layer-actions";
+    this.layersPanel.appendChild(layerActions);
+
+    this.addLayerButton = this.createButton("add-layer", "+", () => this.addLayer());
+    layerActions.appendChild(this.addLayerButton);
+
+    this.removeLayerButton = this.createButton("remove-layer", "-", () => this.removeLayer());
+    layerActions.appendChild(this.removeLayerButton);
+
+    // Notification system
+    this.notificationElement = document.createElement("div");
+    this.notificationElement.className = "notification";
+    this.uiLayer.appendChild(this.notificationElement);
+    
+    this.operationMessageElement = document.createElement("div");
+    this.operationMessageElement.className = "operation-message";
+    this.uiLayer.appendChild(this.operationMessageElement);
+
+    // Popup system
+    this.popupOverlay = document.createElement("div");
+    this.popupOverlay.className = "popup-overlay";
+    this.uiLayer.appendChild(this.popupOverlay);
+
+    this.popupContent = document.createElement("div");
+    this.popupContent.className = "popup-content";
+    this.popupOverlay.appendChild(this.popupContent);
+
+    // Update colors
+    this.updateColorIndicator();
+  }
+
+  initBrushUI() {
+    // Brush size indicator
+    this.brushSizeIndicator = document.createElement("div");
+    this.brushSizeIndicator.className = "brush-size-indicator";
+    this.brushSizeIndicator.style.display = "none";
+    this.uiLayer.appendChild(this.brushSizeIndicator);
+
+    // Brush size text
+    this.brushSizeText = document.createElement("div");
+    this.brushSizeText.className = "brush-size-text";
+    this.brushSizeText.textContent = `${__("Brocha||Brush")}: ${this.brushSize}px`;
+    this.brushSizeIndicator.appendChild(this.brushSizeText);
+
+    this.brushSizeBar = document.createElement("progress");
+    this.brushSizeBar.className = "brush-size-bar";
+    this.brushSizeIndicator.appendChild(this.brushSizeBar);
+
+    this.updateBrushSizeIndicator();
+  }
+  
+  initCanvas() {
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "editor-canvas";
+    this.canvasContainer.appendChild(this.canvas);
+
+    // Add a wrapper div for proper centering
+    this.canvasWrapper = document.createElement("div");
+    this.canvasWrapper.className = "canvas-wrapper";
+    this.canvasWrapper.style.position = "absolute";
+    this.canvasWrapper.style.transformOrigin = "0 0";
+    this.canvasContainer.insertBefore(this.canvasWrapper, this.canvas);
+    this.canvasWrapper.appendChild(this.canvas);
+
+    // Create canvas resize controls
+    this.canvasResizeControls = document.createElement("div");
+    this.canvasResizeControls.className = "canvas-resize-controls";
+    this.canvasWrapper.appendChild(this.canvasResizeControls);
+
+    this.canvasResizeX = document.createElement("div");
+    this.canvasResizeX.className = "canvas-resize-edge vertical";
+    this.canvasResizeControls.appendChild(this.canvasResizeX);
+    
+    this.canvasResizeY = document.createElement("div");
+    this.canvasResizeY.className = "canvas-resize-edge";
+    this.canvasResizeControls.appendChild(this.canvasResizeY);
+    
+    this.canvasResizeWidth = document.createElement("div");
+    this.canvasResizeWidth.className = "canvas-resize-edge vertical";
+    this.canvasResizeControls.appendChild(this.canvasResizeWidth);
+    
+    this.canvasResizeHeight = document.createElement("div");
+    this.canvasResizeHeight.className = "canvas-resize-edge";
+    this.canvasResizeControls.appendChild(this.canvasResizeHeight);
+
+    this.ctx = this.getCanvasContext(this.canvas);
+
+    // Initialize transform values
+    this.scale = 4;
+    this.posX = 0;
+    this.posY = 0;
+    
+    // Initialize debug canvas
+    this.debugCanvas = document.getElementById("debug-canvas");
+    if (this.debugCanvas) {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      this.debugCanvas.width = width;
+      this.debugCanvas.height = height
+      
+      this.debugCtx = this.getCanvasContext(this.debugCanvas);
+      
+      this.debug = {
+        point: (x, y, radius, color) => {
+          this.debugCtx.clearRect(0, 0, width, height);
+          this.drawBrushCircle(this.debugCtx, x, y, radius || 1, color || "#ffffff");
+        },
+        text: (x, y, text, color) => {
+          this.debugCtx.clearRect(0, 0, width, height);
+          this.debugCtx.fillStyle = color;
+          this.debugCtx.fillText(text, x, y);
+        }
+      };
+    }
+  }
+  
+  getCanvasContext(canvas) {
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.imageSmoothingEnabled = false;
+    return context;
+  }
+  
+  getTempCanvas(width, height) {
+    this.tempCanvas = this.tempCanvas || document.createElement("canvas");
+    this.tempCanvas.width = width || this.project.width;
+    this.tempCanvas.height = height || this.project.height;
+    this.tempCtx = this.tempCtx || this.getCanvasContext(this.tempCanvas);
+    this.tempCtx.clearRect(0, 0, this.tempCanvas.width, this.tempCanvas.height);
+    return { canvas: this.tempCanvas, ctx: this.tempCtx };
+  }
+
+  initEventListeners() {
+    // Mouse events
+    this.canvasContainer.addEventListener("mousedown", this.handleMouseDown.bind(this));
+    this.canvasContainer.addEventListener("mousemove", this.handleMouseMove.bind(this));
+    this.canvasContainer.addEventListener("mouseup", this.handleMouseUp.bind(this));
+    this.canvasContainer.addEventListener("mouseleave", this.handleMouseUp.bind(this));
+    this.canvasContainer.addEventListener("wheel", this.handleMouseWheel.bind(this));
+
+    // Touch events
+    this.canvasContainer.addEventListener("touchstart", this.handleTouchStart.bind(this), { passive: false });
+    this.canvasContainer.addEventListener("touchmove", this.handleTouchMove.bind(this), { passive: false });
+    this.canvasContainer.addEventListener("touchend", this.handleTouchEnd.bind(this));
+
+    // Keyboard events
+    document.addEventListener("keydown", this.handleKeyDown.bind(this));
+
+    // Window resize
+    window.addEventListener("resize", this.handleResize.bind(this));
+  }
+
+  initTools() {
+    // Pencil
+    this.addTool({
+      name: "Pencil",
+      displayName: __("Lápiz||Pencil"),
+      icon: "tool-pencil",
+      cursor: "crosshair",
+      shortcut: "d",
+      onDown: (x, y, remote) => {
+        this.isDrawing = true;
+        this._previousPencilPosition = { x, y };
+        this.historyManager.startBatch("draw", __('Dibujar||Draw'));
+        this.drawPixel(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.isDrawing) {
+          if (this._previousPencilPosition && this.distance(x, y, this._previousPencilPosition.x, this._previousPencilPosition.y) >= 2) {
+            this.startLine(this._previousPencilPosition.x, this._previousPencilPosition.y);
+            this.finishLine(x, y);
+          } else {
+            this.drawPixel(x, y);
+          }
+          this._previousPencilPosition = { x, y };
+        }
+      },
+      onUp: (x, y) => {
+        if (this.isDrawing) {
+          this.isDrawing = false;
+          this.historyManager.endBatch();
+        }
+        this._previousPencilPosition = null;
+      }
+    });
+    
+    // Eraser
+    this.addTool({
+      name: "Eraser",
+      displayName: __("Borrador||Eraser"),
+      icon: "tool-eraser",
+      cursor: "crosshair",
+      shortcut: "s",
+      onDown: (x, y) => {
+        this.isDrawing = true;
+        this._previousPencilPosition = { x, y };
+        this.historyManager.startBatch("draw", __('Borrar||Erase'));
+        this.drawPixel(x, y, { color: "transparent" });
+      },
+      onMove: (x, y) => {
+        if (this.isDrawing) {
+          if (this._previousPencilPosition && this.distance(x, y, this._previousPencilPosition.x, this._previousPencilPosition.y) >= 2) {
+            this.startLine(this._previousPencilPosition.x, this._previousPencilPosition.y, "transparent");
+            this.finishLine(x, y);
+          } else {
+            this.drawPixel(x, y, { color: "transparent" });
+          }
+          this._previousPencilPosition = { x, y };
+        }
+      },
+      onUp: (x, y) => {
+        if (this.isDrawing) {
+          this.isDrawing = false;
+          this.historyManager.endBatch();
+        }
+        this._previousPencilPosition = null;
+      }
+    });
+    
+    // Line
+    this.addTool({
+      name: "Line",
+      displayName: __("Línea||Line"),
+      icon: "tool-line",
+      cursor: "crosshair",
+      shortcut: "l",
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Línea||Line'));
+        this.startLine(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.tempLine) {
+          this.previewLine(x, y);
+        }
+      },
+      onUp: (x, y) => {
+        if (this.tempLine) {
+          this.finishLine(x, y);
+          this.saveToHistory();
+        }
+      }
+    });
+    
+    // Rectangle
+    this.addTool({
+      name: "Rectangle",
+      displayName: __("Rectángulo||Rectangle"),
+      icon: "tool-rect",
+      cursor: "crosshair",
+      shortcut: "r",
+      settings: {
+        filled: { type: "boolean", default: false },
+        perfect: { type: "boolean", default: false }
+      },
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Rectángulo||Rectangle'));
+        this.startRect(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.tempRect) {
+          this.previewRect(x, y);
+        }
+      },
+      onUp: (x, y) => {
+        if (this.tempRect) {
+          this.finishRect(x, y);
+          this.saveToHistory();
+        }
+      }
+    });
+
+    // Ellipse 
+    this.addTool({
+      name: "Ellipse",
+      displayName: __("Elipse||Ellipse"),
+      icon: "tool-ellipse",
+      cursor: "crosshair",
+      shortcut: "e",
+      settings: {
+        filled: { type: "boolean", default: false },
+        perfect: { type: "boolean", default: false }
+      },
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Elipse||Ellipse'));
+        this.startEllipse(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.tempEllipse) {
+          this.previewEllipse(x, y);
+        }
+      },
+      onUp: (x, y) => {
+        if (this.tempEllipse) {
+          this.finishEllipse(x, y);
+          this.saveToHistory();
+        }
+      }
+    });
+
+    // Paint Bucket
+    this.addTool({
+      name: "Paint Bucket",
+      displayName: __("Cubeta||Paint Bucket"),
+      icon: "tool-bucket",
+      cursor: "crosshair",
+      shortcut: "b",
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Rellenar||Bucket fill'));
+        this.fillArea(x, y);
+        this.saveToHistory();
+      }
+    });
+    
+    // Pipette
+    this.addTool({
+      name: "Pipette",
+      displayName: __("Pipeta||Pipette"),
+      icon: "tool-pipette",
+      cursor: "crosshair",
+      shortcut: "a",
+      onDown: (x, y) => {
+        this.pickColor(x, y);
+      }
+    });
+    
+    // Set default tool
+    this.setTool("Pencil", true);
+    this.lastTool = "Eraser";
+  }
+
+  updateBrushSizeIndicator() {
+    this.brushSizeText.textContent = __(`(Pincel|Brush): ${this.brushSize}px`);
+    this.brushSizeBar.min = 0;
+    this.brushSizeBar.max = this.maxBrushSize;
+    this.brushSizeBar.value = this.brushSize;
+  }
+  
+  showLoadingScreen(text = "Loading") {
+    this.loadingElement.style.display = "flex";
+    this.loadingText.innerHTML = text;
+  }
+  
+  hideLoadingScreen() {
+    this.loadingElement.style.display = "none";
+  }
+  
+  createButton(id, iconClass, onClick) {
+    const button = document.createElement("button");
+    button.className = "ui-button";
+    button.id = id;
+
+    if (iconClass) {
+      const icon = document.createElement("div");
+      icon.className = `icon ${iconClass}`;
+      button.appendChild(icon);
+    }
+
+    if (onClick) {
+      button.addEventListener("click", onClick);
+    }
+
+    return button;
+  }
+  
+  createMenuTab(name) {
+    const displayNames = {
+      "File": __("Archivo||File"),
+      "Edit": __("Editar||Edit"),
+      "View": __("Ver||View"),
+      "Color": "Color",
+      "Help": __("Ayuda||Help"),
+    };
+    
+    const tab = document.createElement("div");
+    tab.className = "menu-tab";
+    tab.textContent = displayNames[name] || name;
+    tab.name = name;
+    tab.addEventListener("click", () => this.showMenuContent(name));
+    this.menuTabs.appendChild(tab);
+
+    const content = document.createElement("div");
+    content.className = `menu-content-${name.toLowerCase()}`;
+    content.style.display = "none";
+    this.menuContent.appendChild(content);
+
+    if (name === "File") {
+      this.createFileMenu(content);
+    } else if (name === "Edit") {
+      this.createEditMenu(content);
+    } else if (name === "View") {
+      this.createViewMenu(content);
+    } else if (name === "Color") {
+      this.createColorMenu(content);
+    } else if (name === "Help") {
+      this.createHelpMenu(content);
+    }
+
+    // Show first tab by default
+    if (this.menuTabs.children.length === 1) {
+      tab.classList.add("active");
+      content.style.display = "block";
+    }
+  }
+
+  createFileMenu(container) {
+    const section = document.createElement("div");
+    section.className = "menu-section";
+    container.appendChild(section);
+
+    const newItem = document.createElement("div");
+    newItem.className = "menu-item";
+    newItem.textContent = __("Nuevo Proyecto||New Project");
+    newItem.addEventListener("click", () => this.showNewProjectDialog());
+    section.appendChild(newItem);
+
+    const openItem = document.createElement("div");
+    openItem.className = "menu-item";
+    openItem.textContent = __("Abrir Proyecto...||Open Project...");
+    openItem.addEventListener("click", () => this.openFile());
+    section.appendChild(openItem);
+    
+    const openSpritesheetItem = document.createElement("div");
+    openSpritesheetItem.className = "menu-item";
+    openSpritesheetItem.textContent = __("Abrir Hoja...||Open Spritesheet...");
+    openSpritesheetItem.addEventListener("click", () => this.showSpritesheetLoader());
+    section.appendChild(openSpritesheetItem);
+
+    const saveItem = document.createElement("div");
+    saveItem.className = "menu-item";
+    saveItem.textContent = __("Guardar||Save");
+    saveItem.addEventListener("click", () => this.saveProject());
+    section.appendChild(saveItem);
+
+    const saveAsItem = document.createElement("div");
+    saveAsItem.className = "menu-item";
+    saveAsItem.textContent = __("Guardar Como...||Save As...");
+    saveAsItem.addEventListener("click", () => this.saveAs());
+    section.appendChild(saveAsItem);
+
+    const referenceItem = document.createElement("div");
+    referenceItem.className = "menu-item";
+    referenceItem.textContent = __("Cargar Referencia...||Load Reference...");
+    referenceItem.addEventListener("click", () => this.loadReferenceImage());
+    section.appendChild(referenceItem);
+    
+    const collabItem = document.createElement('div');
+    collabItem.className = 'menu-item';
+    collabItem.innerHTML = `
+      <span>${__('Modo Colaborativo||Collab Mode')}</span>
+      <span class="collab-status" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 8px;"></span>
+    `;
+    collabItem.addEventListener('click', () => this.showCollabDialog());
+    section.appendChild(collabItem);
+
+    const exportCurrentFrameItem = document.createElement("div");
+    exportCurrentFrameItem.className = "menu-item";
+    exportCurrentFrameItem.textContent = __("Exportar Frame Actual...||Export Current Frame");
+    exportCurrentFrameItem.addEventListener("click", () => this.exportCurrentFrame());
+    section.appendChild(exportCurrentFrameItem);
+
+    const exportAnimationItem = document.createElement("div");
+    exportAnimationItem.className = "menu-item";
+    exportAnimationItem.textContent = __("Exportar Animación||Export Animation");
+    exportAnimationItem.addEventListener("click", () => this.exportAnimation());
+    section.appendChild(exportAnimationItem);
+
+    const exportMenu = this.menuContent.querySelector(".menu-content-file");
+    const timelapseItem = document.createElement("div");
+    timelapseItem.className = "menu-item";
+    timelapseItem.textContent = __("Exportar Timelapse...||Export Timelapse...");
+    timelapseItem.addEventListener("click", () => this.exportTimelapse());
+    section.appendChild(timelapseItem);
+
+    const exitItem = document.createElement("div");
+    exitItem.className = "menu-item";
+    exitItem.textContent = __("Salir de la app||Exit App");
+    exitItem.addEventListener("click", () => this.exitApp());
+    exitItem.style.display = "none";
+    section.appendChild(exitItem);
+
+    document.addEventListener("deviceready", () => (exitItem.style.display = ""));
+  }
+
+  createEditMenu(container) {
+    const transformSection = document.createElement("div");
+    transformSection.className = "menu-section";
+    container.appendChild(transformSection);
+
+    const h3 = document.createElement("h3");
+    h3.textContent = __("Transformar||Transform");
+    transformSection.appendChild(h3);
+
+    const resizeCanvasItem = document.createElement("div");
+    resizeCanvasItem.className = "menu-item";
+    resizeCanvasItem.textContent = __("Redimensionar Canvas||Resize Canvas");
+    resizeCanvasItem.addEventListener("click", () => this.startResizeCanvas());
+    transformSection.appendChild(resizeCanvasItem);
+    
+    const flipHItem = document.createElement("div");
+    flipHItem.className = "menu-item";
+    flipHItem.textContent = __("Espejo Horizontal||Flip Horizontal");
+    flipHItem.addEventListener("click", () => this.flipHorizontal());
+    transformSection.appendChild(flipHItem);
+
+    const flipVItem = document.createElement("div");
+    flipVItem.className = "menu-item";
+    flipVItem.textContent = __("Espejo Vertical||Flip Vertical");
+    flipVItem.addEventListener("click", () => this.flipVertical());
+    transformSection.appendChild(flipVItem);
+
+    const rotate90Item = document.createElement("div");
+    rotate90Item.className = "menu-item";
+    rotate90Item.textContent = __("(Rotar|Rotate) 90° CW");
+    rotate90Item.addEventListener("click", () => this.rotate(90));
+    transformSection.appendChild(rotate90Item);
+
+    const rotate270Item = document.createElement("div");
+    rotate270Item.className = "menu-item";
+    rotate270Item.textContent = __("(Rotar|Rotate) 90° CCW");
+    rotate270Item.addEventListener("click", () => this.rotate(270));
+    transformSection.appendChild(rotate270Item);
+
+    const rotate180Item = document.createElement("div");
+    rotate180Item.className = "menu-item";
+    rotate180Item.textContent = __("(Rotar|Rotate) 180°");
+    rotate180Item.addEventListener("click", () => this.rotate(180));
+    transformSection.appendChild(rotate180Item);
+
+    // Animation section
+    const animationSection = document.createElement("div");
+    animationSection.className = "menu-section";
+    container.appendChild(animationSection);
+
+    const animationH3 = document.createElement("h3");
+    animationH3.textContent = __("Animación||Animation");
+    animationSection.appendChild(animationH3);
+
+    const fpsItem = document.createElement("div");
+    fpsItem.className = "menu-item";
+    fpsItem.textContent = __("Cambiar FPS...||Set FPS...");
+    fpsItem.addEventListener("click", () => this.showFPSDialog());
+    animationSection.appendChild(fpsItem);
+
+    const frameTimeItem = document.createElement("div");
+    frameTimeItem.className = "menu-item";
+    frameTimeItem.textContent = __("Cambiar Tiempo del Frame...||Set Frame Time...");
+    frameTimeItem.addEventListener("click", () => this.showCurrentFrameTimeDialog());
+    animationSection.appendChild(frameTimeItem);
+    
+    // Settings section
+    const settingsSection = document.createElement("div");
+    settingsSection.className = "menu-section";
+    container.appendChild(settingsSection);
+    
+    const settingsH3 = document.createElement("h3");
+    settingsH3.textContent = __("Ajustes||Settings");
+    settingsSection.appendChild(settingsH3);
+    
+    const settingsItem = document.createElement("div");
+    settingsItem.className = "menu-item";
+    settingsItem.textContent = __("Configurar||Configure");
+    settingsItem.addEventListener("click", () => this.settingsUI.toggle());
+    settingsSection.appendChild(settingsItem);
+  }
+
+  createViewMenu(container) {
+    const viewSection = document.createElement("div");
+    viewSection.className = "menu-section";
+    container.appendChild(viewSection);
+    
+    const zoomInItem = document.createElement("div");
+    zoomInItem.className = "menu-item";
+    zoomInItem.textContent = __("Acercar||Zoom In");
+    zoomInItem.addEventListener("click", () => this.zoom(1.2));
+    viewSection.appendChild(zoomInItem);
+
+    const zoomOutItem = document.createElement("div");
+    zoomOutItem.className = "menu-item";
+    zoomOutItem.textContent = __("Alejar||Zoom Out");
+    zoomOutItem.addEventListener("click", () => this.zoom(0.8));
+    viewSection.appendChild(zoomOutItem);
+
+    const resetZoomItem = document.createElement("div");
+    resetZoomItem.className = "menu-item";
+    resetZoomItem.textContent = __("Reiniciar zoom||Reset Zoom");
+    resetZoomItem.addEventListener("click", () => this.resetZoom());
+    viewSection.appendChild(resetZoomItem);
+
+    const togglePreviewItem = document.createElement("div");
+    togglePreviewItem.className = "menu-item";
+    togglePreviewItem.textContent = __("Alternar vista previa||Toggle Preview");
+    togglePreviewItem.addEventListener("click", () => this.togglePreview());
+    viewSection.appendChild(togglePreviewItem);
+  }
+
+  createColorMenu(container) {
+    const colorSection = document.createElement("div");
+    colorSection.className = "menu-section";
+    container.appendChild(colorSection);
+
+    const h3 = document.createElement("h3");
+    h3.textContent = __("Ajustes de Color||Color Adjustments");
+    colorSection.appendChild(h3);
+
+    const transparencyItem = document.createElement("div");
+    transparencyItem.className = "menu-item";
+    transparencyItem.textContent = __("Alternar Transferencia||Toggle Transparency");
+    transparencyItem.addEventListener("click", () => this.toggleTransparency());
+    colorSection.appendChild(transparencyItem);
+
+    const invertItem = document.createElement("div");
+    invertItem.className = "menu-item";
+    invertItem.textContent = __("Invertir Colores||Invert Colors");
+    invertItem.addEventListener("click", () => this.invertColors());
+    colorSection.appendChild(invertItem);
+
+    const grayscaleItem = document.createElement("div");
+    grayscaleItem.className = "menu-item";
+    grayscaleItem.textContent = __("Escala de Grises||Grayscale");
+    grayscaleItem.addEventListener("click", () => this.grayscale());
+    colorSection.appendChild(grayscaleItem);
+  }
+
+  createHelpMenu(container) {
+    const helpSection = document.createElement("div");
+    helpSection.className = "menu-section";
+    container.appendChild(helpSection);
+
+    const aboutItem = document.createElement("div");
+    aboutItem.className = "menu-item";
+    aboutItem.textContent = __("Acerca de...||About...");
+    aboutItem.addEventListener("click", () => this.showAboutDialog());
+    helpSection.appendChild(aboutItem);
+
+    const manualItem = document.createElement("div");
+    manualItem.className = "menu-item";
+    manualItem.textContent = "Manual";
+    manualItem.addEventListener("click", () => this.showManualDialog());
+    helpSection.appendChild(manualItem);
+  }
+
+  showMenuContent(name) {
+    // Hide all content
+    const contents = this.menuContent.querySelectorAll('div[class^="menu-content-"]');
+    contents.forEach(content => {
+      content.style.display = "none";
+    });
+
+    // Deactivate all tabs
+    const tabs = this.menuTabs.querySelectorAll(".menu-tab");
+    tabs.forEach(tab => {
+      tab.classList.remove("active");
+    });
+
+    // Show selected content
+    const content = this.menuContent.querySelector(`.menu-content-${name.toLowerCase()}`);
+    if (content) {
+      content.style.display = "block";
+    }
+
+    // Activate selected tab
+    const tab = Array.from(tabs).find(t => t.name === name);
+    if (tab) {
+      tab.classList.add("active");
+    }
+  }
+
+  toggleMenu() {
+    this.menuPanel.classList.toggle("visible");
+  }
+
+  togglePanel(panel) {
+    if (panel === "animation") {
+      this.animationPanel.classList.toggle("visible");
+      this.animationButton.classList.toggle("active");
+      this.layersPanel.classList.remove("visible");
+      this.layersButton.classList.remove("active");
+      this.adjustTimelinePosition();
+      this.gridManager.hide();
+      this.menuPanel.classList.remove("visible");
+    } else if (panel === "layers") {
+      this.layersPanel.classList.toggle("visible");
+      this.layersButton.classList.toggle("active");
+      this.animationPanel.classList.remove("visible");
+      this.animationButton.classList.remove("active");
+      this.menuPanel.classList.remove("visible");
+      this.gridManager.hide();
+    }
+  }
+
+  togglePreview() {
+    this.showMiniView = !this.showMiniView;
+    this.animationPreview.classList.toggle("visible");
+  }
+
+  shouldBlockInput() {
+    // Block touch if some panels are visible
+    if (this.menuPanel.classList.contains("visible")) {
+      this.toggleMenu();
+      return true;
+    } else if (this.layersPanel.classList.contains("visible")) {
+      this.togglePanel("layers");
+      return true;
+    }
+     
+    // Otherwise don't block
+    return false;
+  }
+
+  handleMouseDown(e) {
+    if (this.shouldBlockInput()) return; // Hide menus if visible
+
+    const pos = this.getCanvasPosition(e.clientX, e.clientY);
+    if (!pos) return;
+
+    switch(e.button) {
+      case 0: // Left click
+        this.isDrawing = true;
+        this.startX = pos.x;
+        this.startY = pos.y;
+    
+        if (this.currentTool && this.currentTool.onDown) {
+          this.currentTool.onDown(pos.x, pos.y);
+        }
+        break;
+      case 1: // Middle click
+        if (this.isDrawing) {
+          this.handleMouseUp(e);
+        }
+        this.startPan(e);
+        break;
+      case 2: // Right click
+        this.onMouseUp(e);
+        // TODO: Context menu
+        break;
+    }
+  }
+
+  handleMouseMove(e) {
+    const pos = this.getCanvasPosition(e.clientX, e.clientY);
+    if (!pos) return;
+    
+    if (this.isDrawing && this.currentTool && this.currentTool.onMove) {
+      this.currentTool.onMove(pos.x, pos.y);
+    }
+    
+    if (this.isPanning) {
+      this.pan(e.clientX, e.clientY);
+    }
+
+    e.preventDefault();
+  }
+
+  handleMouseUp(e) {
+    this.isPanning = false;
+    
+    if (!this.isDrawing) return;
+
+    const pos = this.getCanvasPosition(e.clientX, e.clientY);
+    if (pos && this.currentTool && this.currentTool.onUp) {
+      this.currentTool.onUp(pos.x, pos.y, this.startX, this.startY);
+    }
+    
+    this.canvas.style.cursor = this.currentTool ? this.currentTool.cursor : "crosshair";
+
+    this.isDrawing = false;
+  }
+  
+  handleMouseWheel(e) {
+    if (e && e.deltaY != 0) {
+      if (e.deltaY < 0) {
+        this.zoom(1.2, e.clientX, e.clientY);
+      } else {
+        this.zoom(0.8, e.clientX, e.clientY);
+      }
+    }
+  }
+  
+  handleTouchStart(e) {
+    if (this.shouldBlockInput()) return;
+    if (this.isColorPicking) {
+      e.preventDefault();
+      return;
+    }
+  
+    e.preventDefault();
+  
+    if (e.touches.length === 1) {
+      // Single touch - potential drawing
+      const touch = e.touches[0];
+      const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+      if (!pos) return;
+  
+      // Store touch start info
+      this._touchStartTime = Date.now();
+      this._touchStartPos = { x: touch.clientX, y: touch.clientY };
+      this._touchStartCanvasPos = { x: pos.x, y: pos.y };
+      this._isPotentialTap = true;
+      
+      // Don't start drawing immediately - wait to see if it's a pan
+      this._touchTimer = setTimeout(() => {
+        if (!this.isCanvasResizing && !this.isPanning && this._isPotentialTap) {
+          this.isDrawing = true;
+          this.startX = pos.x;
+          this.startY = pos.y;
+          this.lastX = pos.x;
+          this.lastY = pos.y;
+  
+          if (this.currentTool && this.currentTool.onDown) {
+            this.currentTool.onDown(pos.x, pos.y);
+          }
+        }
+        this._touchTimer = null;
+      }, 50);
+      
+    } else if (e.touches.length === 2) {
+      // Two fingers - pan and zoom
+      this.isPanning = true;
+      this.isDrawing = false;
+      
+      // Clear any pending drawing timer
+      if (this._touchTimer) {
+        clearTimeout(this._touchTimer);
+        this._touchTimer = null;
+      }
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+  
+      // Store initial touch positions
+      this.touchStart1 = { x: touch1.clientX, y: touch1.clientY };
+      this.touchStart2 = { x: touch2.clientX, y: touch2.clientY };
+  
+      // Calculate initial distance and center
+      this.touchDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+  
+      this.touchCenterX = (touch1.clientX + touch2.clientX) / 2;
+      this.touchCenterY = (touch1.clientY + touch2.clientY) / 2;
+  
+      // Store current transform
+      this.touchStartScale = this.scale;
+      this.touchStartPosX = this.posX;
+      this.touchStartPosY = this.posY;
+      this.startPan({ clientX: this.touchCenterX, clientY: this.touchCenterY });
+  
+      // Get the canvas point under the center using fixed precision
+      const canvasPoint = this.getCanvasPosition(this.touchCenterX, this.touchCenterY);
+      
+      if (canvasPoint) {
+        this.touchCenterCanvasX = canvasPoint.x;
+        this.touchCenterCanvasY = canvasPoint.y;
+      }
+    } else if (e.touches.length === 3) {
+      // Three fingers - brush size adjustment
+      e.preventDefault();
+      
+      // Get all three touch points
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const touch3 = e.touches[2];
+  
+      // Calculate the average position of all three touches (center point)
+      const centerX = (touch1.clientX + touch2.clientX + touch3.clientX) / 3;
+      const centerY = (touch1.clientY + touch2.clientY + touch3.clientY) / 3;
+  
+      // Calculate distances from center to each touch
+      const dist1 = Math.hypot(touch1.clientX - centerX, touch1.clientY - centerY);
+      const dist2 = Math.hypot(touch2.clientX - centerX, touch2.clientY - centerY);
+      const dist3 = Math.hypot(touch3.clientX - centerX, touch3.clientY - centerY);
+  
+      // Average the distances to get a stable spread value
+      const currentSpread = (dist1 + dist2 + dist3) / 3;
+  
+      // Store initial values
+      this.initialBrushSpread = currentSpread;
+      this.initialBrushSize = this.brushSize;
+      this.isBrushResizing = true;
+      this.brushResizingCenter = { x: centerX, y: centerY };
+  
+      // Show brush size indicator
+      this.brushSizeIndicator.style.display = "block";
+      this.updateBrushSizeIndicator();
+      
+      // Cancel any pending drawing
+      if (this._touchTimer) {
+        clearTimeout(this._touchTimer);
+        this._touchTimer = null;
+      }
+      this.isDrawing = false;
+    }
+  }
+  
+  handleTouchMove(e) {
+    e.preventDefault();
+  
+    if (e.touches.length === 1 && this.isDrawing) {
+      // Drawing with single finger
+      const touch = e.touches[0];
+      
+      // Check if this is still a tap (minimal movement)
+      if (this._isPotentialTap) {
+        const moveDistance = Math.hypot(
+          touch.clientX - this._touchStartPos.x,
+          touch.clientY - this._touchStartPos.y
+        );
+        if (moveDistance > 5) {
+          this._isPotentialTap = false;
+        }
+      }
+      
+      const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+      if (!pos) return;
+  
+      if (this.currentTool && this.currentTool.onMove) {
+        this.currentTool.onMove(pos.x, pos.y);
+        this.lastX = pos.x;
+        this.lastY = pos.y;
+      }
+      
+    } else if (e.touches.length === 2 && this.isPanning) {
+      // Two-finger pan and zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+  
+      // Calculate new distance and center
+      const newDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+  
+      const newCenterX = (touch1.clientX + touch2.clientX) / 2;
+      const newCenterY = (touch1.clientY + touch2.clientY) / 2;
+  
+      // Calculate zoom factor with minimum change threshold to reduce flicker
+      if (this.touchDistance > 0 && Math.abs(newDistance - this.touchDistance) > 1) {
+        const zoomFactor = newDistance / this.touchDistance;
+        
+        this.pan(newCenterX, newCenterY, zoomFactor);
+      } else {
+        this.pan(newCenterX, newCenterY, 1);
+      }
+    } else if (e.touches.length === 3 && this.isBrushResizing) {
+      // Three-finger brush size adjustment
+      e.preventDefault();
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const touch3 = e.touches[2];
+  
+      // Calculate current center point
+      const centerX = (touch1.clientX + touch2.clientX + touch3.clientX) / 3;
+      const centerY = (touch1.clientY + touch2.clientY + touch3.clientY) / 3;
+  
+      // Calculate current spread (average distance from center)
+      const dist1 = Math.hypot(touch1.clientX - centerX, touch1.clientY - centerY);
+      const dist2 = Math.hypot(touch2.clientX - centerX, touch2.clientY - centerY);
+      const dist3 = Math.hypot(touch3.clientX - centerX, touch3.clientY - centerY);
+      const currentSpread = (dist1 + dist2 + dist3) / 3;
+  
+      // Only update if spread changed significantly to avoid jitter
+      if (Math.abs(currentSpread - this.initialBrushSpread) > 0.001) {
+        // Calculate scale factor based on spread change
+        const scaleFactor = currentSpread / this.initialBrushSpread;
+        
+        // Calculate new brush size
+        let newSize = Math.round(this.initialBrushSize * scaleFactor);
+        
+        // Constrain to min/max
+        newSize = Math.max(this.minBrushSize, Math.min(newSize, this.maxBrushSize));
+        
+        // Update if changed
+        if (newSize !== this.brushSize) {
+          this.brushSize = newSize;
+          this.updateBrushSizeIndicator();
+          localStorage.setItem("brushSize", this.brushSize);
+        }
+      }
+    }
+  }
+  
+  handleTouchEnd(e) {
+    e.preventDefault();
+  
+    // Clear any pending timer
+    if (this._touchTimer) {
+      clearTimeout(this._touchTimer);
+      this._touchTimer = null;
+    }
+  
+    if (e.touches.length === 0) {
+      // All touches ended
+      if (this.isDrawing) {
+        const wasTap = this._isPotentialTap && (Date.now() - this._touchStartTime < 300);
+  
+        if (this.currentTool && this.currentTool.onUp) {
+          this.currentTool.onUp(this.lastX, this.lastY, this.startX, this.startY);
+        }
+        
+        this.canvas.style.cursor = this.currentTool ? this.currentTool.cursor : "crosshair";
+      }
+  
+      // Reset all states
+      this.isPanning = false;
+      this.isDrawing = false;
+      this._isPotentialTap = false;
+      this.touchDistance = 0;
+  
+      // Hide brush size indicator after delay
+      if (this.isBrushResizing) {
+        setTimeout(() => {
+          this.brushSizeIndicator.style.display = "none";
+        }, 2000);
+      }
+      
+    } else if (e.touches.length === 1) {
+      // One finger remaining - prepare for drawing
+      this.touchDistance = 0;
+      this._isPotentialTap = true;
+      
+      // Store new touch start position
+      const touch = e.touches[0];
+      this._touchStartPos = { x: touch.clientX, y: touch.clientY };
+      this._touchStartTime = Date.now();
+    } else if (e.touches.length === 2) {
+      // Two fingers remaining, prevent zooming and drawing
+      
+      this.isPanning = false;
+      this.isDrawing = false;
+    }
+  }
+
+  handleTouchCancel(e) {
+    if (this.isColorPicking || this.colorPickTimeout) {
+      this.cleanupColorPicking();
+    }
+  }
+
+  handleKeyDown(e) {
+    const { ctrlKey, key } = event;
+    
+    // Handle system keyboard shortcuts
+    if (ctrlKey) {
+      if (key == "z") {
+        this.undo();
+        e.preventDefault();
+        return;
+      } else if (key == "y") {
+        this.undo();
+        e.preventDefault();
+        return;
+      } else if (key == "a") {
+        this.togglePanel("animation");
+        e.preventDefault();
+        return;
+      } else if (key == "l") {
+        this.togglePanel("layers");
+        e.preventDefault();
+        return;
+      } else if (key == " ") {
+        this.switchLastTool();
+        e.preventDefault();
+        return;
+      } else if (key == "Escape") {
+        this.toggleMenu();
+        e.preventDefault();
+        return;
+      }
+    }
+    
+    // Handle tool keyboard shortcuts
+    for (const tool of Object.values(this.tools)) {
+      if (tool.shortcut && tool.shortcut == e.key) {
+        this.setTool(tool.name);
+        return;
+      }
+    };
+  }
+
+  handleResize() {
+    this.updateCanvasTransform();
+    this.adjustTimelinePosition();
+  }
+
+  adjustTimelinePosition() {
+    if (!this.animationPanel) return;
+
+    // Ensure timeline stays above bottom bar
+    const bottomBarHeight = this.bottomBar.offsetHeight;
+    this.animationPanel.style.bottom = `${bottomBarHeight}px`;
+  }
+
+  getCanvasPosition(clientX, clientY, ensureBounds = true) {
+    if (!this.project) return null;
+  
+    // Get container position and dimensions
+    const rect = this.canvasContainer.getBoundingClientRect();
+    
+    // Convert to container coordinates (0,0 at container top-left)
+    const containerX = clientX - rect.left;
+    const containerY = clientY - rect.top;
+  
+    // Convert to viewport coordinates (0,0 at canvas center)
+    const viewportX = containerX - rect.width / 2;
+    const viewportY = containerY - rect.height / 2;
+  
+    // Apply inverse transform to get canvas coordinates
+    // First subtract position offset
+    const worldX = viewportX - this.posX;
+    const worldY = viewportY - this.posY;
+  
+    // Then divide by scale and add canvas center
+    const canvasX = Math.floor(worldX / this.scale + this.project.width / 2);
+    const canvasY = Math.floor(worldY / this.scale + this.project.height / 2);
+  
+    // Check bounds
+    if (ensureBounds) {
+      if (canvasX < 0 || canvasX >= this.project.width || 
+          canvasY < 0 || canvasY >= this.project.height) {
+        return null;
+      }
+    }
+  
+    return { x: canvasX, y: canvasY };
+  }
+  
+  checkBounds(x, y) {
+    return x >= 0 && x < this.project.width && y >= 0 && y < this.project.height;
+  }
+  
+  startPan(e) {
+    this.isPanning = true;
+    this.canvasContainer.style.cursor = "grab";
+    this.panStartX = e.clientX;
+    this.panStartY = e.clientY;
+    this.panStartCanvasPoint = this.getCanvasPosition(e.clientX, e.clientY);
+    this.panStartScale = this.scale;
+  }
+  
+  pan(clientX, clientY, zoomFactor = 1) {
+    if (!this.panStartCanvasPoint) return;
+    
+    const newScale = this.panStartScale * zoomFactor;
+        
+    // Clamp scale
+    this.scale = Math.max(this.minScale, Math.min(newScale, this.maxScale));
+        
+    // Get container dimensions
+    const rect = this.canvasContainer.getBoundingClientRect();
+        
+    // Calculate where th point should be in canvas coordinates
+    const canvasX = this.panStartCanvasPoint.x;
+    const canvasY = this.panStartCanvasPoint.y;
+        
+    // Calculate where this canvas point should be on screen at new scale
+    // Formula: screenX = (canvasX - width/2) * scale + containerWidth/2 + posX
+    const targetScreenX = (canvasX - this.project.width / 2) * this.scale + rect.width / 2 + this.panStartCanvasPoint.x;
+    const targetScreenY = (canvasY - this.project.height / 2) * this.scale + rect.height / 2 + this.panStartCanvasPoint.y;
+        
+    // Calculate the offset needed to keep the canvas point under the new center
+    const deltaX = clientX - targetScreenX;
+    const deltaY = clientY - targetScreenY;
+        
+    // Update position with rounding to reduce subpixel flicker
+    this.posX = Math.round(this.panStartCanvasPoint.x + deltaX);
+    this.posY = Math.round(this.panStartCanvasPoint.y + deltaY);
+    
+    this.updateCanvasTransform();
+  }
+
+  zoom(factor, clientX = this.panStartCanvasPoint.x, clientY = this.panStartCanvasPoint.y) {
+    const oldScale = this.scale;
+    this.scale *= factor;
+
+    // Limit zoom
+    this.scale = Math.max(this.minScale, Math.min(this.scale, this.maxScale));
+
+    if (clientX !== undefined && clientY !== undefined) {
+      // Get container position
+      const rect = this.canvasContainer.getBoundingClientRect();
+      const containerX = clientX - rect.left;
+      const containerY = clientY - rect.top;
+
+      // Calculate mouse position relative to center
+      const mouseX = containerX - this.canvasContainer.clientWidth / 2;
+      const mouseY = containerY - this.canvasContainer.clientHeight / 2;
+
+      // Adjust position to zoom toward mouse
+      this.posX = mouseX - (mouseX - this.posX) * (this.scale / oldScale);
+      this.posY = mouseY - (mouseY - this.posY) * (this.scale / oldScale);
+    }
+
+    this.updateCanvasTransform();
+  }
+
+  resetZoom() {
+    if (!this.project) return;
+
+    // Calculate scale to fit canvas to container
+    const containerWidth = this.canvasContainer.clientWidth;
+    const containerHeight = this.canvasContainer.clientHeight;
+
+    const scaleX = containerWidth / this.project.width;
+    const scaleY = containerHeight / this.project.height;
+    this.scale = Math.min(scaleX, scaleY);
+
+    this.scale = Math.min(this.scale, 10);
+
+    // Reset position
+    this.posX = 0;
+    this.posY = 0;
+
+    this.updateCanvasTransform();
+  }
+
+  updateCanvasTransform() {
+    if (!this.project) return;
+
+    // Get container dimensions
+    const containerWidth = this.canvasContainer.clientWidth;
+    const containerHeight = this.canvasContainer.clientHeight;
+
+    // Calculate the canvas center in its own coordinate space
+    const center = {
+      x: this.project.width / 2,
+      y: this.project.height / 2
+    };
+    
+    // Apply the transform to the wrapper
+    this.canvasWrapper.style.transform = `
+      translate(${this.posX}px, ${this.posY}px)
+      translate(${- center.x * this.scale}px, ${- center.y * this.scale}px)
+      scale(${this.scale})
+    `;
+    
+    // Reverse the scale on background size so it appears constant
+    // Base size is 16px, but we need to divide by scale to counteract the transform
+    const baseSize = 32;
+    const bgSize = Math.min(4, baseSize / this.scale);
+    
+    // Update canvas background style
+    this.canvas.style.backgroundSize = `${bgSize}px ${bgSize}px`;
+  }
+  
+  // Project management
+  newProject(width = this.defaultWidth, height = this.defaultHeight, imageData = null) {
+    this.project = this.getNewProjectData(width, height, imageData);
+
+    this.saveLastProjectSize();
+    
+    this.historyManager.clear();
+    
+    if (this.usePerProjectFloatingColors) {
+      this.colorPicker.removeAllFloatingPaletteColors();
+    }
+
+    this.animationPanel.classList.remove("visible");
+    this.layersPanel.classList.remove("visible");
+
+    this.resetCanvasSize();
+    this.resetZoom();
+    this.render();
+  }
+  
+  saveLastProjectSize() {
+    localStorage.setItem("lastProjectWidth", this.project.width);
+    localStorage.setItem("lastProjectHeight", this.project.height);
+  }
+  
+  getNewProjectData(width, height, img) {
+    const project =  {
+      width: width,
+      height: height,
+      frames: [
+        {
+          layers: [this.createBlankLayer(width, height, __("Capa Base||Default Layer"))]
+        }
+      ],
+      currentFrameTime: 1000 / 12,
+      frameTimes: [1000 / 12],
+      floatingColors: [],
+      currentFrame: 0,
+      currentLayer: 0
+    };
+    
+    if (img) {
+      const layer = project.frames[0].layers[0];
+      layer.ctx.drawImage(img, 0, 0);
+    }
+    
+    return project;
+  }
+
+  resetCanvasSize() {
+    if (!this.project) return;
+
+    this.canvas.width = this.project.width;
+    this.canvas.height = this.project.height;
+  }
+  
+  startResizeCanvas() {
+    if (!this.project) return;
+    
+    this.isCanvasResizing = true;
+    
+    // Initialize resize state
+    this.canvasResizeState = {
+      x: 0,
+      y: 0,
+      width: this.project.width,
+      height: this.project.height
+    };
+    
+    // Show controls
+    this.showCanvasResizeControls();
+    this.enterImmersive();
+    
+    // Show bottom confirmation
+    this.showBottomConfirmation(
+      __('Aceptar||Accept'),
+      __('Cancelar||Cancel'),
+      (accepted) => {
+        if (accepted) {
+          this.finishResizeCanvas();
+        } else {
+          this.cancelResizeCanvas();
+        }
+      }
+    );
+    
+    // Setup event handlers
+    this.setupResizeEventHandlers();
+  }
+  
+  setupResizeEventHandlers() {
+    if (this.resizeHandlersSetup) return;
+    
+    // Set cursors
+    this.canvasResizeX.style.cursor = 'ew-resize';
+    this.canvasResizeY.style.cursor = 'ns-resize';
+    this.canvasResizeWidth.style.cursor = 'ew-resize';
+    this.canvasResizeHeight.style.cursor = 'ns-resize';
+    
+    const handleResizeStart = (e, edge) => {
+      if (!this.isCanvasResizing) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Get position in canvas coordinates (project space)
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      
+      const pos = this.getCanvasPosition(clientX, clientY, false);
+      if (!pos) return;
+      
+      this.resizeDragState = {
+        active: true,
+        edge: edge,
+        startCanvasX: pos.x,
+        startCanvasY: pos.y,
+        startState: { ...this.canvasResizeState }
+      };
+      
+      // Add global handlers
+      document.addEventListener('mousemove', this.handleResizeMove);
+      document.addEventListener('mouseup', this.handleResizeEnd);
+      document.addEventListener('touchmove', this.handleResizeMove, { passive: false });
+      document.addEventListener('touchend', this.handleResizeEnd);
+      document.addEventListener('touchcancel', this.handleResizeEnd);
+    };
+    
+    const handleResizeMove = (e) => {
+      if (!this.resizeDragState?.active) return;
+      
+      e.preventDefault();
+      
+      // Get current position in canvas coordinates
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      
+      const pos = this.getCanvasPosition(clientX, clientY, false);
+      if (!pos) return;
+      
+      const edge = this.resizeDragState.edge;
+      const start = this.resizeDragState.startState;
+      let needsUpdate = false;
+      
+      switch(edge) {
+        case 'x': // Left edge - only X changes
+          {
+            const newX = Math.round(pos.x);
+            if (newX !== this.canvasResizeState.x) {
+              this.canvasResizeState.x = newX;
+              this.canvasResizeState.width = start.width + (start.x - newX);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'y': // Top edge - only Y changes
+          {
+            const newY = Math.round(pos.y);
+            if (newY !== this.canvasResizeState.y) {
+              this.canvasResizeState.y = newY;
+              this.canvasResizeState.height = start.height + (start.y - newY);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'width': // Right edge - only width changes
+          {
+            const newWidth = Math.round(pos.x - start.x);
+            if (newWidth !== this.canvasResizeState.width) {
+              this.canvasResizeState.width = Math.max(1, newWidth);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'height': // Bottom edge - only height changes
+          {
+            const newHeight = Math.round(pos.y - start.y);
+            if (newHeight !== this.canvasResizeState.height) {
+              this.canvasResizeState.height = Math.max(1, newHeight);
+              needsUpdate = true;
+            }
+            break;
+          }
+      }
+      
+      // Ensure width/height don't go negative
+      if (this.canvasResizeState.width < 1) this.canvasResizeState.width = 1;
+      if (this.canvasResizeState.height < 1) this.canvasResizeState.height = 1;
+      
+      if (needsUpdate) {
+        this.updateCanvasResizeControls();
+      }
+    };
+    
+    const handleResizeEnd = () => {
+      this.resizeDragState = null;
+      document.removeEventListener('mousemove', this.handleResizeMove);
+      document.removeEventListener('mouseup', this.handleResizeEnd);
+      document.removeEventListener('touchmove', this.handleResizeMove);
+      document.removeEventListener('touchend', this.handleResizeEnd);
+      document.removeEventListener('touchcancel', this.handleResizeEnd);
+    };
+    
+    // Bind methods
+    this.handleResizeMove = handleResizeMove.bind(this);
+    this.handleResizeEnd = handleResizeEnd.bind(this);
+    
+    // Add event listeners
+    this.canvasResizeX.addEventListener('mousedown', (e) => handleResizeStart(e, 'x'));
+    this.canvasResizeX.addEventListener('touchstart', (e) => handleResizeStart(e, 'x'), { passive: false });
+    
+    this.canvasResizeY.addEventListener('mousedown', (e) => handleResizeStart(e, 'y'));
+    this.canvasResizeY.addEventListener('touchstart', (e) => handleResizeStart(e, 'y'), { passive: false });
+    
+    this.canvasResizeWidth.addEventListener('mousedown', (e) => handleResizeStart(e, 'width'));
+    this.canvasResizeWidth.addEventListener('touchstart', (e) => handleResizeStart(e, 'width'), { passive: false });
+    
+    this.canvasResizeHeight.addEventListener('mousedown', (e) => handleResizeStart(e, 'height'));
+    this.canvasResizeHeight.addEventListener('touchstart', (e) => handleResizeStart(e, 'height'), { passive: false });
+    
+    this.resizeHandlersSetup = true;
+  }  
+
+  showCanvasResizeControls() {
+    this.canvasResizeControls.style.display = 'block';
+    this.updateCanvasResizeControls();
+  }
+  
+  updateCanvasResizeControls() {
+    if (!this.canvasResizeState) return;
+    
+    const state = this.canvasResizeState;
+    
+    // Position the container
+    this.canvasResizeControls.style.left = `${state.x}px`;
+    this.canvasResizeControls.style.top = `${state.y}px`;
+    this.canvasResizeControls.style.width = `${state.width}px`;
+    this.canvasResizeControls.style.height = `${state.height}px`;
+    
+    // Position edges
+    this.canvasResizeX.style.left = `-1px`;
+    this.canvasResizeX.style.height = `${state.height}px`;
+    
+    this.canvasResizeY.style.top = `-1px`;
+    this.canvasResizeY.style.width = `${state.width}px`;
+    
+    this.canvasResizeWidth.style.left = `${state.width}px`;
+    this.canvasResizeWidth.style.height = `${state.height}px`;
+    
+    this.canvasResizeHeight.style.top = `${state.height}px`;
+    this.canvasResizeHeight.style.width = `${state.width}px`;
+  }
+  
+  hideCanvasResizeControls() {
+    this.canvasResizeControls.style.display = "none";
+  }
+  
+  finishResizeCanvas() {
+    if (!this.canvasResizeState) return;
+    
+    const state = this.canvasResizeState;
+    
+    // Handle negative dimensions
+    const cropX = state.width < 0 ? state.x + state.width : state.x;
+    const cropY = state.height < 0 ? state.y + state.height : state.y;
+    const cropWidth = Math.abs(state.width);
+    const cropHeight = Math.abs(state.height);
+    
+    // Start history batch
+    this.historyManager.startBatch('resize', __('Redimensionar Canvas||Resize Canvas'));
+    
+    const oldWidth = this.project.width;
+    const oldHeight = this.project.height;
+    
+    // Store all layers image data before resize
+    const framesData = [];
+    this.project.frames.forEach(frame => {
+      const frameData = {
+        layers: []
+      };
+      frame.layers.forEach(layer => {
+        const imageData = layer.ctx.getImageData(0, 0, oldWidth, oldHeight);
+        frameData.layers.push({
+          imageData: Array.from(imageData.data)
+        });
+      });
+      framesData.push(frameData);
+    });
+    
+    // Perform resize
+    this.resizeCanvas(cropX, cropY, cropWidth, cropHeight);
+    
+    // Record operation with full layer data
+    const operation = {
+      type: 'resize_canvas',
+      description: __('Redimensionar Canvas||Resize Canvas'),
+      oldWidth: oldWidth,
+      oldHeight: oldHeight,
+      newWidth: cropWidth,
+      newHeight: cropHeight,
+      cropX: cropX,
+      cropY: cropY,
+      framesData: framesData // Store all layer data for undo
+    };
+    
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    this.stopResizeCanvas();
+  }  
+  
+  cancelResizeCanvas() {
+    this.stopResizeCanvas();
+    this.showToast(__('Redimensión cancelada||Resize cancelled'));
+  }
+  
+  stopResizeCanvas() {
+    this.isCanvasResizing = false;
+    this.canvasResizeState = null;
+    this.resizeDragState = null;
+    
+    this.hideCanvasResizeControls();
+    this.hideBottomConfirmation();
+    this.exitImmersive();
+  }
+  
+  resizeCanvas(x = 0, y = 0, width = 32, height = 32, silent) {
+    if (!this.project) return;
+    
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
+    x = Math.floor(x);
+    y = Math.floor(y);
+    
+    this.project.width = width;
+    this.project.height = height;
+    this.resetCanvasSize();
+    
+    this.project.frames.forEach(frame => {
+      frame.layers.forEach(layer => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.drawImage(layer.canvas, -x, -y);
+        
+        layer.canvas.width = width;
+        layer.canvas.height = height;
+        layer.ctx.clearRect(0, 0, width, height);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+      });
+    });
+    
+    this.updateCanvasTransform();
+    this.render();
+    
+    if (!silent) {
+      this.showOperationMessage(__('Canvas redimensionado||Canvas resized'));
+    }
+  }
+  
+  enterImmersive() {
+    this.topBar.style.display = "none";
+    this.bottomBar.style.display = "none";
+    this.menuPanel.style.display = "none";
+    this.animationPanel.style.display = "none";
+    this.layersPanel.style.display = "none";
+    if (this.gridManager) this.gridManager.panel.style.display = "none";
+  }
+  
+  exitImmersive() {
+    this.topBar.style.display = "flex";
+    this.bottomBar.style.display = "flex";
+    this.menuPanel.style.display = "flex";
+    this.animationPanel.style.display = "flex";
+    this.layersPanel.style.display = "flex";
+    if (this.gridManager) this.gridManager.panel.style.display = "flex";
+  }
+
+  showBottomConfirmation(acceptText, cancelText, callback) {
+    if (!this.bottomConfirmation) {
+      this.bottomConfirmation = document.createElement('div');
+      this.bottomConfirmation.className = 'bottom-confirmation';
+      
+      this.confirmAccept = document.createElement('button');
+      this.confirmAccept.className = 'ui-button confirm-accept';
+      
+      this.confirmCancel = document.createElement('button');
+      this.confirmCancel.className = 'ui-button confirm-cancel';
+      
+      this.bottomConfirmation.appendChild(this.confirmAccept);
+      this.bottomConfirmation.appendChild(this.confirmCancel);
+      this.uiLayer.appendChild(this.bottomConfirmation);
+    }
+    
+    this.confirmAccept.textContent = acceptText;
+    this.confirmCancel.textContent = cancelText;
+    this.resizeCallback = callback;
+    this.bottomConfirmation.style.display = 'flex';
+    
+    this.confirmAccept.removeEventListener('click', this.handleResizeAccept);
+    this.confirmCancel.removeEventListener('click', this.handleResizeCancel);
+    
+    this.handleResizeAccept = () => {
+      if (this.resizeCallback) this.resizeCallback(true);
+      this.hideBottomConfirmation();
+    };
+    
+    this.handleResizeCancel = () => {
+      if (this.resizeCallback) this.resizeCallback(false);
+      this.hideBottomConfirmation();
+    };
+    
+    this.confirmAccept.addEventListener('click', this.handleResizeAccept);
+    this.confirmCancel.addEventListener('click', this.handleResizeCancel);
+  }
+  
+  hideBottomConfirmation() {
+    if (this.bottomConfirmation) {
+      this.bottomConfirmation.style.display = 'none';
+    }
+  }
+
+  render() {
+    if (!this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    if (!frame) return;
+
+
+    // Draw background if not transparent
+    if (!this.transparentBackground) {
+      this.ctx.fillStyle = this.secondaryColor;
+      this.ctx.fillRect(0, 0, this.project.width, this.project.height);
+    } else {
+      this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    }
+    
+    // Draw trace reference (bottom layer)
+    if (this.referenceManager) {
+      this.referenceManager.renderBottom(this.ctx, this.project.width, this.project.height);
+    }
+  
+    // Draw layers
+    for (let i = 0; i < frame.layers.length; i++) {
+      const layer = frame.layers[i];
+      if (layer.visible) {
+        this.ctx.drawImage(layer.canvas, 0, 0);
+      }
+    }
+      
+    // Draw trace reference (top layer)
+    if (this.referenceManager) {
+      this.referenceManager.renderTop(this.ctx, this.project.width, this.project.height);
+    }
+    
+    //  UI
+    this.updateFramesUI();
+    this.updateLayersUI();
+    this.updateAnimationPreview();
+  }
+  
+  renderQuick() {
+    if (!this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    if (!frame) return;
+
+
+    // Draw background if not transparent
+    if (!this.transparentBackground) {
+      this.ctx.fillStyle = this.secondaryColor;
+      this.ctx.fillRect(0, 0, this.project.width, this.project.height);
+    } else {
+      this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    }
+    
+    // Draw layers
+    for (let i = 0; i < frame.layers.length; i++) {
+      const layer = frame.layers[i];
+      if (layer.visible) {
+        this.ctx.drawImage(layer.canvas, 0, 0);
+      }
+    }
+
+    //  UI
+    this.updateAnimationPreview();
+    this.updateFramesUIQuick();
+  }
+
+  getProjectSnapshot() {
+    if (!this.project) return null;
+
+    // Create a deep clone of the project
+    const snapshot = JSON.parse(JSON.stringify(this.project));
+
+    // Clone canvas data for each layer
+    for (let f = 0; f < snapshot.frames.length; f++) {
+      const frame = snapshot.frames[f];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        
+        // Remove useless canvas property
+        delete layer.canvas;
+        
+        const originalLayer = this.project.frames[f].layers[l];
+
+        // Store canvas data as image data
+        const ctx = originalLayer.ctx;
+        layer.imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+      }
+    }
+
+    return snapshot;
+  }
+
+  restoreProjectSnapshot(snapshot) {
+    if (!snapshot) return;
+
+    // Restore basic properties
+    this.project.currentFrame = snapshot.currentFrame;
+    this.project.currentLayer = snapshot.currentLayer;
+    this.project.currentFrameTime = snapshot.currentFrameTime;
+    this.project.frameTimes = snapshot.frameTimes;
+    this.project.width = snapshot.width;
+    this.project.height = snapshot.height;
+
+    // Restore canvas data for each layer
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const snapshotLayer = snapshot.frames[f].layers[l];
+        const existingCanvas = snapshotLayer.canvas;
+
+        // Recreate canvas
+        if (existingCanvas) {
+          layer.canvas = existingCanvas;
+        } else {
+          layer.canvas = document.createElement("canvas");
+        }
+        layer.canvas.width = this.project.width;
+        layer.canvas.height = this.project.height;
+
+        // Restore image data
+        if (snapshotLayer.imageData) {
+          layer.ctx.putImageData(snapshotLayer.imageData, 0, 0);
+        }
+      }
+    }
+
+    this.resetCanvasSize();
+    this.render();
+  }
+
+  saveToHistory() {
+    // End any current batch
+    this.historyManager.endBatch();
+    
+    // Update
+    this.render();
+  }
+  
+  recordDrawOperation(pixels) {
+    const operation = {
+      type: 'draw',
+      description: 'Draw pixels',
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      pixels: pixels
+    };
+    
+    this.historyManager.addChange(operation);
+  }
+  
+  undo() {
+    const undid = this.historyManager.undo()
+
+    if (undid) {
+      this.render();
+      this.showOperationMessage(undid.message);
+    }
+  }
+
+  redo() {
+    const redid = this.historyManager.redo();
+    if (redid) {
+      this.render();
+      this.showOperationMessage(redid.message);
+    }
+  }
+
+  // Reference image methods
+  loadReferenceImage() {
+    this.referenceManager.showReferenceTypeDialog();
+  }
+
+  // Drawing Operations
+  drawPixel(x, y, options = {}) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+
+    const color = options.color || (this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor);
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Should use brush?
+    const useBrush = true;
+
+    if (useBrush && this.brushSize > 1) {
+      // Use brush for larger sizes
+      let pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color)
+      if (pixels && pixels.length) {
+        this.recordDrawOperation(pixels.filter(p => p.newColor != p.oldColor));
+      }
+    } else {
+      // Save old pixel color
+      const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+      
+      if (color != oldColor) {
+        // Single pixel
+        if (color === "transparent") {
+          ctx.clearRect(x, y, 1, 1);
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, 1, 1);
+        }
+        
+        // Add to history
+        this.recordDrawOperation([{
+          x: x,
+          y: y,
+          oldColor: oldColor,
+          newColor: color
+        }]);
+      }
+    }
+
+    this.render();
+  }
+
+  drawBrushCircle(ctx, centerX, centerY, radius, color) {
+    if (radius <= 0) return [];
+
+    // Use midpoint circle algorithm for pixel-perfect circles
+    return this.midpointEllipse(ctx, centerX, centerY, radius / 2, radius / 2, color, true);
+  }
+
+  startLine(x, y, color) {
+    this.tempLine = { startX: x, startY: y };
+    this.getTempCanvas();
+    this.tempColor = color ? color : (this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor);
+  }
+
+  previewLine(x, y) {
+    if (!this.tempLine || !this.project) return;
+
+    // Clear temp canvas
+    this.tempCtx.clearRect(0, 0, this.project.width, this.project.height);
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from tool
+
+    // Draw line preview using Bresenham's algorithm
+    this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, this.tempCtx, this.tempColor, useBrush);
+
+    // Combine with main canvas
+    this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    this.render();
+    this.ctx.drawImage(this.tempCanvas, 0, 0);
+  }
+
+  finishLine(x, y, record = true) {
+    if (!this.tempLine || !this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from tool
+
+    // Draw final line
+    let pixels = this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, ctx, this.tempColor, useBrush);
+    
+    // Only saved pixels that really changed
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+    
+    this.recordDrawOperation(pixels);
+
+    // Clean up
+    this.tempLine = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+
+    this.render();
+  }
+
+  drawBresenhamLine(x0, y0, x1, y1, ctx, color, useBrush) {
+    const dx = Math.abs(x1 - x0);
+    const dy = -Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    let e2;
+    
+    let linePixels = [];
+    let lineStrokePixels = [];
+
+    while (true) {
+      if (color === "transparent") {
+        if (useBrush && this.brushSize > 1) {
+          const radius = this.brushSize / 2;
+          lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, "transparent", true)];
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
+          ctx.clearRect(x0, y0, 1, 1);
+          linePixels.push({
+            x: x0,
+            y: y0,
+            newColor: color,
+            oldColor
+          });
+        }
+      } else {
+        if (useBrush && this.brushSize > 1) {
+          const radius = this.brushSize / 2;
+          lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, color, true)];
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
+          ctx.fillStyle = color;
+          ctx.fillRect(x0, y0, 1, 1);
+          linePixels.push({
+            x: x0,
+            y: y0,
+            newColor: color,
+            oldColor
+          });
+        }
+      }
+
+      if (x0 === x1 && y0 === y1) break;
+      e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x0 += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+    
+    return [...linePixels, ...lineStrokePixels];
+  }
+
+  startRect(x, y) {
+    this.tempRect = {
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y
+    };
+    this.getTempCanvas();
+  }
+
+  previewRect(x, y) {
+    if (!this.tempRect || !this.project) return;
+
+    // Clear temp canvas
+    this.tempCtx.clearRect(0, 0, this.project.width, this.project.height);
+
+    // Calculate rectangle dimensions
+    let width = x - this.tempRect.startX;
+    let height = y - this.tempRect.startY;
+
+    // Handle perfect rectangle setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Store current position
+    this.tempRect.currentX = this.tempRect.startX + width;
+    this.tempRect.currentY = this.tempRect.startY + height;
+
+    // Draw rectangle preview using lines
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    this.tempCtx.strokeStyle = color;
+    this.tempCtx.lineWidth = 1;
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from tool
+
+    if (this.currentTool.settings?.filled?.value) {
+      this.tempCtx.fillStyle = color;
+      this.tempCtx.fillRect(this.tempRect.startX, this.tempRect.startY, width + 1, height + 1);
+    } else {
+      // Draw four lines to form a rectangle
+      this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY, this.tempCtx, color, useBrush);
+      this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY + height, this.tempCtx, color, useBrush);
+      this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY + height, this.tempCtx, color, useBrush);
+      this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY, this.tempCtx, color, useBrush);
+    }
+
+    // Combine with main canvas
+    this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    this.render();
+    this.ctx.drawImage(this.tempCanvas, 0, 0);
+  }
+
+  finishRect(x, y) {
+    if (!this.tempRect || !this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Calculate rectangle dimensions
+    let width = this.tempRect.currentX - this.tempRect.startX ;
+    let height = this.tempRect.currentY - this.tempRect.startY;
+
+    // Handle perfect rectangle setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from tool
+
+    // Draw final rectangle
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+
+    if (this.currentTool.settings?.filled?.value) {
+      let pixels = [];
+      for (let y = this.tempRect.startY; y <= this.tempRect.startY + height; y++) {
+        for (let x = this.tempRect.startX; x <= this.tempRect.startX + width + 1; x++) {
+          pixels.push({
+            x, y,
+            newColor: color,
+            oldColor: this.getPixelColorFromCtx(ctx, x, y)
+          });
+        }
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(this.tempRect.startX, this.tempRect.startY, width, height);
+      this.recordDrawOperation(pixels.filter(p => p.newColor != p.oldColor));
+    } else {
+      // Draw four lines to form a rectangle
+      let pixels = [
+        ...this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY, ctx, color, useBrush),
+        ...this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY + height, ctx, color, useBrush),
+        ...this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY + height, ctx, color, useBrush),
+        ...this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY, ctx, color, useBrush)
+      ].filter(p => p.newColor != p.oldColor);
+      if (pixels.length) {
+        this.recordDrawOperation(pixels);
+      }
+    }
+
+    // Clean up
+    this.tempRect = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+
+    this.render();
+  }
+
+  startEllipse(x, y) {
+    this.tempEllipse = {
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y
+    };
+    this.getTempCanvas();
+  }
+
+  previewEllipse(x, y) {
+    if (!this.tempEllipse || !this.project) return;
+
+    // Clear temp canvas
+    this.tempCtx.clearRect(0, 0, this.project.width, this.project.height);
+
+    // Calculate ellipse dimensions - ensure integer values
+    let width = Math.floor(x - this.tempEllipse.startX);
+    let height = Math.floor(y - this.tempEllipse.startY);
+
+    // Handle perfect ellipse setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Ensure minimum size of 1 pixel
+    if (Math.abs(width) < 1) width = width < 0 ? -1 : 1;
+    if (Math.abs(height) < 1) height = height < 0 ? -1 : 1;
+
+    // Store current position
+    this.tempEllipse.currentX = this.tempEllipse.startX + width;
+    this.tempEllipse.currentY = this.tempEllipse.startY + height;
+
+    // Draw ellipse preview
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+
+    // Use integer coordinates for preview
+    const startX = Math.floor(this.tempEllipse.startX);
+    const startY = Math.floor(this.tempEllipse.startY);
+
+    if (this.currentTool.settings?.filled?.value) {
+      this.drawFilledEllipse(this.tempCtx, startX, startY, width, height, color);
+    } else {
+      this.drawEllipse(this.tempCtx, startX, startY, width, height, color);
+    }
+
+    // Combine with main canvas
+    this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    this.render();
+    this.ctx.drawImage(this.tempCanvas, 0, 0);
+  }
+
+  finishEllipse(x, y) {
+    if (!this.tempEllipse || !this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Calculate final dimensions - ensure integer values
+    let width = Math.floor(this.tempEllipse.currentX - this.tempEllipse.startX);
+    let height = Math.floor(this.tempEllipse.currentY - this.tempEllipse.startY);
+
+    // Handle perfect ellipse setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Ensure minimum size of 1 pixel
+    if (Math.abs(width) < 1) width = width < 0 ? -1 : 1;
+    if (Math.abs(height) < 1) height = height < 0 ? -1 : 1;
+
+    // Draw final ellipse with integer coordinates
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const startX = Math.floor(this.tempEllipse.startX);
+    const startY = Math.floor(this.tempEllipse.startY);
+
+    let pixels = [];
+
+    if (this.currentTool.settings?.filled?.value) {
+      pixels = this.drawFilledEllipse(ctx, startX, startY, width, height, color);
+    } else {
+      pixels = this.drawEllipse(ctx, startX, startY, width, height, color);
+    }
+
+    // Only save pixel that really changed
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+
+    if (pixels.length) {
+      this.recordDrawOperation(pixels);
+    }
+
+    // Clean up
+    this.tempEllipse = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+
+    this.render();
+  }
+
+  drawEllipse(ctx, x, y, width, height, color) {
+    const centerX = Math.floor(x + width / 2);
+    const centerY = Math.floor(y + height / 2);
+    const radiusX = Math.floor(Math.abs(width / 2));
+    const radiusY = Math.floor(Math.abs(height / 2));
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from Tools
+
+    if (useBrush && this.brushSize > 1) {
+      return this.midpointEllipseWithBrush(ctx, centerX, centerY, radiusX, radiusY, color, false);
+    } else {
+      return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, false);
+    }
+  }
+
+  drawFilledEllipse(ctx, x, y, width, height, color) {
+    const centerX = Math.floor(x + width / 2);
+    const centerY = Math.floor(y + height / 2);
+    const radiusX = Math.floor(Math.abs(width / 2));
+    const radiusY = Math.floor(Math.abs(height / 2));
+
+    return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, true);
+  }
+
+  midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, filled) {
+    if (radiusX <= 0 || radiusY <= 0) return [];
+
+    // Convert to integer coordinates for pixel perfection
+    const cx = Math.floor(centerX);
+    const cy = Math.floor(centerY);
+    const rx = Math.floor(Math.abs(radiusX));
+    const ry = Math.floor(Math.abs(radiusY));
+
+    if (rx === 0 || ry === 0) return [];
+    
+    let pixels = [];
+
+    // Draw pixels function - ensures integer coordinates
+    const drawPixel = (x, y) => {
+      const px = Math.floor(x);
+      const py = Math.floor(y);
+      if (px < 0 || px >= ctx.width || py < 0 || py >= ctx.height) return;
+
+      const oldColor = this.getPixelColorFromCtx(ctx, px, py);
+
+      if (oldColor !== color) {
+        if (color === "transparent") {
+          ctx.clearRect(px, py, 1, 1);
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(px, py, 1, 1);
+        }
+        pixels.push({
+          x, y,
+          newColor: color,
+          oldColor
+        });
+      }
+    };
+
+    // For filled ellipses, use scanline approach
+    if (filled) {
+      return this.fillEllipseScanline(ctx, cx, cy, rx, ry, color);
+    }
+
+    // Outline drawing using integer-only midpoint algorithm
+    let x = 0;
+    let y = ry;
+
+    // Initial decision parameter for region 1
+    let d1 = ry * ry - rx * rx * ry + Math.floor(0.25 * rx * rx);
+    let dx = 2 * ry * ry * x;
+    let dy = 2 * rx * rx * y;
+
+    // Region 1
+    while (dx < dy) {
+      // Draw 4 symmetric points
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+
+      x++;
+      dx += 2 * ry * ry;
+
+      if (d1 < 0) {
+        d1 += dx + ry * ry;
+      } else {
+        y--;
+        dy -= 2 * rx * rx;
+        d1 += dx - dy + ry * ry;
+      }
+    }
+
+    // Decision parameter for region 2
+    let d2 = ry * ry * ((x + 0.5) * (x + 0.5)) + rx * rx * ((y - 1) * (y - 1)) - rx * rx * ry * ry;
+
+    // Region 2
+    while (y >= 0) {
+      // Draw 4 symmetric points
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+
+      y--;
+      dy -= 2 * rx * rx;
+
+      if (d2 > 0) {
+        d2 += rx * rx - dy;
+      } else {
+        x++;
+        dx += 2 * ry * ry;
+        d2 += dx - dy + rx * rx;
+      }
+    }
+    
+    return pixels;
+  }
+  
+  midpointEllipseWithBrush(ctx, centerX, centerY, radiusX, radiusY, color, filled) {
+    // TODO: Integrate with midpointEllipse() logic
+    if (radiusX <= 0 || radiusY <= 0) return [];
+
+    // Convert to integer coordinates for pixel perfection
+    const cx = Math.floor(centerX);
+    const cy = Math.floor(centerY);
+    const rx = Math.floor(Math.abs(radiusX));
+    const ry = Math.floor(Math.abs(radiusY));
+
+    if (rx === 0 || ry === 0) return [];
+    
+    let pixels = [];
+
+    // Draw pixels function - ensures integer coordinates
+    const drawPixel = (x, y) => {
+      if (this.brushSize > 1) {
+        pixels = [...pixels, ...this.drawBrushCircle(ctx, x, y, this.brushSize, color)];
+      } else {
+        const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+        if (oldColor !== color) {
+          if (color === "transparent") {
+            ctx.clearRect(x, y, 1, 1);
+          } else {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, 1, 1);
+          }
+          pixels.push({
+            x, y,
+            newColor: color,
+            oldColor
+          });
+        }
+      }
+    };
+
+    // For filled ellipses, use scanline approach
+    if (filled) {
+      return this.fillEllipseScanline(ctx, cx, cy, rx, ry, color);
+    }
+
+    // Outline drawing using integer-only midpoint algorithm
+    let x = 0;
+    let y = ry;
+
+    // Initial decision parameter for region 1
+    let d1 = ry * ry - rx * rx * ry + Math.floor(0.25 * rx * rx);
+    let dx = 2 * ry * ry * x;
+    let dy = 2 * rx * rx * y;
+
+    // Region 1
+    while (dx < dy) {
+      // Draw 4 symmetric points
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+
+      x++;
+      dx += 2 * ry * ry;
+
+      if (d1 < 0) {
+        d1 += dx + ry * ry;
+      } else {
+        y--;
+        dy -= 2 * rx * rx;
+        d1 += dx - dy + ry * ry;
+      }
+    }
+
+    // Decision parameter for region 2
+    let d2 = ry * ry * ((x + 0.5) * (x + 0.5)) + rx * rx * ((y - 1) * (y - 1)) - rx * rx * ry * ry;
+
+    // Region 2
+    while (y >= 0) {
+      // Draw 4 symmetric points
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+
+      y--;
+      dy -= 2 * rx * rx;
+
+      if (d2 > 0) {
+        d2 += rx * rx - dy;
+      } else {
+        x++;
+        dx += 2 * ry * ry;
+        d2 += dx - dy + rx * rx;
+      }
+    }
+    
+    return pixels;
+  }
+
+  fillEllipseScanline(ctx, cx, cy, rx, ry, color) {
+    if (rx <= 0 || ry <= 0) return [];
+
+    let pixels = [];
+
+    const drawPixel = (x, y) => {
+      if (x < 0 || x >= ctx.width || y < 0 || y >= ctx.height) return;
+
+      const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+
+      if (oldColor !== color) {
+        if (color === "transparent") {
+          ctx.clearRect(x, y, 1, 1);
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, 1, 1);
+        }
+        pixels.push({
+          x, y,
+          newColor: color,
+          oldColor
+        });
+      }
+    };
+
+    // Precompute squared values for efficiency
+    const rx2 = rx * rx;
+    const ry2 = ry * ry;
+    const twoRx2 = 2 * rx2;
+    const twoRy2 = 2 * ry2;
+
+    // Region 1: Slope < 1
+    let x = 0;
+    let y = ry;
+    let px = 0;
+    let py = twoRx2 * y;
+
+    // Initial decision parameter for region 1
+    let d1 = Math.floor(ry2 - rx2 * ry + 0.25 * rx2);
+
+    while (px < py) {
+      // Fill horizontal lines for this y level
+      for (let i = cx - x; i <= cx + x; i++) {
+        drawPixel(i, cy + y);
+        drawPixel(i, cy - y);
+      }
+
+      x++;
+      px += twoRy2;
+
+      if (d1 < 0) {
+        d1 += ry2 + px;
+      } else {
+        y--;
+        py -= twoRx2;
+        d1 += ry2 + px - py;
+      }
+    }
+
+    // Region 2: Slope >= 1
+    let d2 = Math.floor(ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2);
+
+    while (y >= 0) {
+      // Fill horizontal lines for this y level
+      for (let i = cx - x; i <= cx + x; i++) {
+        drawPixel(i, cy + y);
+        drawPixel(i, cy - y);
+      }
+
+      y--;
+      py -= twoRx2;
+
+      if (d2 > 0) {
+        d2 += rx2 - py;
+      } else {
+        x++;
+        px += twoRy2;
+        d2 += rx2 - py + px;
+      }
+    }
+    
+    return pixels;
+  }
+  
+  fillArea(x, y) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Get target color
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    const targetColor = Array.from(imageData.data);
+
+    // Get fill color
+    const fillColor = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const fillRgb = this.colorPicker.hexToRgb(fillColor);
+
+    // If already the same color, return
+    if (fillRgb && fillRgb.r === targetColor[0] && fillRgb.g === targetColor[1] && fillRgb.b === targetColor[2] && targetColor[3] === 255) {
+      return;
+    }
+
+    // Perform flood fill
+    let pixels = this.floodFill(ctx, x, y, targetColor, fillRgb);
+    
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+    
+    if (pixels.length) {
+      this.recordDrawOperation(pixels);
+    }
+    
+    this.render();
+  }
+
+  floodFill(ctx, x, y, targetColor, fillColor) {
+    const canvasWidth = this.project.width;
+    const canvasHeight = this.project.height;
+    const stack = [[x, y]];
+    const visited = new Set();
+    
+    let pixels = [];
+
+    while (stack.length > 0) {
+      const [currentX, currentY] = stack.pop();
+      const key = `${currentX},${currentY}`;
+
+      if (visited.has(key) || currentX < 0 || currentX >= canvasWidth || currentY < 0 || currentY >= canvasHeight) {
+        continue;
+      }
+
+      visited.add(key);
+
+      // Get pixel color
+      const imageData = ctx.getImageData(currentX, currentY, 1, 1);
+      const currentColor = Array.from(imageData.data);
+
+      // Check if pixel matches target color
+      if (this.colorsMatch(currentColor, targetColor)) {
+        // Fill the pixel
+        const oldColor = this.getPixelColorFromCtx(ctx, currentX, currentY);
+        if (fillColor) {
+          const fillData = new Uint8ClampedArray([fillColor.r, fillColor.g, fillColor.b, 255]);
+          ctx.putImageData(new ImageData(fillData, 1, 1), currentX, currentY);
+          pixels.push({
+            x: currentX,
+            y: currentY,
+            newColor: `rgba(${fillColor.r}, ${fillColor.g}, ${fillColor.b}, 255)`,
+            oldColor
+          });
+        } else {
+          // Transparent fill
+          ctx.clearRect(currentX, currentY, 1, 1);
+          pixels.push({
+            x: currentX,
+            y: currentY,
+            newColor: "transparent",
+            oldColor
+          });
+        }
+
+        // Add neighbors to stack
+        stack.push([currentX + 1, currentY], [currentX - 1, currentY], [currentX, currentY + 1], [currentX, currentY - 1]);
+      }
+    }
+    
+    return pixels;
+  }
+
+  colorsMatch(color1, color2) {
+    return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3];
+  }
+
+  pickColor(x, y, includeReferenceImage = true, silent = false) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+
+    const pickFromCtx = ctx => {
+      const imageData = ctx.getImageData(x, y, 1, 1);
+      const data = imageData.data;
+
+      if (data[3] > 0) {
+        // If pixel is not transparent
+        const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
+        this.setColor(color);
+        if (!silent) this.showOperationMessage(`<span style="aspect-ratio: 1/1; width: 1em; height: 1em; background: ${color}">${color}</span>`);
+        return true;
+      } else {
+        return false;
+      }
+    };
+    
+    // Check for current layer first
+    const layerCtx = this.getCurrentLayerContext();
+    if (pickFromCtx(layerCtx)) return;
+    
+    // Check layers from top to bottom
+    for (let l = frame.layers.length - 1; l >= 0; l--) {
+      const layer = frame.layers[l];
+      if (layer.visible) {
+        const ctx = layer.ctx;
+        if (pickFromCtx(ctx)) return;
+      }
+    }
+
+    // Check for reference image
+    if (includeReferenceImage && this.referenceManager.traceImage) {
+      if (pickFromCtx(this.ctx)) return;
+    }
+  }
+
+  // Tools management
+  addTool(toolDef) {
+    if (!toolDef.name) {
+      throw new Error("Tool must have a name");
+    }
+
+    this.tools[toolDef.name] = {
+      name: toolDef.name,
+      displayName: toolDef.displayName || toolDef.name,
+      icon: toolDef.icon,
+      cursor: toolDef.cursor || "default",
+      shortcut: toolDef.shortcut || null,
+      onDown: toolDef.onDown,
+      onMove: toolDef.onMove,
+      onUp: toolDef.onUp,
+      settings: toolDef.settings || {}
+    };
+
+    // Add tool to dropdown
+    const toolButton = this.createButton(`tool-${toolDef.name}`, toolDef.icon, () => {
+      this.setTool(toolDef.name);
+      this.toolDropdown.classList.remove("visible");
+    });
+    toolButton.title = toolDef.shortcut ? toolDef.displayName + ` (${toolDef.shortcut.toUpperCase()})` : toolDef.displayName;
+    this.toolDropdown.appendChild(toolButton);
+  }
+
+  setTool(toolName, silent) {
+    if (!this.tools[toolName]) {
+      throw new Error(`Tool '${toolName}' not found`);
+    }
+
+    // Store previous tool
+    if (this.currentTool && this.currentTool.name !== toolName) {
+      this.lastTool = this.currentTool.name;
+    }
+
+    this.currentTool = this.tools[toolName];
+
+    // Update current tool button
+    const icon = this.currentToolButton.querySelector(".icon");
+    if (icon) {
+      icon.className = `icon ${this.currentTool.icon}`;
+    }
+
+    // Update cursor
+    this.canvas.style.cursor = this.currentTool.cursor;
+
+    // Show/hide settings button
+    this.toolSettingsButton.style.display = Object.keys(this.currentTool.settings).length > 0 ? "flex" : "none";
+
+    if (!silent) this.showOperationMessage(__(this.currentTool.displayName));
+
+    // Hide any open settings popup
+    this.hideToolSettings();
+  }
+
+  switchLastTool() {
+    if (this.lastTool && this.lastTool !== this.currentTool.name) {
+      this.setTool(this.lastTool);
+    }
+  }
+
+  toggleToolDropdown() {
+    this.toolDropdown.classList.toggle("visible");
+
+    // Close dropdown when clicking outside
+    if (this.toolDropdown.classList.contains("visible")) {
+      const clickHandler = e => {
+        if (!this.toolButtonContainer.contains(e.target)) {
+          this.toolDropdown.classList.remove("visible");
+          document.removeEventListener("click", clickHandler);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener("click", clickHandler);
+      }, 0);
+    }
+  }
+
+  showToolSettings() {
+    if (!this.currentTool || Object.keys(this.currentTool.settings).length === 0) return;
+
+    // Clear previous content
+    this.toolSettingsPopup.innerHTML = "";
+
+    // Add title
+    const title = document.createElement("h3");
+    title.textContent = `${this.currentTool.name} Settings`;
+    this.toolSettingsPopup.appendChild(title);
+
+    // Add settings controls
+    for (const [key, setting] of Object.entries(this.currentTool.settings)) {
+      const settingControl = document.createElement("div");
+      settingControl.className = "tool-setting";
+
+      const label = document.createElement("label");
+      label.textContent = key.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase());
+      settingControl.appendChild(label);
+
+      if (setting.type === "boolean") {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = setting.value;
+        checkbox.addEventListener("change", e => {
+          this.currentTool.settings[key].value = e.target.checked;
+        });
+        settingControl.appendChild(checkbox);
+      } else if (setting.type === "number") {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = setting.value;
+        input.min = setting.min || 0;
+        input.max = setting.max || 100;
+        input.addEventListener("change", e => {
+          this.currentTool.settings[key].value = parseFloat(e.target.value);
+        });
+        settingControl.appendChild(input);
+      } else if (setting.type === "select") {
+        const select = document.createElement("select");
+        setting.options.forEach(option => {
+          const optionElement = document.createElement("option");
+          optionElement.value = option.value;
+          optionElement.textContent = option.label;
+          if (option.value === setting.value) {
+            optionElement.selected = true;
+          }
+          select.appendChild(optionElement);
+        });
+        select.addEventListener("change", e => {
+          this.currentTool.settings[key].value = e.target.value;
+        });
+        settingControl.appendChild(select);
+      }
+
+      this.toolSettingsPopup.appendChild(settingControl);
+    }
+
+    // Position near the settings button
+    const rect = this.toolSettingsButton.getBoundingClientRect();
+    this.toolSettingsPopup.style.position = "absolute";
+    this.toolSettingsPopup.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+    this.toolSettingsPopup.style.right = `${window.innerWidth - rect.right}px`;
+    this.toolSettingsPopup.style.display = "block";
+
+    // Close when clicking outside
+    setTimeout(() => {
+      const clickHandler = e => {
+        if (!this.toolSettingsPopup.contains(e.target)) {
+          this.hideToolSettings();
+          document.removeEventListener("click", clickHandler);
+        }
+      };
+      document.addEventListener("click", clickHandler);
+    }, 0);
+  }
+
+  hideToolSettings() {
+    this.toolSettingsPopup.style.display = "none";
+  }
+
+  // Color management
+  toggleSelectedColor() {
+    this.selectedColor = this.selectedColor === "primary" ? "secondary" : "primary";
+    this.updateColorIndicator();
+  }
+
+  updateColorIndicator() {
+    this.colorPrimary.style.backgroundColor = this.primaryColor;
+    this.colorSecondary.style.backgroundColor = this.secondaryColor;
+    
+    this.colorSelector.className = "color-selector";
+    if (this.selectedColor === "secondary") {
+      this.colorSelector.classList.add("secondary");
+    }
+    
+    localStorage.setItem("primaryColor", this.primaryColor);
+    localStorage.setItem("secondaryColor", this.secondaryColor);
+  }
+  
+  showColorPicker() {
+    this.colorPicker.show();
+  }
+  
+  hideColorPicker() {
+    this.colorPicker.hide();
+  }
+  
+  updatePaletteGrid() {
+    // Delegate to colorPicker to update its UI
+    if (this.colorPicker) {
+      this.colorPicker.updatePaletteGrid();
+    }
+  }
+  
+  addToRecentColors(hex) {
+    this.paletteManager.addToRecent(hex);
+  }
+  
+  updateRecentColorsGrid() {
+    if (this.colorPicker) {
+      this.colorPicker.updateRecentColorsGrid();
+    }
+  }
+  
+  updatePaletteGrid() {
+    if (this.colorPicker) {
+      this.colorPicker.updatePaletteGrid();
+    }
+  }
+  
+  addColorToPalette(color) {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.paletteManager.addColorToPalette(currentPalette.id, color);
+      this.updatePaletteGrid();
+    }
+  }
+  
+  removeColorFromPalette(index) {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.paletteManager.removeColorFromPalette(currentPalette.id, index);
+      this.updatePaletteGrid();
+    }
+  }
+  
+  loadPalette() {
+    const fileBrowser = this.getFileBrowser({
+      title: __("Cargar paleta||Load palette"),
+      mode: "open",
+      fileTypes: ["pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.readFile(fileInfo);
+          this.parsePalFile(fileData);
+          this.updatePaletteGrid();
+          this.showToast(__("Paleta cargada||Palette loaded successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+  
+  savePalette() {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (!currentPalette || currentPalette.colors.length === 0) {
+      this.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
+      return;
+    }
+    
+    const fileBrowser = this.getFileBrowser({
+      title: __("Guardar paleta||Save palette"),
+      mode: "saveAs",
+      fileTypes: ["pal"],
+      defaultType: "pal",
+      defaultName: currentPalette.name || "palette",
+      onConfirm: async fileInfo => {
+        try {
+          const palContent = this.generatePalFile();
+          await this.saveFile(fileInfo.name, "pal", palContent);
+          this.showToast(__("Paleta guardada||Palette saved successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+  
+  parsePalFile(content) {
+    const lines = content.split("\n").map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length < 3 || lines[0] !== "JASC-PAL") {
+      throw new Error("Invalid PAL file format - missing JASC-PAL header");
+    }
+    if (lines[1] !== "0100") {
+      throw new Error("Unsupported PAL version - expected 0100");
+    }
+    
+    const colorCount = parseInt(lines[2]);
+    if (isNaN(colorCount)) {
+      throw new Error("Invalid color count - not a number");
+    }
+    
+    if (lines.length < 3 + colorCount) {
+      throw new Error(`File claims to have ${colorCount} colors but only ${lines.length - 3} found`);
+    }
+    
+    const colors = [];
+    for (let i = 3; i < 3 + colorCount; i++) {
+      const components = lines[i].split(/\s+/).filter(c => c.length > 0);
+      if (components.length < 3) {
+        throw new Error(`Invalid color at line ${i + 1} - expected 3 components`);
+      }
+      
+      const r = parseInt(components[0]);
+      const g = parseInt(components[1]);
+      const b = parseInt(components[2]);
+      
+      if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        throw new Error(`Invalid RGB values at line ${i + 1}`);
+      }
+      
+      if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+        throw new Error(`RGB values out of range (0-255) at line ${i + 1}`);
+      }
+      
+      colors.push(this.colorPicker.rgbToHex(r, g, b));
+    }
+    
+    const name = __("Paleta importada||Imported palette");
+    let uniqueName = name;
+    let counter = 1;
+    while (this.paletteManager.palettes.some(p => p.name === uniqueName)) {
+      uniqueName = `${name} ${counter++}`;
+    }
+    this.paletteManager.addPalette(uniqueName, colors);
+  }
+  
+  generatePalFile() {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    const colors = currentPalette.colors.map(hex => {
+      const rgb = this.colorPicker.hexToRgb(hex);
+      return `${rgb.r} ${rgb.g} ${rgb.b}`;
+    });
+    return ["JASC-PAL", "0100", colors.length.toString(), ...colors].join("\n");
+  }
+    
+  // UI helpers
+  showToast(message, duration = 3000) {
+    this.notificationElement.innerHTML = message;
+    this.notificationElement.classList.add("visible");
+
+    setTimeout(() => {
+      this.notificationElement.classList.remove("visible");
+    }, duration);
+  }
+  
+  showOperationMessage(message, duration = 3000) {
+    this.operationMessageElement.innerHTML = message;
+    this.operationMessageElement.classList.add("visible");
+
+    setTimeout(() => {
+      this.operationMessageElement.classList.remove("visible");
+    }, duration);
+  }
+
+  showPopup(title, content, buttons = [{ text: "OK", action: () => this.hidePopup() }], fullscreen = false) {
+    this.popupContent.innerHTML = "";
+    
+    const titleElement = document.createElement("div");
+    titleElement.className = "popup-title";
+    titleElement.textContent = title;
+    this.popupContent.appendChild(titleElement);
+
+    if (typeof content === "string") {
+      const contentElement = document.createElement("div");
+      contentElement.innerHTML = content;
+      this.popupContent.appendChild(contentElement);
+    } else {
+      this.popupContent.appendChild(content);
+    }
+
+    const buttonsContainer = document.createElement("div");
+    buttonsContainer.className = "popup-buttons";
+    this.popupContent.appendChild(buttonsContainer);
+
+    this.popupButtons = [];
+
+    buttons.forEach(button => {
+      const btnElement = document.createElement("button");
+      btnElement.className = button.class || "confirm";
+      btnElement.textContent = button.text;
+      btnElement.addEventListener("click", button.action);
+      buttonsContainer.appendChild(btnElement);
+      this.popupButtons.push(btnElement);
+    });
+    
+    this.popupOverlay.classList.add("visible");
+    
+    if (fullscreen) {
+      this.popupOverlay.classList.add("fullscreen");
+    } else {
+      this.popupOverlay.classList.remove("fullscreen");
+    }
+
+    this.popupOpen = true;
+  }
+
+  hidePopup() {
+    this.popupOverlay.classList.remove("visible");
+    this.popupOpen = false;
+  }
+
+  hidePopupButtons() {
+    if (this.popupButtons) {
+      this.popupButtons.forEach(btnElement => {
+        btnElement.style.display = "none";
+      });
+    }
+  }
+
+  // Menu actions
+  showNewProjectDialog() {
+    const content = document.createElement("div");
+    content.innerHTML = `
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">Width:</label>
+        <input type="number" id="new-width" value="${this.defaultWidth}">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">Height:</label>
+        <input type="number" id="new-height" value="${this.defaultHeight}">
+      </div>
+    `;
+
+    this.showPopup(__("Nuevo Proyecto||New Project"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Crear||Create"),
+        action: () => {
+          const width = parseInt(document.getElementById("new-width").value);
+          const height = parseInt(document.getElementById("new-height").value);
+
+          if (width > 0 && height > 0) {
+            this.newProject(width, height);
+            this.hidePopup();
+          } else {
+            this.showToast(__("Dimensiones inválidas||Invalid dimensions"));
+          }
+        }
+      }
+    ]);
+  }
+
+  flipHorizontal() {
+    if (!this.project) return;
+    
+    this.historyManager.startBatch("transform", __("Espejo Horizontal||Flip Horizontal"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform flip
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
+    const data = imageData.data;
+  
+    for (let y = 0; y < this.project.height; y++) {
+      for (let x = 0; x < Math.floor(this.project.width / 2); x++) {
+        const index1 = (y * this.project.width + x) * 4;
+        const index2 = (y * this.project.width + (this.project.width - x - 1)) * 4;
+  
+        // Swap pixels
+        for (let i = 0; i < 4; i++) {
+          const temp = data[index1 + i];
+          data[index1 + i] = data[index2 + i];
+          data[index2 + i] = temp;
+        }
+      }
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'transform',
+      description: __('Espejo Horizontal||Flip Horizontal'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      transformType: 'flip_horizontal',
+      transformData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  flipVertical() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("transform", __("Girar Horizontal||Flip Vertical"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform flip
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
+    const data = imageData.data;
+  
+    for (let y = 0; y < Math.floor(this.project.height / 2); y++) {
+      for (let x = 0; x < this.project.width; x++) {
+        const index1 = (y * this.project.width + x) * 4;
+        const index2 = ((this.project.height - y - 1) * this.project.width + x) * 4;
+  
+        // Swap pixels
+        for (let i = 0; i < 4; i++) {
+          const temp = data[index1 + i];
+          data[index1 + i] = data[index2 + i];
+          data[index2 + i] = temp;
+        }
+      }
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'transform',
+      description: __('Girar Horizontal||Flip Vertical'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      transformType: 'flip_vertical',
+      transformData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  rotate(degrees = 0) {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("transform", __(`(Rotar|Rotate) ${degrees}°`));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform rotation
+    const imageData = oldImageData;
+    const newData = new ImageData(
+      degrees === 90 || degrees === 270 ? this.project.height : this.project.width,
+      degrees === 90 || degrees === 270 ? this.project.width : this.project.height
+    );
+  
+    for (let y = 0; y < this.project.height; y++) {
+      for (let x = 0; x < this.project.width; x++) {
+        const srcIndex = (y * this.project.width + x) * 4;
+  
+        let destX, destY;
+  
+        if (degrees === 90) {
+          destX = this.project.height - y - 1;
+          destY = x;
+        } else if (degrees === 180) {
+          destX = this.project.width - x - 1;
+          destY = this.project.height - y - 1;
+        } else if (degrees === 270) {
+          destX = y;
+          destY = this.project.width - x - 1;
+        } else {
+          return;
+        }
+  
+        const destIndex = (destY * newData.width + destX) * 4;
+  
+        for (let i = 0; i < 4; i++) {
+          newData.data[destIndex + i] = imageData.data[srcIndex + i];
+        }
+      }
+    }
+  
+    // Resize layer canvas if needed
+    if (degrees === 90 || degrees === 270) {
+      layer.canvas.width = this.project.height;
+      layer.canvas.height = this.project.width;
+    }
+  
+    ctx.putImageData(newData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'transform',
+      description: __(`(Rotar|Rotate) ${degrees}°`),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      transformType: `rotate_${degrees}`,
+      transformData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height).data),
+        oldWidth: this.project.width,
+        oldHeight: this.project.height,
+        newWidth: layer.canvas.width,
+        newHeight: layer.canvas.height
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    // Update project dimensions if rotating 90 or 270 degrees
+    if (degrees === 90 || degrees === 270) {
+      const temp = this.project.width;
+      this.project.width = this.project.height;
+      this.project.height = temp;
+      this.resetCanvasSize();
+    }
+  
+    this.render();
+  }
+  
+  toggleTransparency() {
+    this.transparentBackground = !this.transparentBackground;
+    this.render();
+  }
+
+  invertColors() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("color_adjustment", __("Invertir Colores||Invert Colors"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform inversion
+    const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 255 - data[i]; // R
+      data[i + 1] = 255 - data[i + 1]; // G
+      data[i + 2] = 255 - data[i + 2]; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'color_adjustment',
+      description: __('Invertir Colores||Invert Colors'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      adjustmentType: 'invert',
+      adjustmentData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  grayscale() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("color_adjustment", __("Escala de Grises||Grayscale"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform grayscale
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      data[i] = avg; // R
+      data[i + 1] = avg; // G
+      data[i + 2] = avg; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'color_adjustment',
+      description: __('Escala de Grises||Grayscale'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      adjustmentType: 'grayscale',
+      adjustmentData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  showAboutDialog() {
+    this.showPopup(
+      __("Acerca de Pixelite||About Pixelite"),
+      `
+        <div style="text-align: center;">
+          <h2 style="margin-top: 0; color: var(--primary-color);">Pixelite</h2>
+          <p><strong>${__("Versión||Version")} ${this.version}</strong></p>
+          <p>${__("© %Y RETORA. Todos los derechos reservados.||© %Y RETORA. All rights reserved.").replace('%Y', new Date().getFullYear())}</p>
+          <p>${__("Creado por||Created by")} <a onclick="openExternalUrl('https://retora.html-5.me')">retora</a>.</p></p>
+          <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0;">
+            <a href="https://retora.itch.io/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://retora.itch.io/pixelite')">itch.io</a>
+            <span>•</span>
+            <a href="https://github.com/RetoraDev/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://github.com/RetoraDev/pixelite')">GitHub</a>
+          </div>
+          <p style="font-size: 0.9em; color: var(--text-dim); margin-bottom: 0;">
+            ${__("Un editor de pixel art colaborativo con soporte de animación||Collaborative pixel art editor with animation support")}.
+          </p>
+        </div>
+      `,
+      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
+    );
+  }
+
+  showManualDialog() {
+    this.showPopup(
+      "Manual",
+      __(`
+        (El manual no está disponible todavía|Manual is not available yet)
+      `),
+      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
+    );
+  }
+  
+  // Animation Frame Management
+  addFrame(frameIndex = this.project.currentFrame, time) {
+    if (!this.project) return;
+  
+    const newIndex = frameIndex + 1;
+  
+    this.historyManager.startBatch("add_layer", __("(Añadir|Add) Frame"));
+  
+    const newFrame = {
+      layers: []
+    };
+  
+    // Copy layers from current frame
+    const currentFrame = this.project.frames[frameIndex];
+    for (let i = 0; i < currentFrame.layers.length; i++) {
+      const layer = currentFrame.layers[i];
+      const newLayer = this.createBlankLayer(this.project.width, this.project.height, layer.name);
+      newLayer.visible = layer.visible;
+      newFrame.layers.push(newLayer);
+    }
+  
+    // Insert after current frame
+    this.project.frames.splice(newIndex, 0, newFrame);
+    this.project.frameTimes.splice(newIndex, 0, time || this.project.currentFrameTime);
+    
+    // Switch to the new frame
+    this.project.currentFrame = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'add_frame',
+      description: __('(Añadir|Add) Frame'),
+      index: frameIndex,
+      frameTime: this.project.currentFrameTime,
+      layers: currentFrame.layers.map(layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }))
+    };
+    
+    this.showOperationMessage(__('Nuevo Frame añadido||New Frame added'));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.render();
+  }
+  
+  removeFrame(index = this.project.currentFrame, silent) {
+    if (!this.project || this.project.frames.length <= 1) return;
+    
+    this.historyManager.startBatch("remove_layer", __("(Quitar|Add) Frame"));
+  
+    const removedFrame = this.project.frames[index];
+    const removedFrameTime = this.project.frameTimes[index];
+  
+    this.project.frames.splice(index, 1);
+    this.project.frameTimes.splice(index, 1);
+    this.project.currentFrame = Math.min(index, this.project.frames.length - 1);
+  
+    // Record operation
+    const operation = {
+      type: 'remove_frame',
+      description: __('(Quitar|Remove) Frame'),
+      index: index,
+      frameTime: removedFrameTime,
+      layers: removedFrame.layers.map(layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }))
+    };
+    
+    if (!silent) this.showOperationMessage(__('Frame quitado||Frame removed'));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  duplicateFrame(currentIndex = this.project.currentFrame) {
+    if (!this.project) return;
+  
+    const currentFrame = this.project.frames[currentIndex];
+    const newIndex = currentIndex + 1;
+  
+    this.historyManager.startBatch("duplicate_frame", __("Duplicar Frame||Duplicate Frame"));
+  
+    // Create new frame with same structure
+    const newFrame = {
+      layers: []
+    };
+  
+    // Copy each layer from current frame
+    for (let i = 0; i < currentFrame.layers.length; i++) {
+      const sourceLayer = currentFrame.layers[i];
+      
+      // Create new blank layer
+      const newLayer = this.createBlankLayer(
+        this.project.width, 
+        this.project.height, 
+        `${sourceLayer.name} (${__("copia||copy")})`
+      );
+      newLayer.visible = sourceLayer.visible;
+      
+      // Copy canvas content
+      newLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+      
+      newFrame.layers.push(newLayer);
+    }
+  
+    // Insert new frame after current
+    this.project.frames.splice(newIndex, 0, newFrame);
+    
+    // Copy frame time
+    this.project.frameTimes.splice(newIndex, 0, this.project.frameTimes[currentIndex]);
+    
+    // Set current frame to the new one
+    this.project.currentFrame = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'duplicate_frame',
+      description: __('Duplicar Frame||Duplicate Frame'),
+      index: newIndex,
+      frameTime: this.project.frameTimes[newIndex],
+      layers: newFrame.layers.map(layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }))
+    };
+    
+    this.showOperationMessage(__('Frame duplicado||Frame duplicated'));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    // Update UI
+    this.updateFramesUI();
+    this.render();
+  }  
+  
+  moveFrame(fromIndex, toIndex, silent) {
+    if (fromIndex === toIndex) return;
+  
+    this.historyManager.startBatch("move_frame", __("(Move|Mover) Frame"));
+  
+    const frame = this.project.frames.splice(fromIndex, 1)[0];
+    const frameTime = this.project.frameTimes.splice(fromIndex, 1)[0];
+    this.project.frames.splice(toIndex, 0, frame);
+    this.project.frameTimes.splice(toIndex, 0, frameTime);
+    this.project.currentFrame = toIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'move_frame',
+      description: __('(Move|Mover) Frame'),
+      fromIndex: fromIndex,
+      toIndex: toIndex
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    if (!silent) this.showOperationMessage(__("Frame movido||Frame moved"));
+  
+    this.render();
+  }
+  
+  setFrameTime(frameIndex, time) {
+    if (!this.project || frameIndex < 0 || frameIndex >= this.project.frameTimes.length) return;
+  
+    const oldTime = this.project.frameTimes[frameIndex];
+    this.project.frameTimes[frameIndex] = time;
+  
+    // Record operation
+    const operation = {
+      type: 'edit_frame',
+      description: __('Cambiar Tiempo de Frame||Change Frame Time'),
+      frameIndex: frameIndex,
+      property: 'time',
+      oldValue: oldTime,
+      newValue: time
+    };
+  
+    this.historyManager.addChange(operation);
+  }
+
+  updateFramesUI() {
+    if (!this.project) return;
+  
+    const frameCount = this.project.frames.length;
+    
+    // Initialize frame times if needed
+    if (this.project.frameTimes.length !== frameCount) {
+      this.project.frameTimes = new Array(frameCount).fill(this.project.currentFrameTime);
+    }
+  
+    // Get all current children
+    const timelineChildren = Array.from(this.timelineContent.children);
+    
+    // Find or create add button
+    let addButton = timelineChildren.find(child => child.classList.contains('add-button'));
+    if (!addButton) {
+      addButton = document.createElement("div");
+      addButton.className = "timeline-frame add-button";
+      addButton.innerHTML = `
+        <div class="add-button-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+        </div>
+        <span>${__("Añadir||Add")}</span>
+      `;
+      addButton.addEventListener("click", () => this.addFrame());
+      this.timelineContent.appendChild(addButton);
+    }
+  
+    // Get existing frame elements (excluding add button)
+    const existingFrames = timelineChildren.filter(child => !child.classList.contains('add-button'));
+    
+    // Calculate how many frames we need to add/remove
+    const framesToAdd = Math.max(0, frameCount - existingFrames.length);
+    const framesToRemove = Math.max(0, existingFrames.length - frameCount);
+    
+    // Remove excess frames from the end
+    for (let i = 0; i < framesToRemove; i++) {
+      const lastFrame = existingFrames[existingFrames.length - 1 - i];
+      if (lastFrame && lastFrame.parentNode) {
+        lastFrame.remove();
+      }
+    }
+    
+    // Update existing frames
+    for (let i = 0; i < Math.min(frameCount, existingFrames.length); i++) {
+      const frame = this.project.frames[i];
+      const frameElement = existingFrames[i];
+      
+      // Update classes
+      frameElement.className = `timeline-frame ${i === this.project.currentFrame ? "active" : ""}`;
+      frameElement.setAttribute("data-index", i);
+      
+      // Update thumbnail
+      const thumbContainer = frameElement.querySelector(".frame-thumb");
+      if (thumbContainer) {
+        // Clear old thumbnail
+        thumbContainer.innerHTML = "";
+        
+        const thumbCanvas = document.createElement("canvas");
+        thumbCanvas.width = this.project.width;
+        thumbCanvas.height = this.project.height;
+        thumbCanvas.style.width = "auto";
+        thumbCanvas.style.height = "60px";
+        thumbCanvas.style.backgroundColor = "#fff";
+        thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+        thumbCanvas.style.backgroundSize = "16px 16px";
+
+        const thumbCtx = this.getCanvasContext(thumbCanvas);
+  
+        // Draw background
+        if (!this.transparentBackground) {
+          thumbCtx.fillStyle = this.secondaryColor;
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
+  
+        // Draw all visible layers
+        for (let l = 0; l < frame.layers.length; l++) {
+          if (frame.layers[l].visible) {
+            thumbCtx.drawImage(frame.layers[l].canvas, 0, 0);
+          }
+        }
+  
+        thumbContainer.appendChild(thumbCanvas);
+      }
+      
+      // Update time display
+      const timeDisplay = frameElement.querySelector(".frame-time");
+      if (timeDisplay) {
+        timeDisplay.textContent = `${this.project.frameTimes[i].toFixed(2)}ms`;
+      }
+      
+      // Update frame number
+      const frameNumber = frameElement.querySelector(".frame-number");
+      if (frameNumber) {
+        frameNumber.textContent = i + 1;
+      }
+    }
+    
+    // Add new frames if needed
+    if (framesToAdd > 0) {
+      for (let i = existingFrames.length; i < frameCount; i++) {
+        const frame = this.project.frames[i];
+        const frameElement = document.createElement("div");
+        frameElement.className = `timeline-frame ${i === this.project.currentFrame ? "active" : ""}`;
+        frameElement.setAttribute("data-index", i);
+        frameElement.draggable = true;
+  
+        // Frame thumbnail
+        const thumbContainer = document.createElement("div");
+        thumbContainer.className = "frame-thumb";
+        frameElement.appendChild(thumbContainer);
+        
+        const thumbCanvas = document.createElement("canvas");
+        thumbCanvas.width = this.project.width;
+        thumbCanvas.height = this.project.height;
+        thumbCanvas.style.width = "auto";
+        thumbCanvas.style.height = "60px";
+        thumbCanvas.style.backgroundColor = "#fff";
+        thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+        thumbCanvas.style.backgroundSize = "16px 16px";
+        
+        const thumbCtx = this.getCanvasContext(thumbCanvas);
+  
+        // Draw background
+        if (!this.transparentBackground) {
+          thumbCtx.fillStyle = this.secondaryColor;
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
+  
+        // Draw all visible layers
+        for (let l = 0; l < frame.layers.length; l++) {
+          if (frame.layers[l].visible) {
+            thumbCtx.drawImage(frame.layers[l].canvas, 0, 0);
+          }
+        }
+  
+        thumbContainer.appendChild(thumbCanvas);
+  
+        // Frame time display
+        const timeDisplay = document.createElement("div");
+        timeDisplay.className = "frame-time";
+        timeDisplay.textContent = `${this.project.frameTimes[i].toFixed(2)}ms`;
+        frameElement.appendChild(timeDisplay);
+  
+        // Frame number
+        const frameNumber = document.createElement("div");
+        frameNumber.className = "frame-number";
+        frameNumber.textContent = i + 1;
+        frameElement.appendChild(frameNumber);
+  
+        // Event listeners
+        frameElement.addEventListener("dragstart", e => {
+          e.dataTransfer.setData("text/plain", i.toString());
+          frameElement.classList.add("dragging");
+        });
+  
+        frameElement.addEventListener("dragend", () => {
+          frameElement.classList.remove("dragging");
+        });
+  
+        frameElement.addEventListener("dragover", e => {
+          e.preventDefault();
+        });
+  
+        frameElement.addEventListener("drop", e => {
+          e.preventDefault();
+          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+          const toIndex = i;
+          if (fromIndex !== toIndex) {
+            this.moveFrame(fromIndex, toIndex);
+          }
+        });
+  
+        timeDisplay.addEventListener("click", e => {
+          this.showFrameTimeDialog(i);
+          e.stopPropagation();
+        });
+  
+        frameElement.addEventListener("click", e => {
+          this.project.currentFrame = i;
+          this.render();
+          e.stopPropagation();
+        });
+  
+        this.setupTimelineSwipe(frameElement, i);
+  
+        // Insert before add button
+        this.timelineContent.insertBefore(frameElement, addButton);
+      }
+    }
+  
+    this.updateAnimationPreview();
+  }
+  
+  updateFramesUIQuick() {
+    if (!this.project) return;
+  
+    // Update active class on frames
+    const frameElements = this.timelineContent.children;
+    for (let i = 0; i < frameElements.length - 1; i++) { // -1 for add button
+      const frameEl = frameElements[i];
+      if (frameEl.classList.contains('timeline-frame')) {
+        if (i === this.project.currentFrame) {
+          frameEl.classList.add('active');
+        } else {
+          frameEl.classList.remove('active');
+        }
+      }
+    }
+  
+    // Update animation preview only
+    this.updateAnimationPreview();
+  }
+  
+  // Layer Management
+  addLayer() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("add_layer", __("Añadir Capa||Add Layer"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const newLayer = this.createBlankLayer(this.project.width, this.project.height, `Layer ${frame.layers.length + 1}`);
+    const layerIndex = frame.layers.length;
+  
+    frame.layers.push(newLayer);
+    this.project.currentLayer = layerIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'add_layer',
+      description: __('Añadir Capa||Add Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: layerIndex,
+      layerData: {
+        name: newLayer.name,
+        visible: this.registerLayerVisibilityChanges ? newLayer.visible : true,
+        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+    
+    this.showOperationMessage(__("Nueva capa añadida||New layer added"));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  removeLayer() {
+    if (!this.project) return;
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    if (frame.layers.length <= 1) return;
+  
+    this.historyManager.startBatch("remove_layer", __("Quitar capa||Remove Layer"));
+  
+    const layerIndex = this.project.currentLayer;
+    const removedLayer = frame.layers[layerIndex];
+  
+    frame.layers.splice(layerIndex, 1);
+    this.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+  
+    // Record operation
+    const operation = {
+      type: 'remove_layer',
+      description: __('Quitar capa||Remove Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: layerIndex,
+      layerData: {
+        name: removedLayer.name,
+        visible: this.registerLayerVisibilityChanges ? removedLayer.visible : true,
+        imageData: Array.from(removedLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+    
+    this.showOperationMessage(__("Capa quitada||Layer removed"));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.render();
+  }
+  
+  setLayerVisibility(frameIndex, layerIndex, visible) {
+    if (!this.project || !this.project.frames[frameIndex] || !this.project.frames[frameIndex].layers[layerIndex]) return;
+  
+    const layer = this.project.frames[frameIndex].layers[layerIndex];
+    const oldVisibility = layer.visible;
+    layer.visible = visible;
+  
+    // Record operation
+    const operation = {
+      type: 'change_layer_visibility',
+      description: __('Cambiar visibilidad de la capa||Change Layer Visibility'),
+      frameIndex: frameIndex,
+      layerIndex: layerIndex,
+      visible: visible,
+      oldVisible: oldVisibility
+    };
+  
+    // Only save if enabled
+    if (this.registerLayerVisibilityChanges) {
+      this.historyManager.addChange(operation);
+    }
+    
+    this.render();
+  }
+  
+  moveLayer(frameIndex, fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+  
+    this.historyManager.startBatch("move_layer", "Move Layer");
+  
+    const frame = this.project.frames[frameIndex];
+    const layer = frame.layers.splice(fromIndex, 1)[0];
+    frame.layers.splice(toIndex, 0, layer);
+    this.project.currentLayer = toIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'move_layer',
+      description: 'Move Layer',
+      frameIndex: frameIndex,
+      fromIndex: fromIndex,
+      toIndex: toIndex
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+    
+  prevLayer() {
+    if (!this.project) return;
+    const newIndex = Math.max(0, this.project.currentLayer - 1);
+    this.project.currentLayer = newIndex;
+    this.updateLayersUI();
+  }
+  
+  nextLayer() {
+    if (!this.project) return;
+    const frame = this.project.frames[this.project.currentFrame];
+    const newIndex = Math.min(frame.layers.length - 1, this.project.currentLayer + 1);
+    this.project.currentLayer = newIndex;
+    this.updateLayersUI();
+  }
+  
+  duplicateLayer() {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const sourceIndex = this.project.currentLayer;
+    const sourceLayer = frame.layers[sourceIndex];
+    const newIndex = sourceIndex + 1;
+  
+    this.historyManager.startBatch("duplicate_layer", __("Duplicar capa||Duplicate Layer"));
+  
+    // Create new layer with copy of content
+    const newLayer = this.createBlankLayer(
+      this.project.width, 
+      this.project.height, 
+      `${sourceLayer.name} (${__("copia||copy")})`
+    );
+    newLayer.visible = sourceLayer.visible;
+    newLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+  
+    // Insert after current
+    frame.layers.splice(newIndex, 0, newLayer);
+    this.project.currentLayer = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'duplicate_layer',
+      description: __('Duplicar capa||Duplicate Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: newIndex,
+      layerData: {
+        name: newLayer.name,
+        visible: newLayer.visible,
+        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.showOperationMessage(__('Capa duplicada||Layer duplicated'));
+    this.updateLayersUI();
+    this.render();
+  }
+
+  renameLayer(name, index) {
+    if (!this.project) return;
+    
+    this.historyManager.startBatch("rename_layer", __("Renombrar capa||Rename Layer"));
+    
+    const layerIndex = typeof index != "undefined" ? index : this.currentLayer;
+    let previousName;
+    let newName = name;
+    
+    // Rename the layer in all frames
+    this.project.frames.forEach(frame => {
+      const layer = frame.layers[layerIndex];
+      
+      if (!previousName) previousName = layer.name;
+      
+      layer.name = newName || layer.name;
+    });
+    
+    // Record operation
+    const operation = {
+      type: 'rename_layer',
+      description: __('Renombrar capa||Rename Layer'),
+      layerIndex,
+      previousName,
+      newName
+    };
+
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.showOperationMessage(__("Nombre editado||Name edited"));
+  }
+  
+  mergeLayerUp(layerIndex = this.project.currentLayer) {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    if (layerIndex >= frame.layers.length - 1) return; // Already top layer
+  
+    const sourceIndex = layerIndex;
+    const targetIndex = layerIndex + 1;
+    
+    this.historyManager.startBatch("merge_layers", __("Combinar capas||Merge Layers"));
+  
+    // Store data before merge
+    const sourceLayer = frame.layers[sourceIndex];
+    const targetLayer = frame.layers[targetIndex];
+    
+    const sourceData = {
+      name: sourceLayer.name,
+      visible: sourceLayer.visible,
+      imageData: Array.from(sourceLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+    
+    const targetData = {
+      name: targetLayer.name,
+      visible: targetLayer.visible,
+      imageData: Array.from(targetLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+  
+    // Perform merge
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    frame.layers.splice(sourceIndex, 1);
+    this.project.currentLayer = targetIndex - 1;
+  
+    // Record operation
+    const operation = {
+      type: 'merge_layers',
+      description: __('Combinar capas||Merge Layers'),
+      frameIndex: this.project.currentFrame,
+      sourceIndex: sourceIndex,
+      targetIndex: targetIndex,
+      sourceData: sourceData,
+      targetData: targetData
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    this.showOperationMessage(__('Capas combinadas||Layers merged'));
+    this.updateLayersUI();
+    this.render();
+  }  
+  
+  mergeLayerDown(layerIndex = this.project.currentLayer) {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    if (layerIndex <= 0) return; // Already bottom layer
+  
+    const sourceIndex = layerIndex;
+    const targetIndex = layerIndex - 1;
+    
+    this.historyManager.startBatch("merge_layers", __("Combinar capas||Merge Layers"));
+  
+    // Store data before merge
+    const sourceLayer = frame.layers[sourceIndex];
+    const targetLayer = frame.layers[targetIndex];
+    
+    const sourceData = {
+      name: sourceLayer.name,
+      visible: sourceLayer.visible,
+      imageData: Array.from(sourceLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+    
+    const targetData = {
+      name: targetLayer.name,
+      visible: targetLayer.visible,
+      imageData: Array.from(targetLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+  
+    // Perform merge
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    frame.layers.splice(sourceIndex, 1);
+    this.project.currentLayer = targetIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'merge_layers',
+      description: __('Combinar capas||Merge Layers'),
+      frameIndex: this.project.currentFrame,
+      sourceIndex: sourceIndex,
+      targetIndex: targetIndex,
+      sourceData: sourceData,
+      targetData: targetData
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    this.showOperationMessage(__('Capas combinadas||Layers merged'));
+    this.updateLayersUI();
+    this.render();
+  }
+      
+  createBlankLayer(width, height, name = `Layer ${this.project && this.project.frames.length ? this.project.frames[0].layers.length + 1 : 1}`) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = this.getCanvasContext(canvas);
+
+    return {
+      canvas: canvas,
+      ctx: ctx,
+      visible: true,
+      name
+    };
+  }
+  
+  updateLayersUI() {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const layerCount = frame.layers.length;
+    
+    // Clear the entire container (just like animation panel)
+    this.layersContainer.innerHTML = "";
+    
+    // Create header with controls (like timeline header)
+    const header = document.createElement("div");
+    header.className = "layers-header";
+    
+    // Previous layer button
+    const prevLayerBtn = document.createElement("button");
+    prevLayerBtn.className = "ui-button";
+    prevLayerBtn.innerHTML = '<div class="icon icon-prev"></div>';
+    prevLayerBtn.title = __("Capa anterior||Previous Layer");
+    prevLayerBtn.addEventListener("click", () => this.prevLayer());
+    header.appendChild(prevLayerBtn);
+    
+    // Next layer button
+    const nextLayerBtn = document.createElement("button");
+    nextLayerBtn.className = "ui-button";
+    nextLayerBtn.innerHTML = '<div class="icon icon-next"></div>';
+    nextLayerBtn.title = __("Capa siguiente||Next Layer");
+    nextLayerBtn.addEventListener("click", () => this.nextLayer());
+    header.appendChild(nextLayerBtn);
+    
+    // Add layer button
+    const addLayerBtn = document.createElement("button");
+    addLayerBtn.className = "ui-button";
+    addLayerBtn.innerHTML = '<div class="icon icon-add"></div>';
+    addLayerBtn.title = __("Añadir capa||Add Layer");
+    addLayerBtn.addEventListener("click", () => this.addLayer());
+    header.appendChild(addLayerBtn);
+    
+    // Duplicate layer button
+    const duplicateLayerBtn = document.createElement("button");
+    duplicateLayerBtn.className = "ui-button";
+    duplicateLayerBtn.innerHTML = '<div class="icon icon-copy"></div>';
+    duplicateLayerBtn.title = __("Duplicar capa||Duplicate Layer");
+    duplicateLayerBtn.addEventListener("click", () => this.duplicateLayer());
+    header.appendChild(duplicateLayerBtn);
+    
+    // Merge with top button
+    const mergeTopBtn = document.createElement("button");
+    mergeTopBtn.className = "ui-button";
+    mergeTopBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
+    mergeTopBtn.title = __("Combinar con superior||Merge with Top");
+    mergeTopBtn.addEventListener("click", () => this.mergeLayerUp());
+    header.appendChild(mergeTopBtn);
+    
+    // Merge with bottom button
+    const mergeBottomBtn = document.createElement("button");
+    mergeBottomBtn.className = "ui-button";
+    mergeBottomBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
+    mergeBottomBtn.title = __("Combinar con inferior||Merge with Bottom");
+    mergeBottomBtn.addEventListener("click", () => this.mergeLayerDown());
+    header.appendChild(mergeBottomBtn);
+    
+    this.layersContainer.appendChild(header);
+    
+    // Create layers in reverse order (top layer first in UI)
+    for (let i = layerCount - 1; i >= 0; i--) {
+      const layer = frame.layers[i];
+      const layerElement = document.createElement("div");
+      layerElement.className = "layer-item";
+      if (i === this.project.currentLayer) {
+        layerElement.classList.add('active');
+      }
+      layerElement.setAttribute("data-index", i);
+      layerElement.draggable = true;
+  
+      // Thumbnail container
+      const thumbContainer = document.createElement("div");
+      thumbContainer.className = "layer-thumb";
+      layerElement.appendChild(thumbContainer);
+  
+      const thumbCanvas = document.createElement("canvas");
+      thumbCanvas.width = this.project.width;
+      thumbCanvas.height = this.project.height;
+      thumbCanvas.style.width = "auto";
+      thumbCanvas.style.height = "44px";
+      thumbCanvas.style.backgroundColor = "#fff";
+      thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+      thumbCanvas.style.backgroundSize = "16px 16px";
+      
+      const thumbCtx = this.getCanvasContext(thumbCanvas);
+      
+      // Draw background
+      if (!this.transparentBackground) {
+        thumbCtx.fillStyle = this.secondaryColor;
+        thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+      }
+      
+      // Draw layer content
+      if (layer.canvas) {
+        thumbCtx.drawImage(layer.canvas, 0, 0);
+      }
+      
+      thumbContainer.appendChild(thumbCanvas);
+  
+      // Layer name
+      const layerName = document.createElement("input");
+      layerName.className = "layer-name";
+      layerName.value = layer.name;
+      layerElement.appendChild(layerName);
+  
+      // Layer actions
+      const layerActions = document.createElement("div");
+      layerActions.className = "layer-actions";
+  
+      // Move up button - disabled if at top
+      const moveUpBtn = document.createElement("button");
+      moveUpBtn.className = "ui-button layer-action";
+      moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
+      moveUpBtn.title = __("Subir||Move Up");
+      if (i >= layerCount - 1) {
+        moveUpBtn.disabled = true;
+        moveUpBtn.classList.add("disabled");
+      } else {
+        moveUpBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.moveLayer(this.project.currentFrame, i, i + 1);
+        });
+      }
+      layerActions.appendChild(moveUpBtn);
+  
+      // Move down button - disabled if at bottom
+      const moveDownBtn = document.createElement("button");
+      moveDownBtn.className = "ui-button layer-action";
+      moveDownBtn.innerHTML = '<div class="icon icon-down"></div>';
+      moveDownBtn.title = __("Bajar||Move Down");
+      if (i <= 0) {
+        moveDownBtn.disabled = true;
+        moveDownBtn.classList.add("disabled");
+      } else {
+        moveDownBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.moveLayer(this.project.currentFrame, i, i - 1);
+        });
+      }
+      layerActions.appendChild(moveDownBtn);
+  
+      // Visibility toggle
+      const visibilityBtn = document.createElement("button");
+      visibilityBtn.className = "ui-button layer-action";
+      visibilityBtn.innerHTML = layer.visible ? 
+        '<div class="icon icon-visible"></div>' : 
+        '<div class="icon icon-hidden"></div>';
+      visibilityBtn.title = __("Visibilidad||Toggle Visibility");
+      visibilityBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        this.setLayerVisibility(this.project.currentFrame, i, !layer.visible);
+      });
+      layerActions.appendChild(visibilityBtn);
+  
+      // Merge up button - disabled if at top
+      const mergeUpBtn = document.createElement("button");
+      mergeUpBtn.className = "ui-button layer-action";
+      mergeUpBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
+      mergeUpBtn.title = __("Combinar arriba||Merge Up");
+      if (i >= layerCount - 1) {
+        mergeUpBtn.disabled = true;
+        mergeUpBtn.classList.add("disabled");
+      } else {
+        mergeUpBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.mergeLayerUp(i);
+        });
+      }
+      layerActions.appendChild(mergeUpBtn);
+  
+      // Merge down button - disabled if at bottom
+      const mergeDownBtn = document.createElement("button");
+      mergeDownBtn.className = "ui-button layer-action";
+      mergeDownBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
+      mergeDownBtn.title = __("Combinar abajo||Merge Down");
+      if (i <= 0) {
+        mergeDownBtn.disabled = true;
+        mergeDownBtn.classList.add("disabled");
+      } else {
+        mergeDownBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.mergeLayerDown(i);
+        });
+      }
+      layerActions.appendChild(mergeDownBtn);
+  
+      // Remove button - always enabled if more than one layer
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "ui-button layer-action";
+      removeBtn.innerHTML = '<div class="icon icon-close"></div>';
+      removeBtn.title = __("Eliminar||Remove");
+      if (layerCount <= 1) {
+        removeBtn.disabled = true;
+        removeBtn.classList.add("disabled");
+      } else {
+        removeBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.removeLayer(i);
+        });
+      }
+      layerActions.appendChild(removeBtn);
+  
+      layerElement.appendChild(layerActions);
+  
+      // Drag and drop events
+      layerElement.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", i.toString());
+        layerElement.classList.add("dragging");
+      });
+  
+      layerElement.addEventListener("dragend", () => {
+        layerElement.classList.remove("dragging");
+      });
+  
+      layerElement.addEventListener("dragover", e => {
+        e.preventDefault();
+      });
+  
+      layerElement.addEventListener("drop", e => {
+        e.preventDefault();
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+        const toIndex = i;
+        if (fromIndex !== toIndex) {
+          this.moveLayer(this.project.currentFrame, fromIndex, toIndex);
+        }
+      });
+  
+      layerElement.addEventListener("click", () => {
+        if (this.project.currentLayer != i) {
+          this.project.currentLayer = i;
+          this.updateLayersUI();
+        }
+      });
+      
+      layerName.addEventListener("change", () => {
+        this.renameLayer(layerName.value, i);
+        layerName.blur();
+      });
+  
+      this.layersContainer.appendChild(layerElement);
+    }
+  }  
+  
+  showButtonToast(message, button, undoCallback) {
+    const toast = document.createElement("div");
+    toast.className = "toast-with-button";
+      toast.innerHTML = `
+      <span>${message || ''}</span>
+      <button class="toast-button">${button || __("Deshacer||Undo")}</button>
+    `;
+
+    this.editorElement.appendChild(toast);
+
+    // Add event listener
+    toast.querySelector(".toast-button").addEventListener("click", () => {
+      undoCallback();
+      toast.remove();
+    });
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.remove();
+      }
+    }, 5000);
+  }
+
+  setupTimelineSwipe(element, index) {
+    let startY;
+    let isSwiping = false;
+
+    element.addEventListener("touchstart", e => {
+      startY = e.touches[0].clientY;
+      isSwiping = true;
+    });
+
+    element.addEventListener("touchmove", e => {
+      if (!isSwiping) return;
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+
+      // Vertical swipe up (delete)
+      if (deltaY < -30) {
+        e.preventDefault();
+        element.style.transform = `translateY(${deltaY}px)`;
+        element.style.opacity = `${1 - Math.abs(deltaY) / 100}`;
+      }
+    });
+
+    element.addEventListener("touchend", e => {
+      if (!isSwiping) return;
+
+      const currentY = e.changedTouches[0].clientY;
+      const deltaY = currentY - startY;
+
+      if (deltaY < -60) {
+        // Swipe threshold reached - delete frame
+        this.removeFrame(index);
+      }
+
+      // Reset transform
+      element.style.transform = "";
+      element.style.opacity = "";
+      isSwiping = false;
+    });
+  }
+
+  showFrameTimeDialog(frameIndex) {
+    const content = document.createElement("div");
+    content.innerHTML = `
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; margin-bottom: 5px;">${__("Tiempo del Frame||Frame Time")} (ms):</label>
+      <input type="number" id="frame-time-value" value="${this.project.frameTimes[frameIndex]}" min="1" max="5000" style="width: 100%; padding: 5px;">
+    </div>
+  `;
+
+    this.showPopup(__("Cambiar Tiempo del Frame||Set Frame Time"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Aplicar||Apply"),
+        action: () => {
+          const time = parseInt(document.getElementById("frame-time-value").value);
+          if (time >= 1 && time <= 5000) {
+            this.setFrameTime(frameIndex, time);
+            this.updateFramesUI();
+            this.hidePopup();
+          }
+        }
+      }
+    ]);
+  }
+
+  updateFPS(input) {
+    let fps = parseInt(input || this.fpsInput.value);
+    if (fps >= 1 && fps <= 60) {
+      const oldFPS = 1000 / this.project.currentFrameTime;
+      const oldFrameTimes = this.project.frameTimes;
+      this.project.currentFrameTime = 1000 / fps;
+  
+      // Update all frame times
+      this.project.frameTimes = this.project.frameTimes.map(() => this.project.currentFrameTime);
+  
+      // Record operation
+      const operation = {
+        type: 'change_animation_fps',
+        description: __('Cambiar FPS||Change FPS'),
+        oldFPS: oldFPS,
+        newFPS: fps,
+        oldFrameTimes: oldFrameTimes,
+        newFrameTimes: this.project.frameTimes
+      };
+  
+      this.historyManager.addChange(operation);
+  
+      this.updateFramesUI();
+  
+      // Restart animation if playing
+      if (this.isPlaying) {
+        this.stopAnimation();
+        this.startAnimation();
+      }
+    }
+  }
+  
+  togglePlayback() {
+    if (this.isPlaying) {
+      this.stopAnimation();
+    } else {
+      this.startAnimation();
+    }
+  }
+
+  startAnimation() {
+    if (this.project.frames.length <= 1) return;
+
+    this.isPlaying = true;
+    this.playPauseButton.querySelector(".icon").className = "icon icon-pause";
+
+    let currentFrame = this.project.currentFrame;
+    let startTime = Date.now();
+    let accumulatedTime = 0;
+
+    this.animationInterval = setInterval(() => {
+      const now = Date.now();
+      const delta = now - startTime - accumulatedTime;
+      accumulatedTime += delta;
+
+      // Calculate which frame to show based on accumulated time
+      let timeSum = 0;
+      let nextFrame = currentFrame;
+
+      for (let i = 0; i < this.project.frameTimes.length; i++) {
+        timeSum += this.project.frameTimes[i];
+        if (accumulatedTime < timeSum) {
+          nextFrame = i;
+          break;
+        }
+      }
+
+      // Loop around if we've passed the end
+      if (accumulatedTime >= timeSum) {
+        accumulatedTime = 0;
+        nextFrame = 0;
+        startTime = Date.now();
+      }
+
+      if (nextFrame !== currentFrame) {
+        currentFrame = nextFrame;
+        if (!this.showMiniView) {
+          this.project.currentFrame = currentFrame;
+          this.renderQuick();
+        } else if (!this.isDrawing) {
+          this.updateAnimationPreview(currentFrame);
+        }        
+      }
+    }, 16); // ~60fps update rate
+  }
+
+  stopAnimation() {
+    this.isPlaying = false;
+    if (this.playPauseButton) {
+      this.playPauseButton.querySelector(".icon").className = "icon icon-play";
+    }
+
+    if (this.animationInterval) {
+      clearInterval(this.animationInterval);
+      this.animationInterval = null;
+    }
+  }
+
+  prevFrame() {
+    if (this.project.frames.length <= 1) return;
+
+    this.project.currentFrame = (this.project.currentFrame - 1 + this.project.frames.length) % this.project.frames.length;
+    this.render();
+  }
+
+  nextFrame() {
+    if (this.project.frames.length <= 1) return;
+
+    this.project.currentFrame = (this.project.currentFrame + 1) % this.project.frames.length;
+    this.render();
+  }
+
+  updateAnimationPreview(currentFrame = this.project.currentFrame) {
+    if (!this.project || !this.animationPreview) return;
+
+    const frame = this.project.frames[currentFrame];
+    this.animationPreview.width = this.project.width;
+    this.animationPreview.height = this.project.height;
+
+    const ctx = this.getCanvasContext(this.animationPreview);
+    ctx.clearRect(0, 0, this.animationPreview.width, this.animationPreview.height);
+
+    // Draw background
+    if (!this.transparentBackground) {
+      ctx.fillStyle = this.secondaryColor;
+      ctx.fillRect(0, 0, this.animationPreview.width, this.animationPreview.height);
+    }
+
+    // Draw all visible layers
+    for (let l = 0; l < frame.layers.length; l++) {
+      if (frame.layers[l].visible) {
+        ctx.drawImage(frame.layers[l].canvas, 0, 0, this.project.width, this.project.height, 0, 0, this.animationPreview.width, this.animationPreview.height);
+      }
+    }
+  }
+
+  hasTransparency(canvas) {
+    const ctx = this.getCanvasContext(canvas);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 255) return true;
+    }
+    return false;
+  }
+
+  showFPSDialog() {
+    const content = document.createElement("div");
+    content.innerHTML = `
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; margin-bottom: 5px;">${__("Frames Por Segundo||Frames Per Second")}:</label>
+      <input type="number" id="fps-value" value="${parseInt(1000 / this.project.currentFrameTime)}" min="1" max="60" style="width: 100%; padding: 5px;">
+    </div>
+  `;
+
+    this.showPopup(__("Cambiar FPS||Set Animation FPS"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Aplicar||Apply"),
+        action: () => {
+          const fps = parseInt(document.getElementById("fps-value").value);
+          if (fps >= 1 && fps <= 60) {
+            this.fpsInput.value = fps;
+            this.updateFPS(fps);
+            this.hidePopup();
+          }
+        }
+      }
+    ]);
+  }
+
+  showCurrentFrameTimeDialog() {
+    this.showFrameTimeDialog(this.project.currentFrame);
+  }
+
+  // Initialize file handling
+  initFileHandling() {
+    this.isCordova = typeof window.cordova !== "undefined";
+    this.isFilePluginAvailable = this.isCordova && typeof window.File !== "undefined";
+    this.lastSavedPath = null;
+  }
+
+  // Main file operations
+  openFile() {
+    const fileBrowser = this.getFileBrowser({
+      mode: "open",
+      fileTypes: ["pxl", "psd", "png", "jpg", "jpeg", "pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.readFile(fileInfo);
+
+          if (fileInfo.type === "pxl") {
+            this.loadProject(fileData);
+          } else if (fileInfo.type === "psd") {
+            await this.importPSD(fileData, fileInfo.name);
+          } else if (fileInfo.type === "pal") {
+            this.parsePalFile(fileData);
+            this.updatePaletteGrid();
+            this.showToast(__(`(Paleta|Palette) ${fileInfo.name} (cargada|loaded)`));
+          } else {
+            this.importImage(fileData, fileInfo.name);
+          }
+
+          this.showToast(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
+          this.menuPanel.classList.remove("visible");
+        } catch (error) {
+          this.showToast(__(`(Error al abrir el archivo|Error opening file): ${error.message}`), 5000);
+          console.error(error);
+        }
+      },
+      onError: error => {
+        this.showToast(__(`(Error de archivo|File error): ${error.message}`), 5000);
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  saveProject(quickSave) {
+    if (!this.project) return;
+
+    if (this.lastSavedPath) {
+      this.saveFile(this.lastSavedPath, "pxl", this.getProjectData());
+    } else if (!quickSave) {
+      this.saveAs();
+    }
+  }
+
+  saveAs() {
+    const fileBrowser = this.getFileBrowser({
+      mode: "saveAs",
+      fileTypes: ["pxl", "psd", "png"],
+      defaultType: "pxl",
+      defaultName: this.project.name || "untitled",
+      onConfirm: async fileInfo => {
+        try {
+          this.lastSavedPath = fileInfo.name;
+
+          if (fileInfo.type === "pxl") {
+            await this.saveFile(fileInfo.name, "pxl", this.getProjectData());
+          } else if (fileInfo.type === "psd") {
+            const psdBlob = await this.exportAsPSD();
+            await this.saveFile(fileInfo.name, "psd", psdBlob);
+          } else {
+            const dataURL = this.canvas.toDataURL("image/png");
+            await this.saveFile(fileInfo.name, "png", dataURL);
+          }
+          
+          this.showToast(__(`(Archivo guardado como|File saved as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error al guardar el archivo|Error saving file): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  exportCurrentFrame() {
+    if (!this.project) return;
+
+    const fileBrowser = this.getFileBrowser({
+      title: "Export frame",
+      mode: "saveAs",
+      fileTypes: ["png"],
+      defaultType: "png",
+      defaultName: `frame_${this.project.currentFrame + 1}`,
+      onConfirm: async fileInfo => {
+        try {
+          const frame = this.project.frames[this.project.currentFrame];
+          const canvas = this.renderFrameToCanvas(frame);
+          const dataURL = canvas.toDataURL("image/png");
+
+          await this.saveFile(fileInfo.name, "png", dataURL);
+          this.showToast(__(`Frame (exportado como|exported as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error exportando el frame|Error exporting frame): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  exportAnimation() {
+    if (!this.project || this.project.frames.length <= 1) {
+      this.showToast("Project has only one frame", 3000);
+      return;
+    }
+
+    const fileBrowser = this.getFileBrowser({
+      title: "Export animation sheet",
+      mode: "saveAs",
+      fileTypes: ["png"],
+      defaultType: "png",
+      defaultName: `animation_${this.project.name || Date.now()}`,
+      onConfirm: async fileInfo => {
+        try {
+          const spriteSheet = this.createSpriteSheet();
+          const dataURL = spriteSheet.toDataURL("image/png");
+
+          await this.saveFile(fileInfo.name, "png", dataURL);
+          this.showToast(__(`(Animación exportada como|Animation exported as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error exportando animación|Error exporting animation): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+  
+  showSpritesheetLoader() {
+    if (!this.spritesheetLoader) {
+      this.spritesheetLoader = new SpritesheetLoader(this);
+    }
+    this.spritesheetLoader.show();
+  }
+
+  async readFile(fileInfo) {
+    if (fileInfo.entry) {
+      // Cordova file entry
+      return this.readCordovaFile(fileInfo.entry);
+    } else if (fileInfo.file) {
+      // Browser file object
+      return this.readBrowserFile(fileInfo.file);
+    }
+    throw new Error("Unsupported file source");
+  }
+
+  async readCordovaFile(fileEntry) {
+    return new Promise((resolve, reject) => {
+      fileEntry.file(
+        file => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Failed to read file"));
+
+          if (file.name.endsWith(".pxl") || file.name.endsWith(".anim") || file.name.endsWith(".pal") || file.name.endsWith(".txt")) {
+            reader.readAsText(file);
+          } else {
+            reader.readAsDataURL(file);
+          }
+        },
+        error => {
+          reject(new Error(`Could not read file: ${error.code}`));
+        }
+      );
+    });
+  }
+
+  async readBrowserFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+
+      if (file.name.endsWith(".pxl") || file.name.endsWith(".anim") || file.name.endsWith(".pal") || file.name.endsWith(".txt")) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  async saveFile(filename, type, data) {
+    if (this.isCordova && this.isFilePluginAvailable) {
+      try {
+        await this.saveWithCordova(filename, type, data);
+      } catch (error) {
+        console.error("Cordova save failed, falling back to browser:", error);
+        this.saveWithBrowser(filename, type, data);
+      }
+    } else {
+      this.saveWithBrowser(filename, type, data);
+    }
+  }
+
+  async saveWithCordova(filename, type, data) {
+    return new Promise((resolve, reject) => {
+      // Check if Cordova is available
+      if (!window.requestFileSystem) {
+        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+      }
+
+      if (!window.requestFileSystem) {
+        reject(new Error("File system API not available"));
+        return;
+      }
+
+      // Use PERSISTENT storage (same as your working code)
+      window.requestFileSystem(
+        window.PERSISTENT || 1, // Use 1 if PERSISTENT is undefined
+        5 * 1024 * 1024, // 5MB
+        fileSystem => {
+          // Create or get the file
+          fileSystem.root.getFile(
+            this.fileBrowser.workingDirectory + filename,
+            { create: true, exclusive: false },
+            entry => {
+              entry.createWriter(
+                writer => {
+                  writer.onwriteend = () => {
+                    this.lastSavedPath = filename;
+                    resolve();
+                  };
+                  writer.onerror = error => {
+                    reject(new Error(`File write error: ${error.code}`));
+                  };
+
+                  let blob;
+                  if (type === "pxl") {
+                    blob = new Blob([data], { type: "application/json" });
+                  } else {
+                    blob = this.dataURLtoBlob(data);
+                  }
+
+                  writer.write(blob);
+                },
+                error => {
+                  reject(new Error(`Could not create file writer: ${error.code}`));
+                }
+              );
+            },
+            error => {
+              reject(new Error(`Could not create file: ${error.code}`));
+            }
+          );
+        },
+        error => {
+          reject(new Error(`Could not access file system: ${error.code}`));
+        }
+      );
+    });
+  }
+
+  async saveWithBrowser(filename, type, data) {
+    try {
+      let blob;
+
+      if (data instanceof Blob) {
+        // If it's already a Blob, use it directly
+        blob = data;
+      } else if (type === "pxl") {
+        blob = new Blob([data], { type: "application/json" });
+      } else if (type === "pal") {
+        blob = new Blob([data], { type: "text/plain" });
+      } else {
+        // Assume it's a data URL for images
+        blob = this.dataURLtoBlob(data);
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error("Browser save failed:", error);
+      this.showToast(__("Error al guardar||Failed to save file"), 3000);
+    }
+  }
+
+  async exportAsPSD() {
+    if (!this.project) return;
+  
+    try {
+      // Build PSD structure from current frame
+      const frame = this.project.frames[this.project.currentFrame];
+      
+      // Create PSD data structure
+      const psdData = {
+        width: this.project.width,
+        height: this.project.height,
+        children: []
+      };
+  
+      // Add all layers (PSD layers are ordered from bottom to top)
+      for (let i = 0; i < frame.layers.length; i++) {
+        const layer = frame.layers[i];
+        
+        // Create a new canvas with the exact content (including transparency)
+        const layerCanvas = document.createElement('canvas');
+        layerCanvas.width = this.project.width;
+        layerCanvas.height = this.project.height;
+        const ctx = layerCanvas.getContext('2d');
+        ctx.drawImage(layer.canvas, 0, 0);
+        
+        psdData.children.push({
+          name: layer.name,
+          canvas: layerCanvas,
+          visible: layer.visible,
+          opacity: 255, // Full opacity (PSD uses 0-255)
+          blendMode: 'normal'
+        });
+      }
+  
+      // Write PSD data to ArrayBuffer
+      const arrayBuffer = agPsd.writePsd(psdData);
+      return new Blob([arrayBuffer], { type: 'application/octet-stream' });
+      
+    } catch (error) {
+      console.error('Error exporting PSD:', error);
+      throw new Error('Failed to export PSD');
+    }
+  }
+
+  // Timelapse export methods
+  async exportTimelapse() {
+    if (!this.project || !this.historyManager.history.length) {
+      this.showToast(__("No hay suficiente historia para exportar el proceso||Not enough history to export a timelapse"));
+      return;
+    }
+
+    // Show configuration dialog
+    const content = document.createElement("div");
+    content.innerHTML = `
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">FPS:</label>
+        <input type="number" id="timelapse-fps" value="${this.timelapseFPS}" min="1" max="60" style="width: 100%; padding: 5px;">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">${__("Escala||Scale")}:</label>
+        <input type="number" id="timelapse-scale" value="4" min="1" max="10" style="width: 100%; padding: 5px;">
+      </div>
+      <img style="display:none;image-rendering:pixelated;width:100%;height:auto;background-color:#fff;border:1px solid #000" class="timelapse-preview">
+      <div class="timelapse-progress" style="display: none;">
+        <div style="text-align: center; margin-bottom: 5px;">${__("Generando||Generating")} timelapse...</div>
+        <progress value="0" max="100" style="width: 100%;"></progress>
+        <div class="progress-text" style="text-align: center; margin-top: 5px;">0%</div>
+      </div>
+    `;
+
+    const progressSection = content.querySelector(".timelapse-progress");
+    const progressBar = content.querySelector("progress");
+    const progressText = content.querySelector(".progress-text");
+
+    this.showPopup(__("Exportar Timelapse||Export Timelapse"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Generar||Generate"),
+        action: async () => {
+          const fps = parseInt(document.getElementById("timelapse-fps").value) || 30;
+          const scale = parseInt(document.getElementById("timelapse-scale").value) || 4;
+
+          // Show progress UI
+          content.querySelector("div:first-child").style.display = "none";
+          content.querySelector("div:nth-child(2)").style.display = "none";
+          progressSection.style.display = "block";
+          
+          this.hidePopupButtons();
+
+          try {
+            const videoBlob = await this.generateTimelapse(fps, scale, (progress, previewImageData) => {
+              progressBar.value = progress;
+              progressText.textContent = `${progress}%`;
+              const preview = content.querySelector(".timelapse-preview");
+              if (preview && previewImageData) {
+                preview.style.display = "flex";
+                preview.src = previewImageData;
+              }
+            });
+
+            // Now show file browser to save the video
+            this.hidePopup();
+            this.saveTimelapseWithBrowser(videoBlob);
+          } catch (error) {
+            this.showToast(__(`(Error generando proceso|Error generating timelapse): ${error.message}`), 5000);
+            throw error;
+          }
+        }
+      }
+    ]);
+  }
+
+  async generateTimelapse(fps, scale, progressCallback) {
+    return this.historyManager.generateTimelapse(fps, scale, progressCallback);
+  }
+
+  saveTimelapseWithBrowser(videoBlob) {
+    const fileBrowser = this.getFileBrowser({
+      mode: "saveAs",
+      fileTypes: ["webm"],
+      defaultType: "webm",
+      defaultName: `timelapse_${this.project.name || "artwork"}_${this.formatDate(new Date())}`,
+      onConfirm: async fileInfo => {
+        try {
+          await this.saveFile(fileInfo.name, "webm", videoBlob);
+          this.showToast(__("Timelapse exportado||Timelapse saved successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error guardando proceso|Error saving timelapse): ${error.message}`), 5000);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  getFileBrowser(options = {}) {
+    if (!this.fileBrowser) {
+      this.fileBrowser = new FileBrowser({
+        container: this.container,
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+        onError: options.onError,
+        title: options.title || null,
+        fileTypes: options.fileTypes || ["pxl", "png"],
+        mode: options.mode || "open",
+        defaultType: options.defaultType || "pxl",
+        defaultName: options.defaultName || "untitled"
+      });
+      this.fileBrowser.currentPath = this.defaultFileBrowserPathUrl;
+    } else {
+      // Update options and refresh UI
+      this.fileBrowser.updateOptions({
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+        onError: options.onError,
+        title: options.title || null,
+        fileTypes: options.fileTypes || ["pxl", "png"],
+        mode: options.mode || "open",
+        defaultType: options.defaultType || "pxl",
+        defaultName: options.defaultName || "untitled"
+      });
+    }
+
+    return this.fileBrowser;
+  }
+
+  // Project methods
+  loadProject(projectData) {
+    // Handle both string and object input
+    if (typeof projectData === "string") {
+      try {
+        projectData = JSON.parse(projectData)
+      } catch (error) {
+        throw new Error("Invalid project file format: Not valid JSON");
+      }
+    }
+    
+    // Validate project
+    if (!projectData || !projectData.width || !projectData.height) {
+      throw new Error("Invalid project file format: Missing width or height");
+    }
+
+    // Create new project structure
+    this.project = {
+      width: projectData.width,
+      height: projectData.height,
+      frames: [],
+      floatingColors: projectData.floatingColors || 0,
+      currentFrame: projectData.currentFrame || 0,
+      currentLayer: projectData.currentLayer || 0,
+      name: projectData.name || "untitled",
+    };
+
+    // Load frame times or set defaults
+    this.project.frameTimes = projectData.frameTimes || new Array(projectData.frames.length).fill(1000 / (projectData.fps || 12));
+
+    this.project.currentFrameTime = projectData.animation ? projectData.currentFrameTime : 1000 / 12;
+
+    // Load background settings
+    if (projectData.backgroundColor) {
+      this.transparentBackground = projectData.backgroundColor === "transparent";
+      if (!this.transparentBackground) {
+        this.secondaryColor = projectData.backgroundColor;
+      }
+    }
+
+    // Load frames
+    if (!projectData.frames || !Array.isArray(projectData.frames)) {
+      throw new Error("Invalid project file format: Missing or invalid frames array");
+    }
+
+    for (let f = 0; f < projectData.frames.length; f++) {
+      const frameData = projectData.frames[f];
+      const frame = {
+        layers: []
+      };
+
+      // Ensure layers array exists
+      if (!frameData.layers || !Array.isArray(frameData.layers)) {
+        console.warn(`Frame ${f} has invalid layers array, creating default layer`);
+        frameData.layers = [
+          {
+            name: `Layer 1`,
+            visible: true,
+            imageData: null
+          }
+        ];
+      }
+
+      for (let l = 0; l < frameData.layers.length; l++) {
+        const layerData = frameData.layers[l];
+        const layer = this.createBlankLayer(this.project.width, this.project.height);
+
+        // Set layer properties with defaults
+        layer.name = layerData.name || `Layer ${l + 1}`;
+        layer.visible = layerData.visible !== undefined ? layerData.visible : true;
+
+        // Restore image data if available
+        if (layerData.imageData && Array.isArray(layerData.imageData)) {
+          try {
+            const ctx = layer.ctx;
+            const imageData = new ImageData(new Uint8ClampedArray(layerData.imageData), this.project.width, this.project.height);
+            ctx.putImageData(imageData, 0, 0);
+          } catch (error) {
+            console.error(`Error loading image data for frame ${f}, layer ${l}:`, error);
+            // Continue with blank layer
+          }
+        }
+
+        frame.layers.push(layer);
+      }
+
+      this.project.frames.push(frame);
+    }
+
+    // Load history if available
+    if (projectData.history) {
+      this.historyManager.deserialize(projectData.history);
+    } else {
+      // Create initial history entry for legacy projects
+      this.historyManager.clear();
+    }
+    
+    // Load floating colors
+    if (projectData.floatingColors && this.usePerProjectFloatingColors) {
+      this.removeAllFloatingPaletteColors();
+      this.colorPicker.loadFloatingColors(JSON.parse(projectData.floatingColors));
+    }
+
+    // Initialize project
+    this.resetCanvasSize();
+    this.resetZoom();
+
+    // Update UI
+    this.render();
+  }
+
+  recreateProjectCanvases() {
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+
+        // Recreate canvas
+        layer.canvas = document.createElement("canvas");
+        layer.canvas.width = this.project.width;
+        layer.canvas.height = this.project.height;
+
+        // Restore image data if available
+        if (layer.imageData) {
+          this.drawImageToCanvas(layer.canvas, layer.imageData);
+        }
+      }
+    }
+  }
+
+  drawImageToCanvas(canvas, imageData) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = this.getCanvasContext(canvas);
+        ctx.drawImage(img, 0, 0);
+        resolve();
+      };
+      img.src = imageData;
+    });
+  }
+
+  importImage(imageData, name = "Imported Image") {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        // Create a new project sized to image dimensions
+        this.newProject(img.width, img.height, img);
+
+        // Update UI and render
+        this.render();
+
+        resolve();
+      };
+      img.src = imageData;
+    });
+  }
+  
+  async importPSD(fileData, fileName) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Convert file data to ArrayBuffer if it's a string
+        let buffer;
+        if (typeof fileData === 'string') {
+          // Handle base64 or data URL
+          if (fileData.startsWith('data:')) {
+            // Convert data URL to ArrayBuffer
+            const base64 = fileData.split(',')[1];
+            const binary = atob(base64);
+            buffer = new ArrayBuffer(binary.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < binary.length; i++) {
+              view[i] = binary.charCodeAt(i);
+            }
+          } else {
+            // Assume it's binary data as string
+            buffer = new ArrayBuffer(fileData.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < fileData.length; i++) {
+              view[i] = fileData.charCodeAt(i);
+            }
+          }
+        } else if (fileData instanceof ArrayBuffer) {
+          buffer = fileData;
+        } else if (fileData instanceof Blob) {
+          // Handle blob by reading it
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.importPSDFromBuffer(e.target.result, fileName).then(resolve).catch(reject);
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(fileData);
+          return;
+        } else {
+          reject(new Error('Unsupported file format'));
+          return;
+        }
+  
+        // Parse the PSD
+        const psd = agPsd.readPsd(buffer);
+        
+        // Create new project with PSD dimensions
+        this.newProject(psd.width, psd.height);
+        
+        // Clear existing layers (newProject creates one default layer)
+        const frame = this.project.frames[0];
+        frame.layers = [];
+        
+        // Import PSD layers (they come in bottom-to-top order)
+        if (psd.children && psd.children.length > 0) {
+          for (let i = 0; i < psd.children.length; i++) {
+            const psdLayer = psd.children[i];
+            
+            // Create new layer
+            const layer = this.createBlankLayer(
+              psd.width, 
+              psd.height, 
+              psdLayer.name || `Layer ${i + 1}`
+            );
+            
+            // Set visibility
+            layer.visible = psdLayer.visible !== false;
+            
+            // If the layer has canvas data, draw it
+            if (psdLayer.canvas) {
+              layer.ctx.drawImage(psdLayer.canvas, 0, 0);
+            } else if (psdLayer.imageData) {
+              // Some PSD libraries provide imageData
+              const imageData = new ImageData(
+                new Uint8ClampedArray(psdLayer.imageData),
+                psd.width,
+                psd.height
+              );
+              layer.ctx.putImageData(imageData, 0, 0);
+            }
+            
+            frame.layers.push(layer);
+          }
+        } else {
+          // If no layers found, create a merged layer from the PSD
+          console.warn('PSD has no layer structure, creating merged layer');
+          const layer = this.createBlankLayer(psd.width, psd.height, 'Merged');
+          
+          // Try to get the merged image data
+          if (psd.canvas) {
+            layer.ctx.drawImage(psd.canvas, 0, 0);
+          }
+          
+          frame.layers.push(layer);
+        }
+        
+        // Set current layer to top layer
+        this.project.currentLayer = frame.layers.length - 1;
+        
+        // Update UI
+        this.updateLayersUI();
+        this.updateFramesUI();
+        this.render();
+        
+        this.showToast(__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+        resolve();
+        
+      } catch (error) {
+        console.error('Error importing PSD:', error);
+        reject(new Error('Failed to import PSD file'));
+      }
+    });
+  }
+  
+  async importPSDFromBuffer(buffer, fileName) {
+    try {
+      const psd = agPsd.readPsd(buffer);
+      
+      // Create new project with PSD dimensions
+      this.newProject(psd.width, psd.height);
+      
+      // Clear existing layers
+      const frame = this.project.frames[0];
+      frame.layers = [];
+      
+      // Import PSD layers
+      if (psd.children && psd.children.length > 0) {
+        for (let i = 0; i < psd.children.length; i++) {
+          const psdLayer = psd.children[i];
+          
+          const layer = this.createBlankLayer(
+            psd.width, 
+            psd.height, 
+            psdLayer.name || `Layer ${i + 1}`
+          );
+          
+          layer.visible = psdLayer.visible !== false;
+          
+          if (psdLayer.canvas) {
+            layer.ctx.drawImage(psdLayer.canvas, 0, 0);
+          }
+          
+          frame.layers.push(layer);
+        }
+      }
+      
+      this.project.currentLayer = frame.layers.length - 1;
+      this.updateLayersUI();
+      this.updateFramesUI();
+      this.render();
+      
+      this.showToast(__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+      
+    } catch (error) {
+      console.error('Error importing PSD from buffer:', error);
+      throw error;
+    }
+  }
+
+  getProjectData() {
+    const projectData = {
+      version: this.version,
+      width: this.project.width,
+      height: this.project.height,
+      frames: [],
+      floatingColors: this.getFloatingColorsData(),
+      currentFrameTime: this.project.currentFrameTime,
+      frameTimes: this.project.frameTimes,
+      backgroundColor: this.transparentBackground ? "transparent" : this.secondaryColor,
+      createdAt: new Date().toISOString(),
+      history: this.historyManager.serialize(),
+      currentFrame: this.project.currentFrame,
+      currentLayer: this.project.currentLayer
+    };
+
+    // Convert frames to serializable format
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      const serializedFrame = {
+        layers: []
+      };
+
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const ctx = layer.ctx;
+        const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+
+        serializedFrame.layers.push({
+          name: layer.name || `Layer ${l + 1}`,
+          visible: layer.visible !== undefined ? layer.visible : true,
+          imageData: Array.from(imageData.data)
+        });
+      }
+
+      projectData.frames.push(serializedFrame);
+    }
+    
+    return JSON.stringify(projectData);
+  }
+  
+  compressJSON(json) {
+    const str = JSON.stringify(json);
+    let compressed = "";
+    let count = 1;
+    let prevChar = str[0];
+  
+    // Run-length encoding with special handling for common JSON patterns
+    for (let i = 1; i <= str.length; i++) {
+      const currentChar = str[i];
+  
+      if (currentChar === prevChar && count < 255) {
+        count++;
+      } else {
+        // Encode runs of 4+ characters for better compression
+        if (count > 3) {
+          compressed += `\x01${String.fromCharCode(count)}${prevChar}`;
+        } else {
+          compressed += prevChar.repeat(count);
+        }
+        count = 1;
+        prevChar = currentChar;
+      }
+    }
+  
+    // Dictionary compression for common JSON strings
+    const dict = {
+      '{"': "\x02",
+      '"}': "\x03",
+      '":': "\x04",
+      ',"': "\x05",
+      ',"_': "\x06",
+      "true": "\x07",
+      "false": "\x08",
+      "null": "\x09",
+      "[]": "\x0A",
+      "{}": "\x0B"
+    };
+  
+    Object.entries(dict).forEach(([key, value]) => {
+      compressed = compressed.split(key).join(value);
+    });
+  
+    return compressed;
+  }
+  
+  decompressJSON(compressed) {
+    let decompressed = compressed;
+  
+    // Reverse dictionar lookup
+    const dict = {
+      "\x02": '{"',
+      "\x03": '"}',
+      "\x04": '":',
+      "\x05": ',"',
+      "\x06": ',"_',
+      "\x07": "true",
+      "\x08": "false",
+      "\x09": "null",
+      "\x0A": "[]",
+      "\x0B": "{}"
+    };
+  
+    Object.entries(dict).forEach(([key, value]) => {
+      decompressed = decompressed.split(key).join(value);
+    });
+  
+    // Handle run-length decoding
+    let result = "";
+    let i = 0;
+  
+    while (i < decompressed.length) {
+      if (decompressed[i] === "\x01" && i + 2 < decompressed.length) {
+        const count = decompressed.charCodeAt(i + 1);
+        const char = decompressed[i + 2];
+        result += char.repeat(count);
+        i += 3;
+      } else {
+        result += decompressed[i];
+        i++;
+      }
+    }
+  
+    return JSON.parse(result);
+  }
+
+  serializeSnapshot(snapshot) {
+    if (!snapshot) return null;
+
+    const serialized = {
+      frames: [],
+      currentFrame: snapshot.currentFrame,
+      currentLayer: snapshot.currentLayer
+    };
+
+    for (let f = 0; f < snapshot.frames.length; f++) {
+      const frame = snapshot.frames[f];
+      const serializedFrame = {
+        layers: []
+      };
+
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+
+        serializedFrame.layers.push({
+          name: layer.name,
+          visible: layer.visible,
+          imageData: layer.imageData ? Array.from(layer.imageData.data) : null
+        });
+      }
+
+      serialized.frames.push(serializedFrame);
+    }
+
+    return serialized;
+  }
+
+  deserializeSnapshot(serialized) {
+    if (!serialized) return null;
+
+    const snapshot = {
+      frames: [],
+      currentFrame: serialized.currentFrame,
+      currentLayer: serialized.currentLayer
+    };
+
+    for (let f = 0; f < serialized.frames.length; f++) {
+      const frameData = serialized.frames[f];
+      const frame = {
+        layers: []
+      };
+
+      for (let l = 0; l < frameData.layers.length; l++) {
+        const layerData = frameData.layers[l];
+
+        const imageData = layerData.imageData ? new ImageData(new Uint8ClampedArray(layerData.imageData), this.project.width, this.project.height) : null;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = this.project.width;
+        canvas.height = this.project.height;
+        this.drawImageToCanvas(canvas, imageData);
+
+        const layer = {
+          name: layerData.name,
+          visible: layerData.visible,
+          imageData: imageData,
+          canvas: canvas,
+          ctx: this.getCanvasContext(canvas)
+        };
+
+        frame.layers.push(layer);
+      }
+
+      snapshot.frames.push(frame);
+    }
+
+    return snapshot;
+  }
+
+  renderFrameToCanvas(frame) {
+    const canvas = document.createElement("canvas");
+    canvas.width = this.project.width;
+    canvas.height = this.project.height;
+    const ctx = this.getCanvasContext(canvas);
+    
+    // Draw all visible layers
+    for (let l = 0; l < frame.layers.length; l++) {
+      const layer = frame.layers[l];
+      if (layer.visible) {
+        ctx.drawImage(layer.canvas, 0, 0);
+      }
+    }
+
+    return canvas;
+  }
+
+  createSpriteSheet() {
+    const frameCount = this.project.frames.length;
+    const cols = Math.ceil(Math.sqrt(frameCount));
+    const rows = Math.ceil(frameCount / cols);
+
+    const spriteCanvas = document.createElement("canvas");
+    spriteCanvas.width = cols * this.project.width;
+    spriteCanvas.height = rows * this.project.height;
+    const spriteCtx = this.getCanvasContext(spriteCanvas);
+
+    // Draw all frames
+    for (let f = 0; f < frameCount; f++) {
+      const col = f % cols;
+      const row = Math.floor(f / cols);
+      const frame = this.project.frames[f];
+
+      // Draw all visible layers
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        if (layer.visible) {
+          spriteCtx.drawImage(layer.canvas, col * this.project.width, row * this.project.height);
+        }
+      }
+    }
+
+    return spriteCanvas;
+  }
+
+  // Utilities
+  dataURLtoBlob(dataURL) {
+    try {
+      // Handle both regular data URLs and blob data URLs
+      if (dataURL instanceof Blob) {
+        return dataURL;
+      }
+
+      const parts = dataURL.split(",");
+      const mime = parts[0].match(/:(.*?);/)[1];
+      const byteString = atob(parts[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+
+      return new Blob([ab], { type: mime });
+    } catch (error) {
+      console.error("Error converting data URL to blob:", error);
+      throw new Error("Invalid data URL format");
+    }
+  }
+
+  distance(x1, y1, x2, y2) {
+    var dx = x1 - x2;
+    var dy = y1 - y2;
+
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  getCurrentLayerContext() {
+    if (!this.project) return null;
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    return layer.ctx;
+  }
+
+  getPixelColor(x, y) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) {
+      return null;
+    }
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    return this.getPixelColorFromCtx(ctx, x, y);
+  }
+  
+  getPixelColorFromCtx(ctx, x, y) {
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    return imageData.data[3] === 0 ? 'transparent' : `#${this.componentToHex(imageData.data[0])}${this.componentToHex(imageData.data[1])}${this.componentToHex(imageData.data[2])}`;
+  }
+
+  componentToHex(c) {
+    const hex = c.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }
+
+  setColor(color) {
+    if (this.selectedColor === "primary") {
+      this.primaryColor = color;
+    } else {
+      this.secondaryColor = color;
+    }
+    this.updateColorIndicator();
+  }
+
+  formatDate(date) {
+    const pad = n => n.toString().padStart(2, "0");
+    return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  }
+  
+  getColor() {
+    return this.selectedColor == 'primary' ? this.primaryColor : this.secondaryColor;
+  }
+
+  exitApp() {
+    this.showPopup(__("Cerrar App||Exit App"), __("¿Estás seguro de que quieres irte ahora? Cualquier cambio no guardado se perderá para siempre.||Are you sure you want to leave now? Any unsaved changes will be lost forever."), [
+      { text: "No", class: "cancel", action: () => this.hidePopup() },
+      { text: __("Sí||Yes"), action: () => navigator.app.exitApp() }
+    ]);
+  }
+}
+

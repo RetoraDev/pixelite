@@ -144,7 +144,11 @@
 .palette-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
+  overflow-y: auto;
+  max-height: 250px;
   gap: 5px;
+  min-height: 0;
+  flex: 1;
 }
 
 .palette-color {
@@ -304,6 +308,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 400px;
+  padding-right: 4px;
+  overflow-y: auto;
 }
 
 .palette-manager-item {
@@ -323,7 +330,7 @@
 
 .palette-manager-preview {
   display: flex;
-  gap: 2px;
+  gap: 0;
   width: 60px;
   height: 30px;
   overflow: hidden;

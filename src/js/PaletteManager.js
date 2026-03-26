@@ -13,28 +13,193 @@ class PaletteManager {
     this.loadPalettes();
   }
 
-  getDefaultPalette() {
-    return {
-      id: 'default_' + Date.now(),
-      name: __('Sistema||System'),
-      colors: [
-        "#000000", "#7c7c7c", "#bcbcbc", "#fcfcfc",
-        "#a80020", "#e40058", "#f85898", "#f8a4c0",
-        "#940084", "#d800cc", "#f878f8", "#f8b8f8",
-        "#4428bc", "#6844fc", "#9878f8", "#d8b8f8",
-        "#0000bc", "#0000fc", "#6888fc", "#b8b8f8",
-        "#0058f8", "#0078f8", "#3cbcfc", "#a4e4fc",
-        "#004058", "#008888", "#00e8d8", "#00fcfc",
-        "#007800", "#00a800", "#00b800", "#b8f8d8",
-        "#006800", "#00a844", "#58f898", "#b8f8b8",
-        "#005800", "#58d854", "#b8f818", "#d8f878",
-        "#503000", "#ac7c00", "#f8b800", "#fce0a8",
-        "#a81000", "#fca044", "#f8d878", "#f0d0b0",
-        "#881400", "#f83800", "#e45c10", "#f87858"
-      ]
-    };
+  getDefaultPalettes() {
+    return [
+      {
+        id: "nes",
+        name: "NES",
+        colors: [
+          "#7c7c7c", "#bcbcbc", "#fcfcfc", "#a80020",
+          "#e40058", "#f85898", "#f8a4c0", "#940084",
+          "#d800cc", "#f878f8", "#f8b8f8", "#4428bc",
+          "#6844fc", "#9878f8", "#d8b8f8", "#0000bc", 
+          "#0000fc", "#6888fc", "#b8b8f8", "#0058f8",
+          "#0078f8", "#3cbcfc", "#a4e4fc", "#004058", 
+          "#008888", "#00e8d8", "#00fcfc", "#007800", 
+          "#00a800", "#00b800", "#b8f8d8", "#006800", 
+          "#00a844", "#58f898", "#b8f8b8", "#005800", 
+          "#58d854", "#b8f818", "#d8f878", "#503000", 
+          "#ac7c00", "#f8b800", "#fce0a8", "#a81000", 
+          "#fca044", "#f8d878", "#f0d0b0", "#881400", 
+          "#f83800", "#e45c10", "#f87858", "#080808", 
+          "#787878", "#000000"
+        ]
+      },
+      {
+        id: "gb-original",
+        name: "Game Boy",
+        colors: ["#071821", "#306850", "#86c06c", "#e0f8cf"]
+      },
+      {
+        id: "gb-pocket",
+        name: "Game Boy Pocket",
+        colors: ["#111111", "#555555", "#aaaaaa", "#eeeeee"]
+      },
+      {
+        id: "commodore-64",
+        name: "Commodore 64",
+        colors: [
+          "#000000", "#ffffff", "#68372b", "#70a4b2", 
+          "#6f3d86", "#588d43", "#352879", "#b8c76f",
+          "#6f4f25", "#433900", "#9a6759", "#444444", 
+          "#6c6c6c", "#9ad284", "#6c5eb5", "#959595"
+        ]
+      },
+      {
+        id: "tic-80",
+        name: "TIC-80 (SWEETIE-16)",
+        colors: [
+          "#1a1c2c", "#5d275d", "#b13e53", "#ef7d57", 
+          "#ffcd75", "#a7f070", "#38b764", "#257179",
+          "#29366f", "#3b5dc9", "#41a6f6", "#73eff7", 
+          "#f4f4f4", "#94b0c2", "#566c86", "#333c57"
+        ]
+      },
+      {
+        id: "pico-8",
+        name: "PICO-8",
+        colors: [
+          "#000000", "#1d2b53", "#7e2553", "#008751", 
+          "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8",
+          "#ff004d", "#ffa300", "#ffec27", "#00e436", 
+          "#29adff", "#83769c", "#ff77a8", "#ffccaa"
+        ]
+      },
+      {
+        id: "arne-16",
+        name: "Arne 16",
+        colors: [
+          "#000000", "#9d9d9d", "#ffffff", "#be2633", 
+          "#e06f8b", "#2c3e2b", "#7e8c6d", "#e0cdaa", 
+          "#2f2e2e", "#4c4c4c", "#d6a13b", "#f5f2b0", 
+          "#3b4e8f", "#617fce", "#8ba2d9", "#cacaca"
+        ]
+      },
+      {
+        id: "endesga-32",
+        name: "ENDESGA 32",
+        colors: [
+          "#222034", "#45283c", "#663931", "#8f563b", 
+          "#df7126", "#d9a066", "#eec39a", "#fbf236", 
+          "#99e550", "#6abe30", "#37946e", "#4b692f", 
+          "#524b24", "#323c39", "#3f3f74", "#306082", 
+          "#5b6ee1", "#639bff", "#5fcde4", "#cbd3b5", 
+          "#a7a36b", "#9b7031", "#6b4c2c", "#4a2824", 
+          "#412e28", "#372126", "#1b1d2b", "#1e1918", 
+          "#0c0f1a", "#05060f", "#b94629", "#ce6a39"
+        ]
+      },
+      {
+        id: "aap-64",
+        name: "AAP-64",
+        colors: [
+          "#000000", "#141414", "#282828", "#3c3c3c", 
+          "#505050", "#646464", "#787878", "#8c8c8c", 
+          "#a0a0a0", "#b4b4b4", "#c8c8c8", "#dcdcdc", 
+          "#f0f0f0", "#ffffff", "#1e2a3a", "#2c3e4e", 
+          "#3a5262", "#486676", "#567a8a", "#648e9e", 
+          "#72a2b2", "#80b6c6", "#8ecada", "#9cdede", 
+          "#aae2e2", "#b8e6e6", "#c6eaea", "#d4eeee", 
+          "#e2f2f2", "#f0f6f6"
+        ]
+      },
+      {
+        id: "cga",
+        name: "CGA",
+        colors: [
+          "#000000", "#00aa00", "#aa0000", "#aa5500",
+          "#ffffff"
+        ]
+      },
+      {
+        id: "ega",
+        name: "EGA",
+        colors: [
+          "#000000", "#0000aa", "#00aa00", "#00aaaa",
+          "#aa0000", "#aa00aa", "#aa5500", "#aaaaaa",
+          "#555555", "#5555ff", "#55ff55", "#55ffff", 
+          "#ff5555", "#ff55ff", "#ffff55", "#ffffff"
+        ]
+      },
+      {
+        // Based on GBA's 15-bit RGB: 5 bits per channel
+        id: "gba",
+        name: "GB 15-bit",
+        colors: [
+          "#000000", "#111111", "#222222", "#333333",
+          "#444444", "#555555", "#666666", "#777777",
+          "#888888", "#999999", "#aaaaaa", "#bbbbbb",
+          "#cccccc", "#dddddd", "#eeeeee", "#ffffff",
+          "#7a2b2b", "#9a3a3a", "#ba4a4a", "#da5a5a",
+          "#fa6a6a", "#2b5a2b", "#3a6a3a", "#4a7a4a",
+          "#5a8a5a", "#6a9a6a", "#2b2b7a", "#3a3a9a",
+          "#4a4aba", "#5a5ada", "#6a6afa", "#7a2b7a",
+          "#9a3a9a", "#ba4aba", "#da5ada", "#fa6afa",
+          "#2b7a7a", "#3a9a9a", "#4ababa", "#5adada",
+          "#6afafa"
+        ]
+      },
+      {
+        id: "futuristic-green",
+        name: "Futuristic Green",
+        colors: [
+          "#0a0f0a", "#0f1a0f", "#1a2a1a", "#2a3f2a",
+          "#3f553f", "#557055", "#709070", "#8fb58f",
+          "#b0d0b0", "#c8e6c8", "#e0f5e0", "#f0fff0",
+          "#00ff00", "#33ff33", "#66ff66", "#99ff99", 
+          "#ccffcc", "#ffff00", "#ccff33", "#99ff66", 
+          "#66ff99", "#33ffcc", "#00ffff"
+        ]
+      },
+      {
+        id: "futuristic-blue",
+        name: "Futuristic Blue",
+        colors: [
+          "#0a0a1a", "#0a0f2a", "#0f1a3f", "#1a2a55",
+          "#2a3f6a", "#3f5580", "#557095", "#7090aa", 
+          "#8fb5c0", "#b0d0d5", "#c8e6ea", "#e0f5f5", 
+          "#00aaff", "#33bbff", "#66ccff", "#99ddff", 
+          "#cceeff", "#ffffff", "#00ccff", "#33ddff", 
+          "#66eaff", "#99f2ff", "#ccf9ff"
+        ]
+      },
+      {
+        id: "sunset",
+        name: "Sunset",
+        colors: [
+          "#282b39", "#3a2e3f", "#633b4a", "#ab4f63", 
+          "#d6726c", "#f1a67a", "#fad68f", "#fcf1bc", 
+          "#b2e1e8", "#7fb3cd", "#5585b2", "#394779", 
+          "#1f2f46", "#121e2c", "#0d121f"
+        ]
+      },
+      {
+        id: "dreamcast",
+        name: "Dreamcast",
+        colors: [
+          "#000000", "#111111", "#222222", "#333333", 
+          "#444444", "#555555", "#666666", "#777777", 
+          "#888888", "#999999", "#aaaaaa", "#bbbbbb", 
+          "#cccccc", "#dddddd", "#eeeeee", "#ffffff", 
+          "#7a2b2b", "#9a3a3a", "#ba4a4a", "#da5a5a", 
+          "#fa6a6a", "#2b5a2b", "#3a6a3a", "#4a7a4a", 
+          "#5a8a5a", "#6a9a6a", "#2b2b7a", "#3a3a9a", 
+          "#4a4aba", "#5a5ada", "#6a6afa", "#7a2b7a"
+        ]
+      }
+    ];
   }
-
+  
   loadPalettes() {
     try {
       const saved = localStorage.getItem("palettes");
@@ -45,13 +210,13 @@ class PaletteManager {
           if (!p.id) p.id = 'palette_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         });
       } else {
-        this.palettes = [this.getDefaultPalette()];
+        this.palettes = this.getDefaultPalettes();
       }
       this.currentPaletteId = this.palettes[0]?.id || null;
       this.savePalettes();
     } catch (e) {
       console.warn("Failed to load palettes:", e);
-      this.palettes = [this.getDefaultPalette()];
+      this.palettes = this.getDefaultPalettes();
       this.currentPaletteId = this.palettes[0].id;
     }
   }
@@ -279,12 +444,18 @@ class PaletteManager {
       listContainer.innerHTML = "";
       
       this.palettes.forEach(palette => {
+        const isActice = palette.id === this.currentPaletteId;
+        
         const item = document.createElement("div");
-        item.className = `palette-manager-item ${palette.id === this.currentPaletteId ? 'active' : ''}`;
+        item.className = `palette-manager-item ${isActice ? 'active' : ''}`;
+        
+        if (isActice) {
+          activeItem = item;
+        }
         
         const preview = document.createElement("div");
         preview.className = "palette-manager-preview";
-        palette.colors.slice(0, 6).forEach(color => {
+        palette.colors.slice(0, 8).forEach(color => {
           const swatch = document.createElement("div");
           swatch.className = "palette-manager-swatch";
           swatch.style.backgroundColor = color;
@@ -341,7 +512,10 @@ class PaletteManager {
                 {
                   text: __("Cancelar||Cancel"),
                   class: "cancel",
-                  action: () => this.editor.hidePopup()
+                  action: () => {
+                    this.editor.hidePopup();
+                    this.showPaletteManagerDialog();
+                  }
                 },
                 {
                   text: __("Eliminar||Delete"),
@@ -350,6 +524,7 @@ class PaletteManager {
                     renderList();
                     this.editor.colorPicker?.updatePaletteGrid();
                     this.editor.hidePopup();
+                    this.showPaletteManagerDialog();
                   }
                 }
               ]
@@ -369,6 +544,7 @@ class PaletteManager {
         });
         
         listContainer.appendChild(item);
+        
       });
     };
     

@@ -37,7 +37,9 @@ class ColorPicker {
     this.createColorPicker();
     this.createFloatingColorsDeleteZone();
     this.initColorPickerDrag();
-    this.loadFloatingColors(JSON.parse(localStorage.getItem("floatingColors")) || []);
+    if (this.editor.autoLoadRecentFloatingColors) {
+      this.loadFloatingColors(JSON.parse(localStorage.getItem("floatingColors")) || []);
+    }
   }
 
   createColorPicker() {

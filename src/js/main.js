@@ -24,6 +24,9 @@ window.__ = function(text) {
     const parts = match.split('||');
     return parts[language] || parts[0];
   });
+  
+  // Fix some artifacts
+  text = text.replace('))', ')');
 
   return text;
 };

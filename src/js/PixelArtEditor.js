@@ -45,12 +45,16 @@ class PixelArtEditor {
     this.fileBrowser = null;
     this.defaultFileBrowserPathUrl = null;
     this.timelapseFPS = 30;
-    this.registerLayerVisibilityChanges = false;
     this.isCanvasResizing = false;
     this.canvasResizeState = {
       x: 0, y : 0,
       width: 0, height: 0
     };
+    
+    // Some settings
+    this.registerLayerVisibilityChanges = false;
+    this.autoLoadRecentFloatingColors = false;
+    this.usePerProjectFloatingColors = false;
     
     // Collab Session
     this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
@@ -203,6 +207,28 @@ class PixelArtEditor {
       },
       onUpdate: (value, oldScale, editor) => {
         editor.registerLayerVisibilityChanges = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'autoLoadRecentFloatingColors',
+      label: 'Cargar colores flotantes recientes||Load recent floating colors',
+      description: 'Cargar colores flotantes recientes automáticamente al iniciar la app||Auto-load recent floating colors on startup',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.autoLoadRecentFloatingColors = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'usePerProjectFloatingColors',
+      label: 'Usar colores flotantes por proyecto||Use per project floating colors',
+      description: 'Los colores flotantes se guardan de forma independiente para cada proyecto||Floating colors are saved independently for each project',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.usePerProjectFloatingColors = value;
       }
     });
     
@@ -2244,6 +2270,10 @@ class PixelArtEditor {
     this.saveLastProjectSize();
     
     this.historyManager.clear();
+    
+    if (this.usePerProjectFloatingColors) {
+      this.colorPicker.removeAllFloatingPaletteColors();
+    }
 
     this.animationPanel.classList.remove("visible");
     this.layersPanel.classList.remove("visible");
@@ -6225,8 +6255,9 @@ class PixelArtEditor {
     }
     
     // Load floating colors
-    if (projectData.floatingColors) {
-      this.loadFloatingColors(JSON.parse(projectData.floatingColors));
+    if (projectData.floatingColors && this.usePerProjectFloatingColors) {
+      this.removeAllFloatingPaletteColors();
+      this.colorPicker.loadFloatingColors(JSON.parse(projectData.floatingColors));
     }
 
     // Initialize project
