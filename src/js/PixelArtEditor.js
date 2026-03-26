@@ -37,17 +37,15 @@ class PixelArtEditor {
     this.toolDropdownOpen = false;
     this.toolSettingsOpen = false;
     this.recentColors = JSON.parse(localStorage.getItem("recentColors")) || [];
-    this.lastPalette = JSON.parse(localStorage.getItem("lastPalette")) || null;
+    this.lastPalette = JSON.parse(localStorage.getItem("lastPalette")) || this.getDefaultPalette();
     this.colorPickerPreviewColor = null;
     this.isColorPicking = false;
     this.colorPickStartX = 0;
     this.colorPickStartY = 0;
     this.colorPickLine = null;
-    this.animationFPS = 12;
     this.isPlaying = false;
     this.animationInterval = null;
-    this.frameTimes = []; // Array of frame durations in milliseconds
-    this.currentFrameTime = 1000 / this.animationFPS; // Default frame time
+    this.defaultFrameTime = 1000 / 12; // Default frame time
     this.showMiniView = false;
     this.useCordova = window.location.href.startsWith("file");
     this.deviceReady = false;
@@ -299,8 +297,7 @@ class PixelArtEditor {
       max: 60,
       step: 1,
       onInit: (value, editor) => {
-        editor.animationFPS = value;
-        editor.currentFrameTime = 1000 / value;
+        editor.defaultFrameTime = 1000 / value;
       }
     });
 
@@ -947,7 +944,7 @@ class PixelArtEditor {
     timelineHeader.appendChild(this.nextFrameButton);
 
     // Add Frame button
-    this.addFrameButton = this.createButton("add-frame", "icon-add", () => this.addFrame());
+    this.addFrameButton = this.createButton("add-frame", "icon-add", () => this.addFrame(this.project.currentFrame));
     timelineHeader.appendChild(this.addFrameButton);
   
     // Duplicate Frame button
@@ -967,8 +964,24 @@ class PixelArtEditor {
     this.fpsInput.type = "number";
     this.fpsInput.min = "1";
     this.fpsInput.max = "60";
-    this.fpsInput.value = this.animationFPS;
-    this.fpsInput.addEventListener("change", () => this.updateFPS());
+    this.fpsInput.value = parseInt(1000 / this.defaultFrameTime);
+    this.fpsInput.addEventListener("keyup", () => {
+      const value = this.fpsInput.value;
+      if (value && value <= 60) {
+        this.fpsInput.style.backgroundColor = "var(--bg-color)";
+      } else {
+        this.fpsInput.style.backgroundColor =  "#9f0000";
+      }
+    });
+    this.fpsInput.addEventListener("change", () => {
+      const value = this.fpsInput.value;
+      if (value && value <= 60) {
+        this.updateFPS(value);
+        this.fpsInput.style.backgroundColor = "var(--bg-color)";
+      } else {
+        this.fpsInput.style.backgroundColor =  "#9f0000";
+      }
+    });
     fpsControl.appendChild(this.fpsInput);
 
     // Close button
@@ -1906,6 +1919,70 @@ class PixelArtEditor {
       this.currentColorPreview.style.backgroundColor = hex;
     }
   }
+  
+  getDefaultPalette() {
+    return {
+      name: "System Palette",
+      colors: [
+        "#a80020",
+        "#e40058",
+        "#f85898",
+        "#f8a4c0",
+        "#940084",
+        "#d800cc",
+        "#f878f8",
+        "#f8b8f8",
+        "#4428bc",
+        "#6844fc",
+        "#9878f8",
+        "#d8b8f8",
+        "#0000bc",
+        "#0000fc",
+        "#6888fc",
+        "#b8b8f8",
+        "#0058f8",
+        "#0078f8",
+        "#3cbcfc",
+        "#a4e4fc",
+        "#004058",
+        "#008888",
+        "#00e8d8",
+        "#00fcfc",
+        "#007800",
+        "#00a800",
+        "#00b800",
+        "#b8f8d8",
+        "#006800",
+        "#00a844",
+        "#58f898",
+        "#b8f8b8",
+        "#005800",
+        "#58d854",
+        "#b8f818",
+        "#d8f878",
+        "#503000",
+        "#ac7c00",
+        "#f8b800",
+        "#fce0a8",
+        "#a81000",
+        "#fca044",
+        "#f8d878",
+        "#f0d0b0",
+        "#881400",
+        "#f83800",
+        "#e45c10",
+        "#f87858",
+        "#bcbcbc",
+        "#d8d8d8",
+        "#f8f8f8",
+        "#fcfcfc",
+        "#080808",
+        "#7c7c7c",
+        "#787878",
+        "#000000"
+      ]
+    };
+  }
 
   rgbToHex(r, g, b) {
     return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
@@ -2135,6 +2212,8 @@ class PixelArtEditor {
     this.lastPalette.colors.push(color);
     this.updatePaletteGrid();
     this.showToast(__("Color añadido a la paleta||Color added to palette"));
+    
+    localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
   }
 
   removeColorFromPalette(index) {
@@ -2142,6 +2221,7 @@ class PixelArtEditor {
       this.lastPalette.colors.splice(index, 1);
       this.updatePaletteGrid();
       this.showToast(__("Color quitado de la paleta||Color removed from palette"));
+      localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
     }
   }
 
@@ -2150,6 +2230,7 @@ class PixelArtEditor {
       const color = this.lastPalette.colors.splice(fromIndex, 1)[0];
       this.lastPalette.colors.splice(toIndex, 0, color);
       this.updatePaletteGrid();
+      localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
     }
   }
 
@@ -2384,7 +2465,7 @@ class PixelArtEditor {
       
       if (isOverDelete) {
         // Delete the color
-        this.removeFloatingPaletteColor(id);
+        this.removeFloatingPaletteColor(colorElement.dataset.id);
       } else {
         // Save new position
         this.saveFloatingColors();
@@ -2655,24 +2736,6 @@ class PixelArtEditor {
     frameTimeItem.textContent = __("Cambiar Tiempo del Frame...||Set Frame Time...");
     frameTimeItem.addEventListener("click", () => this.showCurrentFrameTimeDialog());
     animationSection.appendChild(frameTimeItem);
-    
-    // Reference grids section
-    const gridsSection = document.createElement("div");
-    gridsSection.className = "menu-section";
-    container.appendChild(gridsSection);
-    
-    const gridsH3 = document.createElement("h3");
-    gridsH3.textContent = __("Cuadrículas||Grids");
-    gridsSection.appendChild(gridsH3);
-    
-    const addGridItem = document.createElement("div");
-    addGridItem.className = "menu-item";
-    addGridItem.textContent = __("Configurar||Configure");
-    addGridItem.addEventListener("click", () => {
-      this.gridManager.toggle();
-      this.menuPanel.classList.remove("visible");
-    });
-    gridsSection.appendChild(addGridItem);
     
     // Settings section
     const settingsSection = document.createElement("div");
@@ -3379,8 +3442,6 @@ class PixelArtEditor {
     
     this.historyManager.clear();
 
-    this.frameTimes = [this.currentFrameTime];
-
     this.animationPanel.classList.remove("visible");
     this.layersPanel.classList.remove("visible");
 
@@ -3403,6 +3464,8 @@ class PixelArtEditor {
           layers: [this.createBlankLayer(width, height, __("Capa Base||Default Layer"))]
         }
       ],
+      currentFrameTime: 1000 / 12,
+      frameTimes: [1000 / 12],
       floatingColors: [],
       currentFrame: 0,
       currentLayer: 0
@@ -3890,6 +3953,8 @@ class PixelArtEditor {
     // Restore basic properties
     this.project.currentFrame = snapshot.currentFrame;
     this.project.currentLayer = snapshot.currentLayer;
+    this.project.currentFrameTime = snapshot.currentFrameTime;
+    this.project.frameTimes = snapshot.frameTimes;
     this.project.width = snapshot.width;
     this.project.height = snapshot.height;
 
@@ -5446,97 +5511,11 @@ class PixelArtEditor {
     );
   }
   
-  showManualDialog() {
-    const manualContent = document.createElement("div");
-    manualContent.style.maxHeight = "60vh";
-    manualContent.style.overflowY = "auto";
-    manualContent.style.padding = "10px";
-    
-    manualContent.innerHTML = `
-      <h3 style="margin-top: 0;">${__("Guía rápida||Quick Guide")}</h3>
-      
-      <h4>${__("Herramientas||Tools")}</h4>
-      <ul style="padding-left: 20px;">
-        <li><strong>${__("Lápiz||Pencil")} (D):</strong> ${__("Dibuja píxel a píxel||Draw pixel by pixel")}</li>
-        <li><strong>${__("Borrador||Eraser")} (S):</strong> ${__("Elimina píxeles||Erase pixels")}</li>
-        <li><strong>${__("Línea||Line")} (L):</strong> ${__("Dibuja líneas rectas||Draw straight lines")}</li>
-        <li><strong>${__("Rectángulo||Rectangle")} (R):</strong> ${__("Dibuja rectángulos||Draw rectangles")}</li>
-        <li><strong>${__("Elipse||Ellipse")} (E):</strong> ${__("Dibuja elipses||Draw ellipses")}</li>
-        <li><strong>${__("Cubeta||Bucket")} (B):</strong> ${__("Rellena áreas del mismo color||Fill areas of same color")}</li>
-        <li><strong>${__("Pipeta||Pipette")} (A):</strong> ${__("Selecciona color del lienzo||Pick color from canvas")}</li>
-      </ul>
-      
-      <h4>${__("Atajos de teclado||Keyboard Shortcuts")}</h4>
-      <ul style="padding-left: 20px;">
-        <li><strong>Ctrl+Z:</strong> ${__("Deshacer||Undo")}</li>
-        <li><strong>Ctrl+Y:</strong> ${__("Rehacer||Redo")}</li>
-        <li><strong>Ctrl+A:</strong> ${__("Mostrar/ocultar animación||Toggle animation panel")}</li>
-        <li><strong>Ctrl+L:</strong> ${__("Mostrar/ocultar capas||Toggle layers panel")}</li>
-        <li><strong>${__("Espacio||Space")}:</strong> ${__("Alternar entre últimas dos herramientas||Switch between last two tools")}</li>
-        <li><strong>Esc:</strong> ${__("Cerrar menús||Close menus")}</li>
-      </ul>
-      
-      <h4>${__("Gestos táctiles||Touch Gestures")}</h4>
-      <ul style="padding-left: 20px;">
-        <li><strong>${__("1 dedo||1 finger")}:</strong> ${__("Dibujar||Draw")}</li>
-        <li><strong>${__("2 dedos||1 fingers")}:</strong> ${__("Mover y hacer zoom||Pan and zoom")}</li>
-        <li><strong>${__("3 dedos||1 fingers")}:</strong> ${__("Ajustar tamaño del pincel||Adjust brush size")}</li>
-      </ul>
-      
-      <h4>${__("Capas||Layers")}</h4>
-      <ul style="padding-left: 20px;">
-        <li>${__("Arrastra para reordenar||Drag to reorder")}</li>
-        <li>${__("Botones de ojo para visibilidad||Eye buttons to toggle visibility")}</li>
-        <li>${__("Flechas para mover arriba/abajo||Arrows to move up/down")}</li>
-        <li>${__("Iconos de combinar para fusionar capas||Merge icons to combine layers")}</li>
-      </ul>
-      
-      <h4>${__("Animación||Animation")}</h4>
-      <ul style="padding-left: 20px;">
-        <li>${__("Haz clic en un frame para seleccionarlo||Click a frame to select it")}</li>
-        <li>${__("Arrastra frames para reordenar||Drag frames to reorder")}</li>
-        <li>${__("Doble clic en tiempo del frame para ajustar||Double-click frame time to adjust")}</li>
-        <li>${__("Botón + para nuevo frame||+ button for new frame")}</li>
-        <li>${__("Botón copiar para duplicar frame||Copy button to duplicate frame")}</li>
-      </ul>
-      
-      <h4>${__("Referencias||References")}</h4>
-      <ul style="padding-left: 20px;">
-        <li><strong>${__("Traza||Trace")}:</strong> ${__("Una imagen fija con opacidad ajustable||Single static image with adjustable opacity")}</li>
-        <li><strong>${__("Flotante||Floating")}:</strong> ${__("Múltiples imágenes arrastrables con pinza para redimensionar||Multiple draggable images with pinch to resize")}</li>
-        <li>${__("Arrastra a la zona de eliminar para quitar||Drag to delete zone to remove")}</li>
-      </ul>
-      
-      <h4>${__("Colaboración||Collaboration")}</h4>
-      <ul style="padding-left: 20px;">
-        <li>${__("Crea una sala y comparte el ID||Create a room and share the ID")}</li>
-        <li>${__("Los cursores muestran dónde dibujan otros||Cursors show where others are drawing")}</li>
-        <li>${__("Chat integrado para comunicarse||Built-in chat to communicate")}</li>
-        <li>${__("El anfitrión puede expulsar miembros||Host can kick members")}</li>
-      </ul>
-      
-      <h4>${__("Formatos soportados||Supported Formats")}</h4>
-      <ul style="padding-left: 20px;">
-        <li><strong>${__("Abrir||Open")}:</strong> PXL, PSD, PNG, JPG, GIF, PAL</li>
-        <li><strong>${__("Guardar||Save")}:</strong> PXL, PSD, PNG</li>
-        <li><strong>${__("Paletas||Palettes")}:</strong> PAL (JASC)</li>
-      </ul>
-      
-      <p style="text-align: center; margin-top: 20px; color: var(--text-dim);">
-        ${__("Más información en||More info at")} <a href="https://github.com/RetoraDev/pixelite" target="_blank" onclick="openExternalUrl('https://github.com/RetoraDev/pixelite')">GitHub</a>
-      </p>
-    `;
-    
-    this.showPopup(
-      __("Manual"),
-      manualContent,
-      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
-    );
-  }
-
   // Animation Frame Management
-  addFrame(frameIndex = this.project.frames.length) {
+  addFrame(frameIndex = this.project.currentFrame, time) {
     if (!this.project) return;
+  
+    const newIndex = frameIndex + 1;
   
     this.historyManager.startBatch("add_layer", __("(Añadir|Add) Frame"));
   
@@ -5545,7 +5524,7 @@ class PixelArtEditor {
     };
   
     // Copy layers from current frame
-    const currentFrame = this.project.frames[this.project.currentFrame];
+    const currentFrame = this.project.frames[frameIndex];
     for (let i = 0; i < currentFrame.layers.length; i++) {
       const layer = currentFrame.layers[i];
       const newLayer = this.createBlankLayer(this.project.width, this.project.height, layer.name);
@@ -5553,18 +5532,19 @@ class PixelArtEditor {
       newFrame.layers.push(newLayer);
     }
   
-    // TODO: Add frame at specific frame index
-  
-    this.project.frames.push(newFrame);
-    this.frameTimes.push(this.currentFrameTime);
-    this.project.currentFrame = frameIndex;
+    // Insert after current frame
+    this.project.frames.splice(newIndex, 0, newFrame);
+    this.project.frameTimes.splice(newIndex, 0, time || this.project.currentFrameTime);
+    
+    // Switch to the new frame
+    this.project.currentFrame = newIndex;
   
     // Record operation
     const operation = {
       type: 'add_frame',
       description: __('(Añadir|Add) Frame'),
       index: frameIndex,
-      frameTime: this.currentFrameTime,
+      frameTime: this.project.currentFrameTime,
       layers: currentFrame.layers.map(layer => ({
         name: layer.name,
         visible: layer.visible,
@@ -5586,10 +5566,10 @@ class PixelArtEditor {
     this.historyManager.startBatch("remove_layer", __("(Quitar|Add) Frame"));
   
     const removedFrame = this.project.frames[index];
-    const removedFrameTime = this.frameTimes[index];
+    const removedFrameTime = this.project.frameTimes[index];
   
     this.project.frames.splice(index, 1);
-    this.frameTimes.splice(index, 1);
+    this.project.frameTimes.splice(index, 1);
     this.project.currentFrame = Math.min(index, this.project.frames.length - 1);
   
     // Record operation
@@ -5613,10 +5593,9 @@ class PixelArtEditor {
     this.render();
   }
   
-  duplicateFrame() {
+  duplicateFrame(currentIndex = this.project.currentFrame) {
     if (!this.project) return;
   
-    const currentIndex = this.project.currentFrame;
     const currentFrame = this.project.frames[currentIndex];
     const newIndex = currentIndex + 1;
   
@@ -5649,7 +5628,7 @@ class PixelArtEditor {
     this.project.frames.splice(newIndex, 0, newFrame);
     
     // Copy frame time
-    this.frameTimes.splice(newIndex, 0, this.frameTimes[currentIndex]);
+    this.project.frameTimes.splice(newIndex, 0, this.project.frameTimes[currentIndex]);
     
     // Set current frame to the new one
     this.project.currentFrame = newIndex;
@@ -5659,7 +5638,7 @@ class PixelArtEditor {
       type: 'duplicate_frame',
       description: __('Duplicar Frame||Duplicate Frame'),
       index: newIndex,
-      frameTime: this.frameTimes[newIndex],
+      frameTime: this.project.frameTimes[newIndex],
       layers: newFrame.layers.map(layer => ({
         name: layer.name,
         visible: layer.visible,
@@ -5683,9 +5662,9 @@ class PixelArtEditor {
     this.historyManager.startBatch("move_frame", __("(Move|Mover) Frame"));
   
     const frame = this.project.frames.splice(fromIndex, 1)[0];
-    const frameTime = this.frameTimes.splice(fromIndex, 1)[0];
+    const frameTime = this.project.frameTimes.splice(fromIndex, 1)[0];
     this.project.frames.splice(toIndex, 0, frame);
-    this.frameTimes.splice(toIndex, 0, frameTime);
+    this.project.frameTimes.splice(toIndex, 0, frameTime);
     this.project.currentFrame = toIndex;
   
     // Record operation
@@ -5705,10 +5684,10 @@ class PixelArtEditor {
   }
   
   setFrameTime(frameIndex, time) {
-    if (!this.project || frameIndex < 0 || frameIndex >= this.frameTimes.length) return;
+    if (!this.project || frameIndex < 0 || frameIndex >= this.project.frameTimes.length) return;
   
-    const oldTime = this.frameTimes[frameIndex];
-    this.frameTimes[frameIndex] = time;
+    const oldTime = this.project.frameTimes[frameIndex];
+    this.project.frameTimes[frameIndex] = time;
   
     // Record operation
     const operation = {
@@ -5729,8 +5708,8 @@ class PixelArtEditor {
     const frameCount = this.project.frames.length;
     
     // Initialize frame times if needed
-    if (this.frameTimes.length !== frameCount) {
-      this.frameTimes = new Array(frameCount).fill(this.currentFrameTime);
+    if (this.project.frameTimes.length !== frameCount) {
+      this.project.frameTimes = new Array(frameCount).fill(this.project.currentFrameTime);
     }
   
     // Get all current children
@@ -5788,7 +5767,17 @@ class PixelArtEditor {
         thumbCanvas.height = this.project.height;
         thumbCanvas.style.width = "auto";
         thumbCanvas.style.height = "60px";
+        thumbCanvas.style.backgroundColor = "#fff";
+        thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+        thumbCanvas.style.backgroundSize = "16px 16px";
+
         const thumbCtx = this.getCanvasContext(thumbCanvas);
+  
+        // Draw background
+        if (!this.transparentBackground) {
+          thumbCtx.fillStyle = this.secondaryColor;
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
   
         // Draw all visible layers
         for (let l = 0; l < frame.layers.length; l++) {
@@ -5803,7 +5792,7 @@ class PixelArtEditor {
       // Update time display
       const timeDisplay = frameElement.querySelector(".frame-time");
       if (timeDisplay) {
-        timeDisplay.textContent = `${this.frameTimes[i].toFixed(2)}ms`;
+        timeDisplay.textContent = `${this.project.frameTimes[i].toFixed(2)}ms`;
       }
       
       // Update frame number
@@ -5826,13 +5815,23 @@ class PixelArtEditor {
         const thumbContainer = document.createElement("div");
         thumbContainer.className = "frame-thumb";
         frameElement.appendChild(thumbContainer);
-  
+        
         const thumbCanvas = document.createElement("canvas");
         thumbCanvas.width = this.project.width;
         thumbCanvas.height = this.project.height;
         thumbCanvas.style.width = "auto";
         thumbCanvas.style.height = "60px";
+        thumbCanvas.style.backgroundColor = "#fff";
+        thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+        thumbCanvas.style.backgroundSize = "16px 16px";
+        
         const thumbCtx = this.getCanvasContext(thumbCanvas);
+  
+        // Draw background
+        if (!this.transparentBackground) {
+          thumbCtx.fillStyle = this.secondaryColor;
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
   
         // Draw all visible layers
         for (let l = 0; l < frame.layers.length; l++) {
@@ -5846,7 +5845,7 @@ class PixelArtEditor {
         // Frame time display
         const timeDisplay = document.createElement("div");
         timeDisplay.className = "frame-time";
-        timeDisplay.textContent = `${this.frameTimes[i].toFixed(2)}ms`;
+        timeDisplay.textContent = `${this.project.frameTimes[i].toFixed(2)}ms`;
         frameElement.appendChild(timeDisplay);
   
         // Frame number
@@ -6096,6 +6095,39 @@ class PixelArtEditor {
     this.updateLayersUI();
     this.render();
   }
+
+  renameLayer(name, index) {
+    if (!this.project) return;
+    
+    this.historyManager.startBatch("rename_layer", __("Renombrar capa||Rename Layer"));
+    
+    const layerIndex = typeof index != "undefined" ? index : this.currentLayer;
+    let previousName;
+    let newName = name;
+    
+    // Rename the layer in all frames
+    this.project.frames.forEach(frame => {
+      const layer = frame.layers[layerIndex];
+      
+      if (!previousName) previousName = layer.name;
+      
+      layer.name = newName || layer.name;
+    });
+    
+    // Record operation
+    const operation = {
+      type: 'rename_layer',
+      description: __('Renombrar capa||Rename Layer'),
+      layerIndex,
+      previousName,
+      newName
+    };
+
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.showOperationMessage(__("Nombre editado||Name edited"));
+  }
   
   mergeLayerUp(layerIndex = this.project.currentLayer) {
     if (!this.project) return;
@@ -6287,52 +6319,39 @@ class PixelArtEditor {
       layerElement.setAttribute("data-index", i);
       layerElement.draggable = true;
   
-      // Thumbnail container - 44x44
+      // Thumbnail container
       const thumbContainer = document.createElement("div");
       thumbContainer.className = "layer-thumb";
       layerElement.appendChild(thumbContainer);
   
       const thumbCanvas = document.createElement("canvas");
-      thumbCanvas.width = 44;
-      thumbCanvas.height = 44;
+      thumbCanvas.width = this.project.width;
+      thumbCanvas.height = this.project.height;
+      thumbCanvas.style.width = "auto";
+      thumbCanvas.style.height = "44px";
+      thumbCanvas.style.backgroundColor = "#fff";
+      thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+      thumbCanvas.style.backgroundSize = "16px 16px";
+      
       const thumbCtx = this.getCanvasContext(thumbCanvas);
-      thumbCtx.imageSmoothingEnabled = false;
       
-      // Calculate scaling to fit 44x44
-      const scale = Math.min(44 / this.project.width, 44 / this.project.height);
-      const scaledWidth = Math.floor(this.project.width * scale);
-      const scaledHeight = Math.floor(this.project.height * scale);
-      const offsetX = Math.floor((44 - scaledWidth) / 2);
-      const offsetY = Math.floor((44 - scaledHeight) / 2);
-      
-      // Draw checkerboard background
-      thumbCtx.fillStyle = "#fff";
-      thumbCtx.fillRect(0, 0, 44, 44);
-      
-      thumbCtx.fillStyle = "#ccc";
-      for (let y = 0; y < 44; y += 8) {
-        for (let x = 0; x < 44; x += 8) {
-          if ((Math.floor(x / 8) + Math.floor(y / 8)) % 2 === 0) {
-            thumbCtx.fillRect(x, y, 8, 8);
-          }
-        }
+      // Draw background
+      if (!this.transparentBackground) {
+        thumbCtx.fillStyle = this.secondaryColor;
+        thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
       }
       
       // Draw layer content
       if (layer.canvas) {
-        thumbCtx.drawImage(
-          layer.canvas, 
-          0, 0, this.project.width, this.project.height,
-          offsetX, offsetY, scaledWidth, scaledHeight
-        );
+        thumbCtx.drawImage(layer.canvas, 0, 0);
       }
       
       thumbContainer.appendChild(thumbCanvas);
   
       // Layer name
-      const layerName = document.createElement("div");
+      const layerName = document.createElement("input");
       layerName.className = "layer-name";
-      layerName.textContent = layer.name;
+      layerName.value = layer.name;
       layerElement.appendChild(layerName);
   
       // Layer actions
@@ -6458,8 +6477,15 @@ class PixelArtEditor {
       });
   
       layerElement.addEventListener("click", () => {
-        this.project.currentLayer = i;
-        this.updateLayersUI();
+        if (this.project.currentLayer != i) {
+          this.project.currentLayer = i;
+          this.updateLayersUI();
+        }
+      });
+      
+      layerName.addEventListener("change", () => {
+        this.renameLayer(layerName.value, i);
+        layerName.blur();
       });
   
       this.layersContainer.appendChild(layerElement);
@@ -6536,7 +6562,7 @@ class PixelArtEditor {
     content.innerHTML = `
     <div style="margin-bottom: 15px;">
       <label style="display: block; margin-bottom: 5px;">${__("Tiempo del Frame||Frame Time")} (ms):</label>
-      <input type="number" id="frame-time-value" value="${this.frameTimes[frameIndex]}" min="1" max="5000" style="width: 100%; padding: 5px;">
+      <input type="number" id="frame-time-value" value="${this.project.frameTimes[frameIndex]}" min="1" max="5000" style="width: 100%; padding: 5px;">
     </div>
   `;
 
@@ -6560,24 +6586,24 @@ class PixelArtEditor {
     ]);
   }
 
-  updateFPS() {
-    const fps = parseInt(this.fpsInput.value);
+  updateFPS(input) {
+    let fps = parseInt(input || this.fpsInput.value);
     if (fps >= 1 && fps <= 60) {
-      const oldFPS = this.animationFPS;
-      this.animationFPS = fps;
-      this.currentFrameTime = 1000 / fps;
+      const oldFPS = 1000 / this.project.currentFrameTime;
+      const oldFrameTimes = this.project.frameTimes;
+      this.project.currentFrameTime = 1000 / fps;
   
-      // Update all frame times if they're using the default
-      if (this.frameTimes.every(time => time === 1000 / oldFPS)) {
-        this.frameTimes = this.frameTimes.map(() => this.currentFrameTime);
-      }
+      // Update all frame times
+      this.project.frameTimes = this.project.frameTimes.map(() => this.project.currentFrameTime);
   
       // Record operation
       const operation = {
         type: 'change_animation_fps',
         description: __('Cambiar FPS||Change FPS'),
         oldFPS: oldFPS,
-        newFPS: fps
+        newFPS: fps,
+        oldFrameTimes: oldFrameTimes,
+        newFrameTimes: this.project.frameTimes
       };
   
       this.historyManager.addChange(operation);
@@ -6591,7 +6617,7 @@ class PixelArtEditor {
       }
     }
   }
-
+  
   togglePlayback() {
     if (this.isPlaying) {
       this.stopAnimation();
@@ -6619,8 +6645,8 @@ class PixelArtEditor {
       let timeSum = 0;
       let nextFrame = currentFrame;
 
-      for (let i = 0; i < this.frameTimes.length; i++) {
-        timeSum += this.frameTimes[i];
+      for (let i = 0; i < this.project.frameTimes.length; i++) {
+        timeSum += this.project.frameTimes[i];
         if (accumulatedTime < timeSum) {
           nextFrame = i;
           break;
@@ -6636,9 +6662,12 @@ class PixelArtEditor {
 
       if (nextFrame !== currentFrame) {
         currentFrame = nextFrame;
-        this.project.currentFrame = currentFrame;
-        this.renderQuick();
-        
+        if (!this.showMiniView) {
+          this.project.currentFrame = currentFrame;
+          this.renderQuick();
+        } else if (!this.isDrawing) {
+          this.updateAnimationPreview(currentFrame);
+        }        
       }
     }, 16); // ~60fps update rate
   }
@@ -6669,10 +6698,10 @@ class PixelArtEditor {
     this.render();
   }
 
-  updateAnimationPreview() {
+  updateAnimationPreview(currentFrame = this.project.currentFrame) {
     if (!this.project || !this.animationPreview) return;
 
-    const frame = this.project.frames[this.project.currentFrame];
+    const frame = this.project.frames[currentFrame];
     this.animationPreview.width = this.project.width;
     this.animationPreview.height = this.project.height;
 
@@ -6709,7 +6738,7 @@ class PixelArtEditor {
     content.innerHTML = `
     <div style="margin-bottom: 15px;">
       <label style="display: block; margin-bottom: 5px;">${__("Frames Por Segundo||Frames Per Second")}:</label>
-      <input type="number" id="fps-value" value="${this.animationFPS}" min="1" max="60" style="width: 100%; padding: 5px;">
+      <input type="number" id="fps-value" value="${parseInt(1000 / this.project.currentFrameTime)}" min="1" max="60" style="width: 100%; padding: 5px;">
     </div>
   `;
 
@@ -6724,10 +6753,8 @@ class PixelArtEditor {
         action: () => {
           const fps = parseInt(document.getElementById("fps-value").value);
           if (fps >= 1 && fps <= 60) {
-            this.animationFPS = fps;
             this.fpsInput.value = fps;
-            this.currentFrameTime = 1000 / fps;
-            this.updateFPS();
+            this.updateFPS(fps);
             this.hidePopup();
           }
         }
@@ -7145,6 +7172,7 @@ class PixelArtEditor {
             this.saveTimelapseWithBrowser(videoBlob);
           } catch (error) {
             this.showToast(__(`(Error generando proceso|Error generating timelapse): ${error.message}`), 5000);
+            throw error;
           }
         }
       }
@@ -7205,27 +7233,6 @@ class PixelArtEditor {
     return this.fileBrowser;
   }
 
-  requestStorageQuota() {
-    return new Promise((resolve, reject) => {
-      if (window.webkitStorageInfo) {
-        window.webkitStorageInfo.requestQuota(
-          window.PERSISTENT,
-          5 * 1024 * 1024,
-          () => resolve(),
-          error => reject(new Error(`Quota request failed: ${error.code}`))
-        );
-      } else if (navigator.webkitPersistentStorage) {
-        navigator.webkitPersistentStorage.requestQuota(
-          5 * 1024 * 1024,
-          () => resolve(),
-          error => reject(new Error(`Quota request failed: ${error.code}`))
-        );
-      } else {
-        resolve(); // No quota API available, proceed anyway
-      }
-    });
-  }
-
   // Project methods
   loadProject(projectData) {
     // Handle both string and object input
@@ -7254,10 +7261,9 @@ class PixelArtEditor {
     };
 
     // Load frame times or set defaults
-    this.frameTimes = projectData.frameTimes || new Array(projectData.frames.length).fill(1000 / (projectData.fps || 12));
+    this.project.frameTimes = projectData.frameTimes || new Array(projectData.frames.length).fill(1000 / (projectData.fps || 12));
 
-    this.animationFPS = projectData.fps || 12;
-    this.currentFrameTime = 1000 / this.animationFPS;
+    this.project.currentFrameTime = projectData.animation ? projectData.currentFrameTime : 1000 / 12;
 
     // Load background settings
     if (projectData.backgroundColor) {
@@ -7547,8 +7553,8 @@ class PixelArtEditor {
       height: this.project.height,
       frames: [],
       floatingColors: this.getFloatingColorsData(),
-      frameTimes: this.frameTimes,
-      fps: this.animationFPS,
+      currentFrameTime: this.project.currentFrameTime,
+      frameTimes: this.project.frameTimes,
       backgroundColor: this.transparentBackground ? "transparent" : this.secondaryColor,
       createdAt: new Date().toISOString(),
       history: this.historyManager.serialize(),

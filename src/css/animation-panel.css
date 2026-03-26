@@ -9,6 +9,7 @@
   height: 180px;
   transform: translateY(100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   background-color: var(--ui-color);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -66,8 +67,11 @@
   background-color: var(--bg-color);
   border-radius: 6px;
   cursor: pointer;
-  min-width: 70px;
+  min-width: 80px;
+  overflow: hidden;
   position: relative;
+  transition: opacity 0.3s, transform 0.3s;
+  will-change: transform, opacity;
 }
 
 .timeline-frame.active {
@@ -80,12 +84,23 @@
 }
 
 .frame-thumb {
+  width: auto;
+  max-width: 72px;
+  height: 60px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+  align-content: center;
+  text-align: center;
+  align-items: center;
   margin-bottom: 5px;
 }
 
 .frame-thumb canvas {
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
+  width: 60px;
+  height: 60px;
+  display: block;
 }
 
 .frame-time {
@@ -117,6 +132,8 @@
   border: 2px solid var(--border-color);
   background-color: #fff;
   background-image: var(--transparent-bg);
+  background-size: 16px 16px;
+  background-position: 0 0;
   display: none;
 }
 

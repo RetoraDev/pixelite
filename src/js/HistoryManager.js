@@ -87,58 +87,63 @@ class HistoryManager {
   }
 
   // Apply a history entry (undo or redo)
-  applyHistoryEntry(entry, isUndo) {
+  applyHistoryEntry(entry, isUndo, project) {
     const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
+    
+    if (!project) project = this.editor.project;
     
     operations.forEach(operation => {
       switch (operation.type) {
         case 'draw':
-          this.applyDrawOperation(operation, isUndo);
+          this.applyDrawOperation(project, operation, isUndo);
           break;
         case 'add_frame':
-          this.applyAddFrameOperation(operation, isUndo);
+          this.applyAddFrameOperation(project, operation, isUndo);
           break;
         case 'remove_frame':
-          this.applyRemoveFrameOperation(operation, isUndo);
+          this.applyRemoveFrameOperation(project, operation, isUndo);
           break;
         case 'duplicate_frame':
-          this.applyDuplicateFrameOperation(operation, isUndo);
+          this.applyDuplicateFrameOperation(project, operation, isUndo);
           break;
         case 'edit_frame':
-          this.applyEditFrameOperation(operation, isUndo);
+          this.applyEditFrameOperation(project, operation, isUndo);
           break;
         case 'move_frame':
-          this.applyMoveFrameOperation(operation, isUndo);
+          this.applyMoveFrameOperation(project, operation, isUndo);
           break;
         case 'change_animation_fps':
-          this.applyChangeFPSOperation(operation, isUndo);
+          this.applyChangeFPSOperation(project, operation, isUndo);
           break;
         case 'add_layer':
-          this.applyAddLayerOperation(operation, isUndo);
+          this.applyAddLayerOperation(project, operation, isUndo);
           break;
         case 'remove_layer':
-          this.applyRemoveLayerOperation(operation, isUndo);
+          this.applyRemoveLayerOperation(project, operation, isUndo);
           break;
         case 'duplicate_layer':
-          this.applyDuplicateLayerOperation(operation, isUndo);
+          this.applyDuplicateLayerOperation(project, operation, isUndo);
+          break;
+        case 'rename_layer':
+          this.applyRenameLayerOperation(project, operation, isUndo);
           break;
         case 'merge_layers':
-          this.applyMergeLayersOperation(operation, isUndo);
+          this.applyMergeLayersOperation(project, operation, isUndo);
           break;
         case 'change_layer_visibility':
-          this.applyLayerVisibilityOperation(operation, isUndo);
+          this.applyLayerVisibilityOperation(project, operation, isUndo);
           break;
         case 'move_layer':
-          this.applyMoveLayerOperation(operation, isUndo);
+          this.applyMoveLayerOperation(project, operation, isUndo);
           break;
         case 'transform':
-          this.applyTransformOperation(operation, isUndo);
+          this.applyTransformOperation(project, operation, isUndo);
           break;
         case 'color_adjustment':
-          this.applyColorAdjustmentOperation(operation, isUndo);
+          this.applyColorAdjustmentOperation(project, operation, isUndo);
           break;
         case 'resize_canvas':
-          this.applyResizeCanvasOperation(operation, isUndo);
+          this.applyResizeCanvasOperation(project, operation, isUndo);
           break;
       }
     });
@@ -150,31 +155,9 @@ class HistoryManager {
   }
 
   // Specific operation handlers
-  applyDrawAction(item) {
-    const { data } = item;
-    
-    const frame = this.editor.project?.frames[data.frame];
-    if (!frame) return;
-    
-    const layer = frame.layers[data.layer];
-    if (!layer) return;
-    
-    const ctx = layer.ctx;
-    
-    switch (data.type) {
-      case 'fillRect':
-        ctx.fillStyle = data.color;
-        ctx.fillRect(data.x, data.y, data.w, data.h);
-        break;
-      case 'clearRect':
-        ctx.clearRect(data.x, data.y, data.w, data.h);
-        break;
-    }
-  }
-
-  applyDrawOperation(operation, isUndo) {
+  applyDrawOperation(project, operation, isUndo) {
     const { frameIndex, layerIndex, pixels } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = project.frames[frameIndex];
     const layer = frame.layers[layerIndex];
     const ctx = layer.ctx;
     
@@ -191,21 +174,17 @@ class HistoryManager {
     });
   }
 
-  applyAddFrameOperation(operation, isUndo) {
+  applyAddFrameOperation(project, operation, isUndo) {
     if (isUndo) {
       // Remove the frame that was added
-      this.editor.project.frames.splice(operation.index, 1);
-      this.editor.frameTimes.splice(operation.index, 1);
-      this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
+      project.frames.splice(operation.index, 1);
+      project.frameTimes.splice(operation.index, 1);
+      project.currentFrame = Math.min(operation.index, project.frames.length - 1);
     } else {
       // Add the frame back
       const newFrame = {
         layers: operation.layers.map(layerData => {
-          const layer = this.editor.createBlankLayer(
-            this.editor.project.width, 
-            this.editor.project.height,
-            layerData.name
-          );
+          const layer = this.editor.createBlankLayer(project.width, project.height, layerData.name);
           layer.visible = layerData.visible;
           
           // Restore layer content if available
@@ -213,8 +192,8 @@ class HistoryManager {
             const ctx = layer.ctx;
             const imageData = new ImageData(
               new Uint8ClampedArray(layerData.imageData),
-              this.editor.project.width,
-              this.editor.project.height
+              project.width,
+              project.height
             );
             ctx.putImageData(imageData, 0, 0);
           }
@@ -223,72 +202,35 @@ class HistoryManager {
         })
       };
       
-      this.editor.project.frames.splice(operation.index, 0, newFrame);
-      this.editor.frameTimes.splice(operation.index, 0, operation.frameTime);
-      this.editor.project.currentFrame = operation.index;
+      project.frames.splice(operation.index, 0, newFrame);
+      project.frameTimes.splice(operation.index, 0, operation.frameTime);
+      project.currentFrame = operation.index;
     }
   }
 
-  applyRemoveFrameOperation(operation, isUndo) {
-    if (isUndo) {
-      // Restore the removed frame
-      const restoredFrame = {
-        layers: operation.layers.map(layerData => {
-          const layer = this.editor.createBlankLayer(
-            this.editor.project.width, 
-            this.editor.project.height,
-            layerData.name
-          );
-          layer.visible = layerData.visible;
-          
-          if (layerData.imageData) {
-            const ctx = layer.ctx;
-            const imageData = new ImageData(
-              new Uint8ClampedArray(layerData.imageData),
-              this.editor.project.width,
-              this.editor.project.height
-            );
-            ctx.putImageData(imageData, 0, 0);
-          }
-          
-          return layer;
-        })
-      };
-      
-      this.editor.project.frames.splice(operation.index, 0, restoredFrame);
-      this.editor.frameTimes.splice(operation.index, 0, operation.frameTime);
-      this.editor.project.currentFrame = operation.index;
-    } else {
-      // Remove the frame again
-      this.editor.project.frames.splice(operation.index, 1);
-      this.editor.frameTimes.splice(operation.index, 1);
-      this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
-    }
+  applyRemoveFrameOperation(project, operation, isUndo) {
+    this.applyAddFrameOperation(project, operation, !isUndo);
   }
   
-  applyDuplicateFrameOperation(operation, isUndo) {
+  applyDuplicateFrameOperation(project, operation, isUndo) {
     if (isUndo) {
       // Remove the duplicated frame
-      this.editor.project.frames.splice(operation.index, 1);
-      this.editor.frameTimes.splice(operation.index, 1);
-      this.editor.project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
+      project.frames.splice(operation.index, 1);
+      project.frameTimes.splice(operation.index, 1);
+      project.currentFrame = Math.min(operation.index, this.editor.project.frames.length - 1);
     } else {
       // Restore the duplicated frame
       const newFrame = {
         layers: operation.layers.map(layerData => {
-          const layer = this.editor.createBlankLayer(
-            this.editor.project.width, 
-            this.editor.project.height,
-            layerData.name
-          );
+          const layer = this.editor.createBlankLayer(project.width, project.height, layerData.name);
           layer.visible = layerData.visible;
           
           if (layerData.imageData) {
             const ctx = layer.ctx;
             const imageData = new ImageData(
               new Uint8ClampedArray(layerData.imageData),
-              this.editor.project.width,
-              this.editor.project.height
+              project.width,
+              project.height
             );
             ctx.putImageData(imageData, 0, 0);
           }
@@ -297,112 +239,83 @@ class HistoryManager {
         })
       };
       
-      this.editor.project.frames.splice(operation.index, 0, newFrame);
-      this.editor.frameTimes.splice(operation.index, 0, operation.frameTime);
-      this.editor.project.currentFrame = operation.index;
+      project.frames.splice(operation.index, 0, newFrame);
+      project.frameTimes.splice(operation.index, 0, operation.frameTime);
+      project.currentFrame = operation.index;
     }
   }
 
-  applyEditFrameOperation(operation, isUndo) {
+  applyEditFrameOperation(project, operation, isUndo) {
     const { frameIndex, property, oldValue, newValue } = operation;
     
     if (property === 'time') {
-      this.editor.frameTimes[frameIndex] = isUndo ? oldValue : newValue;
+      project.frameTimes[frameIndex] = isUndo ? oldValue : newValue;
     }
-    // Add other frame properties as needed
   }
 
-  applyMoveFrameOperation(operation, isUndo) {
+  applyMoveFrameOperation(project, operation, isUndo) {
     const { fromIndex, toIndex } = operation;
     
     if (isUndo) {
       // Move back to original position
-      const frame = this.editor.project.frames.splice(toIndex, 1)[0];
-      const frameTime = this.editor.frameTimes.splice(toIndex, 1)[0];
-      this.editor.project.frames.splice(fromIndex, 0, frame);
-      this.editor.frameTimes.splice(fromIndex, 0, frameTime);
+      const frame = project.frames.splice(toIndex, 1)[0];
+      const frameTime = project.frameTimes.splice(toIndex, 1)[0];
+      project.frames.splice(fromIndex, 0, frame);
+      project.frameTimes.splice(fromIndex, 0, frameTime);
     } else {
       // Move to new position again
-      const frame = this.editor.project.frames.splice(fromIndex, 1)[0];
-      const frameTime = this.editor.frameTimes.splice(fromIndex, 1)[0];
-      this.editor.project.frames.splice(toIndex, 0, frame);
-      this.editor.frameTimes.splice(toIndex, 0, frameTime);
+      const frame = project.frames.splice(fromIndex, 1)[0];
+      const frameTime = project.frameTimes.splice(fromIndex, 1)[0];
+      project.frames.splice(toIndex, 0, frame);
+      project.frameTimes.splice(toIndex, 0, frameTime);
     }
   }
 
-  applyChangeFPSOperation(operation, isUndo) {
-    this.editor.animationFPS = isUndo ? operation.oldFPS : operation.newFPS;
-    this.editor.currentFrameTime = 1000 / this.editor.animationFPS;
-    this.editor.fpsInput.value = this.editor.animationFPS;
+  applyChangeFPSOperation(project, operation, isUndo) {
+    project.frameTimes = isUndo ? operation.oldFrameTimes : operation.newFrameTimes;
+    
+    const fps = isUndo ? operation.oldFPS : operation.newFPS;
+    
+    project.currentFrameTime = 1000 / operation.newFPS;
+    
+    this.editor.fpsInput.value = fps;
   }
 
-  applyAddLayerOperation(operation, isUndo) {
+  applyAddLayerOperation(project, operation, isUndo) {
     const { frameIndex, layerIndex, layerData } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = project.frames[frameIndex];
     
     if (isUndo) {
       // Remove the added layer
       frame.layers.splice(layerIndex, 1);
-      this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+      project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
     } else {
       // Add the layer back
-      const layer = this.editor.createBlankLayer(
-        this.editor.project.width, 
-        this.editor.project.height,
-        layerData.name
-      );
+      const layer = this.editor.createBlankLayer(project.width, project.height, layerData.name);
       layer.visible = layerData.visible;
       
       if (layerData.imageData) {
         const ctx = layer.ctx;
         const imageData = new ImageData(
           new Uint8ClampedArray(layerData.imageData),
-          this.editor.project.width,
-          this.editor.project.height
+          project.width,
+          project.height
         );
         ctx.putImageData(imageData, 0, 0);
       }
       
       frame.layers.splice(layerIndex, 0, layer);
 
-      this.editor.project.currentLayer = layerIndex;
+      project.currentLayer = layerIndex;
     }
   }
 
-  applyRemoveLayerOperation(operation, isUndo) {
-    const { frameIndex, layerIndex, layerData } = operation;
-    const frame = this.editor.project.frames[frameIndex];
-    
-    if (isUndo) {
-      // Restore the removed layer
-      const layer = this.editor.createBlankLayer(
-        this.editor.project.width, 
-        this.editor.project.height,
-        layerData.name
-      );
-      layer.visible = layerData.visible;
-      
-      if (layerData.imageData) {
-        const ctx = layer.ctx;
-        const imageData = new ImageData(
-          new Uint8ClampedArray(layerData.imageData),
-          this.editor.project.width,
-          this.editor.project.height
-        );
-        ctx.putImageData(imageData, 0, 0);
-      }
-      
-      frame.layers.splice(layerIndex, 0, layer);
-      
-      this.editor.project.currentLayer = layerIndex;
-    } else {
-      // Remove the layer again
-      frame.layers.splice(layerIndex, 1);
-      this.editor.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
-    }
+  applyRemoveLayerOperation(project, operation, isUndo) {
+    // Apply 'Add Layer' operation in reverse
+    this.applyAddLayerOperation(project, operation, !isUndo);
   }
   
-  applyDuplicateLayerOperation(operation, isUndo) {
+  applyDuplicateLayerOperation(project, operation, isUndo) {
     const { frameIndex, layerIndex, layerData } = operation;
     const frame = this.editor.project.frames[frameIndex];
     
@@ -434,33 +347,40 @@ class HistoryManager {
     }
   }
   
-  applyMergeLayersOperation(operation, isUndo) {
+  applyRenameLayerOperation(project, operation, isUndo) {
+    const { layerIndex, previousName, newName } = operation;
+    
+    // Rename the layer in all frames
+    project.frames.forEach(frame => {
+      const layer = frame.layers[layerIndex];
+      
+      layer.name = isUndo ? previousName : newName;
+    });
+  }
+  
+  applyMergeLayersOperation(project, operation, isUndo) {
     const { frameIndex, sourceIndex, targetIndex, sourceData, targetData } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = projectframes[frameIndex];
     
     if (isUndo) {
       // Restore both layers to their original state
-      const sourceLayer = this.editor.createBlankLayer(
-        this.editor.project.width,
-        this.editor.project.height,
-        sourceData.name
-      );
+      const sourceLayer = this.editor.createBlankLayer(project.width, project.height, sourceData.name);
       sourceLayer.visible = sourceData.visible;
       
       const sourceImageData = new ImageData(
         new Uint8ClampedArray(sourceData.imageData),
-        this.editor.project.width,
-        this.editor.project.height
+        project.width,
+        project.height
       );
       sourceLayer.ctx.putImageData(sourceImageData, 0, 0);
       
       const targetLayer = frame.layers[targetIndex];
-      targetLayer.ctx.clearRect(0, 0, this.editor.project.width, this.editor.project.height);
+      targetLayer.ctx.clearRect(0, 0, project.width, project.height);
       
       const targetImageData = new ImageData(
         new Uint8ClampedArray(targetData.imageData),
-        this.editor.project.width,
-        this.editor.project.height
+        project.width,
+        project.height
       );
       targetLayer.ctx.putImageData(targetImageData, 0, 0);
       
@@ -468,8 +388,8 @@ class HistoryManager {
       frame.layers.splice(sourceIndex, 0, sourceLayer);
       
       // Adjust current layer if needed
-      if (sourceIndex <= this.editor.project.currentLayer) {
-        this.editor.project.currentLayer++;
+      if (sourceIndex <= project.currentLayer) {
+        project.currentLayer++;
       }
       
     } else {
@@ -480,23 +400,23 @@ class HistoryManager {
       targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
       frame.layers.splice(sourceIndex, 1);
       
-      if (sourceIndex < this.editor.project.currentLayer) {
-        this.editor.project.currentLayer--;
-      } else if (sourceIndex === this.editor.project.currentLayer) {
-        this.editor.project.currentLayer = targetIndex;
+      if (sourceIndex < project.currentLayer) {
+        project.currentLayer--;
+      } else if (sourceIndex === project.currentLayer) {
+        project.currentLayer = targetIndex;
       }
     }
   }
 
-  applyLayerVisibilityOperation(operation, isUndo) {
+  applyLayerVisibilityOperation(project, operation, isUndo) {
     const { frameIndex, layerIndex, visible } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = project.frames[frameIndex];
     frame.layers[layerIndex].visible = isUndo ? !visible : visible;
   }
 
-  applyMoveLayerOperation(operation, isUndo) {
+  applyMoveLayerOperation(project, operation, isUndo) {
     const { frameIndex, fromIndex, toIndex } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = project.frames[frameIndex];
     
     if (isUndo) {
       // Move back to original position
@@ -509,61 +429,61 @@ class HistoryManager {
     }
   }
 
-  applyTransformOperation(operation, isUndo) {
+  applyTransformOperation(project, operation, isUndo) {
     const { frameIndex, layerIndex, transformType, transformData } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = project.frames[frameIndex];
     const layer = frame.layers[layerIndex];
     const ctx = layer.ctx;
     
-    // For simplicity, we'll store the entire image data for transformations
+    // We'll store the entire image data for transformations
     // This is still more efficient than full project snapshots
     // But we can optimize this in the future
     
-    ctx.clearRect(0, 0, this.editor.project.width, this.editor.project.height);
+    ctx.clearRect(0, 0, project.width, project.height);
     
     const imageData = new ImageData(
       new Uint8ClampedArray(isUndo ? transformData.oldImageData : transformData.newImageData),
-      this.editor.project.width,
-      this.editor.project.height
+      project.width,
+      project.height
     );
     
     ctx.putImageData(imageData, 0, 0);
   }
 
-  applyColorAdjustmentOperation(operation, isUndo) {
+  applyColorAdjustmentOperation(project, operation, isUndo) {
     const { frameIndex, layerIndex, adjustmentType, adjustmentData } = operation;
-    const frame = this.editor.project.frames[frameIndex];
+    const frame = project.frames[frameIndex];
     const layer = frame.layers[layerIndex];
     const ctx = layer.ctx;
     
     // Similar to transform, store the image data for color adjustments
     const imageData = new ImageData(
       new Uint8ClampedArray(isUndo ? adjustmentData.oldImageData : adjustmentData.newImageData),
-      this.editor.project.width,
-      this.editor.project.height
+      project.width,
+      project.height
     );
     
     ctx.putImageData(imageData, 0, 0);
   }
   
-  applyResizeCanvasOperation(operation, isUndo) {
+  applyResizeCanvasOperation(project, operation, isUndo) {
     const { oldWidth, oldHeight, newWidth, newHeight, cropX, cropY, framesData } = operation;
     
     // Store current frame/layer indices
-    const currentFrame = this.editor.project.currentFrame;
-    const currentLayer = this.editor.project.currentLayer;
+    const currentFrame = project.currentFrame;
+    const currentLayer = project.currentLayer;
     
     // Determine which dimensions to use
     const targetWidth = isUndo ? oldWidth : newWidth;
     const targetHeight = isUndo ? oldHeight : newHeight;
     
     // Resize project dimensions first
-    this.editor.project.width = targetWidth;
-    this.editor.project.height = targetHeight;
+    project.width = targetWidth;
+    project.height = targetHeight;
     this.editor.resetCanvasSize();
     
     // Restore/transform each layer
-    this.editor.project.frames.forEach((frame, fIndex) => {
+    project.frames.forEach((frame, fIndex) => {
       // Make sure we have data for this frame
       const frameData = framesData && framesData[fIndex];
       if (!frameData) return;
@@ -630,9 +550,9 @@ class HistoryManager {
     });
     
     // Restore frame/layer indices
-    this.editor.project.currentFrame = Math.min(currentFrame, this.editor.project.frames.length - 1);
-    this.editor.project.currentLayer = Math.min(currentLayer, 
-      this.editor.project.frames[this.editor.project.currentFrame].layers.length - 1);
+    project.currentFrame = Math.min(currentFrame, project.frames.length - 1);
+    project.currentLayer = Math.min(currentLayer, 
+      project.frames[project.currentFrame].layers.length - 1);
     
     // Update transform and render
     this.editor.updateCanvasTransform();
@@ -643,7 +563,7 @@ class HistoryManager {
   async generateTimelapse(fps, scale, progressCallback) {
     // Create a temporary project to replay history
     const tempProject = this.editor.getNewProjectData(this.editor.project.width, this.editor.project.height);
-    const tempFrameTimes = [...this.editor.frameTimes];
+    const tempFrameTimes = [...this.editor.project.frameTimes];
     
     // Get canvas for rendering
     const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas(tempProject.width * scale, tempProject.height * scale);
@@ -772,48 +692,7 @@ class HistoryManager {
     renderFrame();
   }
 
-  applyHistoryEntryToProject(entry, project, frameTimes, isUndo) {
-    const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
-    
-    operations.forEach(operation => {
-      switch (operation.type) {
-        case 'add_frame':
-          this.applyAddFrameToProject(operation, project, frameTimes, isUndo);
-          break;
-        case 'remove_frame':
-          this.applyRemoveFrameToProject(operation, project, frameTimes, isUndo);
-          break;
-        case 'edit_frame':
-          if (operation.property === 'time') {
-            frameTimes[operation.frameIndex] = isUndo ? operation.oldValue : operation.newValue;
-          }
-          break;
-        case 'move_frame':
-          this.applyMoveFrameToProject(operation, project, frameTimes, isUndo);
-          break;
-        case 'change_animation_fps':
-          // This affects the global FPS, so we might not need to apply it per project
-          break;
-        case 'add_layer':
-          this.applyAddLayerToProject(operation, project, isUndo);
-          break;
-        case 'remove_layer':
-          this.applyRemoveLayerToProject(operation, project, isUndo);
-          break;
-        case 'change_layer_visibility':
-          const frame = project.frames[operation.frameIndex];
-          frame.layers[operation.layerIndex].visible = isUndo ? !operation.visible : operation.visible;
-          break;
-        case 'move_layer':
-          this.applyMoveLayerToProject(operation, project, isUndo);
-          break;
-        // Note: draw, transform, and color_adjustment operations modify canvas content,
-        // so we'd need to store image data in the operation for this to work properly
-      }
-    });
-  }
-
-  // Project-specific operation handlers (similar to the main ones but for a target project)
+  // Project-specific operation handlers (similar to the main ones but for a target project) used to generate timelapse
   applyHistoryEntryToProject(entry, project, frameTimes, isUndo) {
     const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
     
@@ -863,7 +742,7 @@ class HistoryManager {
       }
     });
   }
-
+  
   applyAddFrameToProject(operation, project, frameTimes, isUndo) {
     if (isUndo) {
       project.frames.splice(operation.index, 1);

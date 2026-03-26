@@ -235,18 +235,6 @@
   cursor: pointer;
 }
 
-@keyframes pulse-delete-zone {
-  0% {
-    box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
-  }
-  50% {
-    box-shadow: 0 6px 25px rgba(255, 68, 68, 0.6);
-  }
-  100% {
-    box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
-  }
-}
-
 /* Palette Add Button */
 .palette-add-button {
   display: flex;
@@ -300,13 +288,4 @@
   padding: 20px;
   color: var(--text-dim);
   font-style: italic;
-}
-
-@media (max-width: 400px) {
-  .palette-grid {
-    grid-template-columns: repeat(8, 1fr);
-  }
-  .recent-colors-grid {
-    grid-template-columns: repeat(8, 1fr);
-  }
 }

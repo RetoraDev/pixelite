@@ -40,10 +40,10 @@ class ReferenceManager {
     const opacityContainer = document.createElement("div");
     opacityContainer.className = "trace-opacity-control";
     
-    const opacityLabel = document.createElement("span");
-    opacityLabel.className = "trace-opacity-label";
-    opacityLabel.textContent = __("Opacidad||Opacity") + ":";
-    opacityContainer.appendChild(opacityLabel);
+    this.traceOpacityValue = document.createElement("span");
+    this.traceOpacityValue.className = "trace-opacity-value";
+    this.traceOpacityValue.textContent = this.traceOpacity * 100 + "%";
+    opacityContainer.appendChild(this.traceOpacityValue);
     
     this.traceOpacitySlider = document.createElement("input");
     this.traceOpacitySlider.type = "range";
@@ -57,11 +57,6 @@ class ReferenceManager {
       this.editor.render();
     });
     opacityContainer.appendChild(this.traceOpacitySlider);
-    
-    this.traceOpacityValue = document.createElement("span");
-    this.traceOpacityValue.className = "trace-opacity-value";
-    this.traceOpacityValue.textContent = "50%";
-    opacityContainer.appendChild(this.traceOpacityValue);
     
     this.traceControls.appendChild(opacityContainer);
     
@@ -162,7 +157,7 @@ class ReferenceManager {
     const fileBrowser = this.editor.getFileBrowser({
       title: __("Cargar imagen||Load image"),
       mode: "open",
-      fileTypes: ["png", "jpg", "jpeg", "gif", "webp"],
+      fileTypes: ["png", "jpg", "jpeg", "gif","webp"],
       onConfirm: async (fileInfo) => {
         try {
           const fileData = await this.editor.readFile(fileInfo);
@@ -373,6 +368,16 @@ class ReferenceManager {
     if (el) {
       el.style.left = state.ref.x + "px";
       el.style.top = state.ref.y + "px";
+      
+      const rect = this.deleteZone.getBoundingClientRect();
+      const isOverDelete = clientX >= rect.left && clientX <= rect.right &&
+                          clientY >= rect.top && clientY <= rect.bottom;
+      
+      if (isOverDelete) {
+        el.classList.add("over-delete");
+      } else {
+        el.classList.remove("over-delete");
+      }
     }
   }
   
@@ -394,7 +399,7 @@ class ReferenceManager {
       
       const el = document.getElementById(this.dragState.ref.id);
       if (el) {
-        el.style.cursor = "grab";
+        el.classList.remove("grabbing");
       }
       
       this.dragState = null;
@@ -404,7 +409,8 @@ class ReferenceManager {
       const el = document.getElementById(this.resizeState.ref.id);
       if (el) {
         el.classList.remove("resizing");
-        el.style.cursor = "grab";
+        el.classList.remove("grabbing");
+        el.classList.remove("over-delete");
       }
       this.resizeState = null;
     }
@@ -464,7 +470,7 @@ class ReferenceManager {
       let newY = state.startTop;
       
       const direction = state.direction;
-      const keepAspect = e.shiftKey; // Hold Shift to keep aspect ratio
+      const keepAspect = e.shiftKey || direction == 'se'; // Hold Shift to keep aspect ratio
       
       // Handle different resize directions
       if (direction.includes('e')) {
@@ -590,7 +596,6 @@ class ReferenceManager {
     el.style.width = ref.width + "px";
     el.style.height = ref.height + "px";
     el.style.transform = `rotate(${ref.rotation}deg)`;
-    el.style.cursor = "grab";
     
     // Create image
     const img = document.createElement("img");
@@ -612,7 +617,7 @@ class ReferenceManager {
       
       handle.addEventListener("touchstart", (e) => {
         e.stopPropagation();
-        this.startResize(e, ref);
+        if (e.touches.length === 1) this.startResize(e, ref);
       }, { passive: false });
       
       el.appendChild(handle);
@@ -629,14 +634,16 @@ class ReferenceManager {
       // Only start drag if not clicking a handle
       if (!e.target.classList.contains('resize-handle')) {
         this.startDrag(e, ref);
-        el.style.cursor = "grabbing";
+        el.classList.add("grabbing");
       }
     });
     
     el.addEventListener("touchstart", (e) => {
       if (!e.target.classList.contains('resize-handle')) {
         this.startDrag(e, ref);
-        el.style.cursor = "grabbing";
+        el.classList.add("grabbing");
+      } else if (e.touches.length === 2) {
+        this.startResize(e, ref);
       }
     }, { passive: false });
     

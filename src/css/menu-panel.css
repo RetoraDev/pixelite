@@ -8,9 +8,9 @@
   width: 250px;
   height: calc(100% - 90px);
   background-color: var(--ui-color);
-  box-shadow: 2px 0 5px var(--shadow-color);
   transform: translateX(-100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   display: flex;
   flex-direction: column;
   padding: 10px;
@@ -19,6 +19,7 @@
 
 .menu-panel.visible {
   transform: translateX(0);
+  box-shadow: 2px 0 5px var(--shadow-color);
 }
 
 .menu-tabs {

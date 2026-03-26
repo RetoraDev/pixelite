@@ -263,7 +263,7 @@ class CollabManager {
     // Hook into undo/redo
     this.editor.undo = function() {
       if (self.isConnected && !self.isHost && !self.canPerformAction('undoRedo')) {
-        self.editor.showNotification(__('No tienes permiso para deshacer'), 1000);
+        self.editor.showToast(__('No tienes permiso para deshacer'), 1000);
         return;
       }
       const result = originalUndo.call(this);
@@ -275,7 +275,7 @@ class CollabManager {
     
     this.editor.redo = function() {
       if (self.isConnected && !self.isHost && !self.canPerformAction('undoRedo')) {
-        self.editor.showNotification(__('No tienes permiso para rehacer'), 1000);
+        self.editor.showToast(__('No tienes permiso para rehacer'), 1000);
         return;
       }
       const result = originalRedo.call(this);
@@ -429,7 +429,7 @@ class CollabManager {
     this.ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       this.editor.hideLoadingScreen();
-      this.editor.showNotification(__('Error de conexión||Connection error'), 3000);
+      this.editor.showToast(__('Error de conexión||Connection error'), 3000);
     };
   }
 
@@ -511,7 +511,7 @@ class CollabManager {
     
     this.hookEditorMethods();
     
-    this.editor.showNotification(__('Sesión creada||Session created'), 2000);
+    this.editor.showToast(__('Sesión creada||Session created'), 2000);
   }
 
   handleSessionJoined(message) {
@@ -540,13 +540,13 @@ class CollabManager {
     
     this.hookEditorMethods();
     
-    this.editor.showNotification(__('Conectado a la sesión||Connected to the session'), 2000);
+    this.editor.showToast(__('Conectado a la sesión||Connected to the session'), 2000);
   }
 
   handleMemberJoined(member) {
     if (member.id === this.memberId) return;
     this.members.set(member.id, member);
-    this.editor.showNotification(`${this.wrapMemberName(member)} ${__('se unió||joined')}`, 2000);
+    this.editor.showToast(`${this.wrapMemberName(member)} ${__('se unió||joined')}`, 2000);
     if (this.isHost) {
       this.sendFullState(member.id);
     }
@@ -558,7 +558,7 @@ class CollabManager {
     if (member) {
       this.members.delete(memberId);
       this.removeUserCursor(memberId);
-      this.editor.showNotification(`${this.wrapMemberName(member, member.name || memberName)} ${__('salió||left')}`, 2000);
+      this.editor.showToast(`${this.wrapMemberName(member, member.name || memberName)} ${__('salió||left')}`, 2000);
       this.renderSessionMenu();
     }
   }
@@ -568,7 +568,7 @@ class CollabManager {
     if (member) {
       this.members.delete(memberId);
       this.removeUserCursor(memberId);
-      this.editor.showNotification(`${member.name || memberName} ${__('fue expulsado')}`, 3000);
+      this.editor.showToast(`${member.name || memberName} ${__('fue expulsado')}`, 3000);
       this.renderSessionMenu();
     }
   }
@@ -576,7 +576,7 @@ class CollabManager {
   handleYouWereKicked() {
     this.manualDisconnect = false;
     this.disconnect();
-    this.editor.showNotification(__('Has sido expulsado de la sesión'), 4000);
+    this.editor.showToast(__('Has sido expulsado de la sesión'), 4000);
   }
 
   handleTraceComplete(message) {
@@ -680,7 +680,7 @@ class CollabManager {
     
     member.name = newName;
     
-    this.editor.showNotification(`${this.wrapMemberName(member, oldName)}</span> ${__("(ha cambiado su nombre a|has changed name to)")} ${this.wrapMemberName(member, newName)}`);
+    this.editor.showToast(`${this.wrapMemberName(member, oldName)}</span> ${__("(ha cambiado su nombre a|has changed name to)")} ${this.wrapMemberName(member, newName)}`);
   }
   
   handleColorUpdate(message) {
@@ -691,7 +691,7 @@ class CollabManager {
     
     member.color = newColor;
     
-    this.editor.showNotification(`${this.wrapMemberName(member)}</span> ${__("(ha cambiado su color|has changed color)")}`);
+    this.editor.showToast(`${this.wrapMemberName(member)}</span> ${__("(ha cambiado su color|has changed color)")}`);
   }
 
   handleChatMessage(message) {
@@ -711,7 +711,7 @@ class CollabManager {
 
   handleSessionEnded(reason) {
     this.disconnect(false);
-    this.editor.showNotification(reason || __('La sesión ha terminado'), 3000);
+    this.editor.showToast(reason || __('La sesión ha terminado'), 3000);
   }
 
   handlePong(timestamp) {
@@ -741,7 +741,7 @@ class CollabManager {
     this.restoreEditorMethods();
     
     if (!this.manualDisconnect) {
-      this.editor.showNotification(__('Desconectado'), 2000);
+      this.editor.showToast(__('Desconectado'), 2000);
     }
   }
 
@@ -1038,7 +1038,7 @@ class CollabManager {
     const copyBtn = infoCard.querySelector('#copyIdBtn');
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(this.sessionId);
-      this.editor.showNotification(__('ID copiado||ID copied'), 1000);
+      this.editor.showToast(__('ID copiado||ID copied'), 1000);
     });
     
     this.sessionContent.appendChild(infoCard);
@@ -1215,7 +1215,7 @@ class CollabManager {
     const copyBtn = infoCard.querySelector('#copyIdBtn');
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(this.sessionId);
-      this.editor.showNotification(__('ID copiado||ID copied'), 1000);
+      this.editor.showToast(__('ID copiado||ID copied'), 1000);
     });
     
     this.sessionContent.appendChild(infoCard);

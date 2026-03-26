@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1
- * Built: 3/20/2026, 11:37:23 AM
+ * Built: 3/25/2026, 10:59:55 AM
  * Platform: Android (Cordova)
  * Debug: false
  * Minified: false
@@ -26,7 +26,7 @@ body {
   --border-color: #1d1d1d;
   --shadow-color: rgba(0, 0, 0, 0.5);
   --svg-filter: none;
-  --transparent-bg: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><rect width="8" height="8" x="0" y="0" fill="%23fff"/><rect width="8" height="8" x="8" y="8" fill="%23fff"/><rect width="8" height="8" x="8" y="0" fill="%23ccc"/><rect width="8" height="8" x="0" y="8" fill="%23ccc"/></svg>');
+  --transparent-bg: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
 }
 
 /* Themes */
@@ -316,6 +316,11 @@ button:active {
   height: 1px;
   background-color: var(--primary-color);
   pointer-events: auto;
+}
+
+.canvas-resize-edge:hover,
+.canvas-resize-edge:active {
+  background-color: var(--secondary-color);
 }
 
 .canvas-resize-edge.vertical {
@@ -779,6 +784,9 @@ button:active {
 .icon-layers {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z"/></svg>');
 }
+.icon-grids {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 3h4v4H3V3zm7 0h4v4h-4V3zm7 0h4v4h-4V3zM3 10h4v4H3v-4zm7 0h4v4h-4v-4zm7 0h4v4h-4v-4zM3 17h4v4H3v-4zm7 0h4v4h-4v-4zm7 0h4v4h-4v-4z"/></svg>');
+}
 .icon-switch-tool {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z"/></svg>');
 }
@@ -931,9 +939,9 @@ button:active {
   width: 250px;
   height: calc(100% - 90px);
   background-color: var(--ui-color);
-  box-shadow: 2px 0 5px var(--shadow-color);
   transform: translateX(-100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   display: flex;
   flex-direction: column;
   padding: 10px;
@@ -942,6 +950,7 @@ button:active {
 
 .menu-panel.visible {
   transform: translateX(0);
+  box-shadow: 2px 0 5px var(--shadow-color);
 }
 
 .menu-tabs {
@@ -1000,6 +1009,7 @@ button:active {
   height: 360px;
   transform: translateY(100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   background-color: var(--ui-color);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -1108,21 +1118,22 @@ button:active {
   background-color: var(--primary-color);
 }
 
-/* Layer thumbnail - 44x44 */
+/* Layer thumbnail */
 .layer-thumb {
-  width: 44px;
+  width: auto;
+  max-width: 72px;
   height: 44px;
   flex-shrink: 0;
   border: 1px solid var(--border-color);
   border-radius: 3px;
   overflow: hidden;
+  align-content: center;
 }
 
 .layer-thumb canvas {
   width: 44px;
   height: 44px;
   display: block;
-  image-rendering: pixelated;
 }
 
 /* Layer name */
@@ -1134,6 +1145,9 @@ button:active {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
 }
 
 /* Layer actions */
@@ -1160,7 +1174,7 @@ button:active {
   height: 16px;
 }
 
-/* Scrollbar - exactly like timeline */
+/* Scrollbar */
 .layers-container::-webkit-scrollbar {
   width: 6px;
 }
@@ -1189,6 +1203,7 @@ button:active {
   height: 180px;
   transform: translateY(100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   background-color: var(--ui-color);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -1246,8 +1261,11 @@ button:active {
   background-color: var(--bg-color);
   border-radius: 6px;
   cursor: pointer;
-  min-width: 70px;
+  min-width: 80px;
+  overflow: hidden;
   position: relative;
+  transition: opacity 0.3s, transform 0.3s;
+  will-change: transform, opacity;
 }
 
 .timeline-frame.active {
@@ -1260,12 +1278,23 @@ button:active {
 }
 
 .frame-thumb {
+  width: auto;
+  max-width: 72px;
+  height: 60px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+  align-content: center;
+  text-align: center;
+  align-items: center;
   margin-bottom: 5px;
 }
 
 .frame-thumb canvas {
-  border: 1px solid var(--border-color);
-  border-radius: 3px;
+  width: 60px;
+  height: 60px;
+  display: block;
 }
 
 .frame-time {
@@ -1297,6 +1326,8 @@ button:active {
   border: 2px solid var(--border-color);
   background-color: #fff;
   background-image: var(--transparent-bg);
+  background-size: 16px 16px;
+  background-position: 0 0;
   display: none;
 }
 
@@ -1331,6 +1362,7 @@ button:active {
   height: 360px;
   transform: translateY(100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   background-color: var(--ui-color);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -2205,13 +2237,12 @@ button:active {
   bottom: 60px;
   left: 10px;
   background-color: var(--ui-color);
-  border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 8px;
   display: none;
   align-items: center;
-  gap: 12px;
-  box-shadow: 0 2px 10px var(--shadow-color);
+  gap: 5px;
+  box-shadow: 0 2px 5px var(--shadow-color);
 }
 
 .trace-reference-controls.visible {
@@ -2269,10 +2300,11 @@ button:active {
 .floating-reference {
   position: absolute;
   transform-origin: center center;
-  cursor: move;
+  cursor: grab;
   touch-action: none;
   will-change: transform;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  transition: opacity 0.3s, scale 0.3s;
+  filter: drop-shadow(0 4px 8px var(--shadow-color));
   pointer-events: auto;
 }
 
@@ -2287,8 +2319,18 @@ button:active {
   cursor: se-resize;
 }
 
+.floating-reference.grabbing {
+  scale: 1.1;
+  cursor: grabbing;
+}
+
 .floating-reference.selected {
-  filter: drop-shadow(0 0 0 2px var(--primary-color)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  /*filter: drop-shadow(0 0 2px var(--primary-color)) drop-shadow(0 4px 8px var(--shadow-color));*/
+}
+
+.floating-reference.over-delete {
+  opacity: 0.5;
+  scale: 0.5;
 }
 
 /* Resize handles */
@@ -2782,18 +2824,6 @@ button:active {
   cursor: pointer;
 }
 
-@keyframes pulse-delete-zone {
-  0% {
-    box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
-  }
-  50% {
-    box-shadow: 0 6px 25px rgba(255, 68, 68, 0.6);
-  }
-  100% {
-    box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
-  }
-}
-
 /* Palette Add Button */
 .palette-add-button {
   display: flex;
@@ -2847,15 +2877,6 @@ button:active {
   padding: 20px;
   color: var(--text-dim);
   font-style: italic;
-}
-
-@media (max-width: 400px) {
-  .palette-grid {
-    grid-template-columns: repeat(8, 1fr);
-  }
-  .recent-colors-grid {
-    grid-template-columns: repeat(8, 1fr);
-  }
 }
 
 /* Settings */
@@ -3669,13 +3690,8 @@ input:checked + .slider:before {
   white-space: nowrap;
 }
 
-Here's the cleaned and organized z-index.css:
-
-```css
 /*
   z-index order - Organized by layer stack
-  ===========================================
-  Higher numbers = closer to user
 */
 
 /* ========== Base Layer (0-9) ========== */
@@ -3694,10 +3710,6 @@ Here's the cleaned and organized z-index.css:
 }
 
 /* ========== UI Elements (10-19) ========== */
-.editor-ui {
-  z-index: 10;
-}
-
 /* Floating references container */
 .floating-references-container {
   z-index: 12;
@@ -3748,6 +3760,10 @@ Here's the cleaned and organized z-index.css:
   z-index: 25;
 }
 
+.editor-overlay-layer {
+  z-index: 25;
+}
+
 /* ========== Top Bars & Dropdowns (30-99) ========== */
 .ui-top-bar,
 .ui-bottom-bar,
@@ -3765,12 +3781,11 @@ Here's the cleaned and organized z-index.css:
   z-index: 100;
 }
 
-/* Color picker overlay */
-.color-picker-overlay {
-  z-index: 100;
+/* ========== Overlays (200-999) ========== */
+.editor-ui {
+  z-index: 200;
 }
 
-/* ========== Overlays (200-999) ========== */
 .canvas-resize-controls {
   z-index: 200;
 }
@@ -3781,20 +3796,15 @@ Here's the cleaned and organized z-index.css:
   z-index: 1000;
 }
 
-/* Editor overlay layer */
-.editor-overlay-layer {
-  z-index: 1001;
-}
-
 .delete-zone {
   z-index: 1001;
 }
 
-/* ========== Popups & Dialogs (2000-9999) ========== */
-.editor-loading,
-.editor-error,
-.popup-overlay {
-  z-index: 2000;
+/* ========== Popups & Dialogs (2000-10000) ========== */
+
+/* Color picker overlay */
+.color-picker-overlay {
+  z-index: 10000;
 }
 
 /* Collaboration session overlay */
@@ -3806,6 +3816,11 @@ Here's the cleaned and organized z-index.css:
   z-index: 10000;
 }
 
+.editor-loading,
+.editor-error,
+.popup-overlay {
+  z-index: 10001;
+}
 /* ========== Notifications & Debug (10000+) ========== */
 .operation-message {
   z-index: 10001;
@@ -3828,7 +3843,6 @@ Here's the cleaned and organized z-index.css:
 #debug-canvas {
   z-index: 9999;
 }
-```
 
 /*
   Animations
@@ -3857,6 +3871,18 @@ Here's the cleaned and organized z-index.css:
 @keyframes colorPickPulse {
   0%, 100% { opacity: 0.7; }
   50% { opacity: 1; }
+}
+
+@keyframes pulse-delete-zone {
+  0% {
+    box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 6px 25px rgba(255, 68, 68, 0.6);
+  }
+  100% {
+    box-shadow: 0 4px 20px rgba(255, 68, 68, 0.4);
+  }
 }
 
 @keyframes newMessage {

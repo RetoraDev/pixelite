@@ -13,7 +13,7 @@ body {
   --border-color: #1d1d1d;
   --shadow-color: rgba(0, 0, 0, 0.5);
   --svg-filter: none;
-  --transparent-bg: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><rect width="8" height="8" x="0" y="0" fill="%23fff"/><rect width="8" height="8" x="8" y="8" fill="%23fff"/><rect width="8" height="8" x="8" y="0" fill="%23ccc"/><rect width="8" height="8" x="0" y="8" fill="%23ccc"/></svg>');
+  --transparent-bg: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
 }
 
 /* Themes */
@@ -303,6 +303,11 @@ button:active {
   height: 1px;
   background-color: var(--primary-color);
   pointer-events: auto;
+}
+
+.canvas-resize-edge:hover,
+.canvas-resize-edge:active {
+  background-color: var(--secondary-color);
 }
 
 .canvas-resize-edge.vertical {

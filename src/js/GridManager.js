@@ -374,11 +374,13 @@ class GridManager {
 
   show() {
     // Hide other panels
-    if (this.editor.animationPanel) this.editor.animationPanel.classList.remove('visible');
-    if (this.editor.layersPanel) this.editor.layersPanel.classList.remove('visible');
-    if (this.editor.animationButton) this.editor.animationButton.classList.remove('active');
-    if (this.editor.layersButton) this.editor.layersButton.classList.remove('active');
+    this.editor.menuPanel.classList.remove('visible');
+    this.editor.animationPanel.classList.remove('visible');
+    this.editor.layersPanel.classList.remove('visible');
+    this.editor.animationButton.classList.remove('active');
+    this.editor.layersButton.classList.remove('active');
     
+    // Show our panel
     this.panel.classList.add('visible');
     this.editor.gridsButton.classList.add("active");
     this.panelVisible = true;
@@ -388,6 +390,7 @@ class GridManager {
 
   hide() {
     this.panel.classList.remove('visible');
+    this.editor.menuPanel.classList.remove('visible');
     this.editor.gridsButton.classList.remove("active");
     this.panelVisible = false;
   }

@@ -16,6 +16,7 @@ class FileBrowser {
     
     this.mimeMap = {
       pxl: "text/plain, application/json, application/octet-stream",
+      pal: "text/plain, application/octet-stream",
       png: "image/png",
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
@@ -23,6 +24,7 @@ class FileBrowser {
       webp: "image/webp",
       psd: "applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
       txt: "text/plain, application/octet-stream",
+      project: "application/*",
       default: "*"
     };
     

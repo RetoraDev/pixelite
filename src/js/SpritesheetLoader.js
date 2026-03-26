@@ -774,7 +774,7 @@ class SpritesheetLoader {
     
     // Add frame to project
     this.editor.project.frames.push(newFrame);
-    this.editor.frameTimes.push(this.editor.currentFrameTime);
+    this.editor.project.frameTimes.push(this.editor.defaultFrameTime);
   }
 
   cleanup() {

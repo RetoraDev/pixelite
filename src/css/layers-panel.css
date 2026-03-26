@@ -7,6 +7,7 @@
   height: 360px;
   transform: translateY(100%);
   transition: transform 0.3s ease;
+  will-change: transform;
   background-color: var(--ui-color);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -115,21 +116,22 @@
   background-color: var(--primary-color);
 }
 
-/* Layer thumbnail - 44x44 */
+/* Layer thumbnail */
 .layer-thumb {
-  width: 44px;
+  width: auto;
+  max-width: 72px;
   height: 44px;
   flex-shrink: 0;
   border: 1px solid var(--border-color);
   border-radius: 3px;
   overflow: hidden;
+  align-content: center;
 }
 
 .layer-thumb canvas {
   width: 44px;
   height: 44px;
   display: block;
-  image-rendering: pixelated;
 }
 
 /* Layer name */
@@ -141,6 +143,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
 }
 
 /* Layer actions */
@@ -167,7 +172,7 @@
   height: 16px;
 }
 
-/* Scrollbar - exactly like timeline */
+/* Scrollbar */
 .layers-container::-webkit-scrollbar {
   width: 6px;
 }
