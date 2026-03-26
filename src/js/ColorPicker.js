@@ -27,13 +27,17 @@ class ColorPicker {
     this.recentColorsGrid = null;
     this.paletteGrid = null;
     this.deleteZone = null;
+    this.floatingColors = new Map();
+    this.floatingColorsDeleteZone = null;
     
     this.init();
   }
 
   init() {
     this.createColorPicker();
+    this.createFloatingColorsDeleteZone();
     this.initColorPickerDrag();
+    this.loadFloatingColors(JSON.parse(localStorage.getItem("floatingColors")) || []);
   }
 
   createColorPicker() {
@@ -43,10 +47,47 @@ class ColorPicker {
     this.overlay.style.display = "none";
     this.editor.uiLayer.appendChild(this.overlay);
     
+    this.overlay.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.overlay.classList.add("drag-over");
+    });
+    
+    this.overlay.addEventListener("dragleave", () => {
+      this.overlay.classList.remove("drag-over");
+    });
+    
+    this.overlay.addEventListener("drop", (e) => {
+      e.preventDefault();
+      this.overlay.classList.remove("drag-over");
+      const index = parseInt(e.dataTransfer.getData("text/plain"));
+      const currentPalette = this.editor.paletteManager.getCurrentPalette();
+      const color = currentPalette?.colors[index];
+      if (color && this.floatingColorsDeleteZone) {
+        this.addFloatingPaletteColor(color, e.clientX, e.clientY);
+      }
+    });
+        
     // Create picker
     this.colorPicker = document.createElement("div");
     this.colorPicker.className = "color-picker";
     this.overlay.appendChild(this.colorPicker);
+    
+    // Block overlay events
+    this.colorPicker.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    this.colorPicker.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    this.colorPicker.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
     
     // Header
     const header = document.createElement("div");
@@ -164,6 +205,26 @@ class ColorPicker {
     // Show RGB tab by default
     this.showTab("rgb");
     this.updatePaletteGrid();
+  }
+
+  createFloatingColorsDeleteZone() {
+    this.floatingColorsDeleteZone = document.createElement("div");
+    this.floatingColorsDeleteZone.className = "delete-zone";
+    this.floatingColorsDeleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.editor.overlayLayer.appendChild(this.floatingColorsDeleteZone);
+    
+    this.floatingColorsDeleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      this.floatingColorsDeleteZone.classList.add("drag-over");
+    });
+    
+    this.floatingColorsDeleteZone.addEventListener("dragleave", () => {
+      this.floatingColorsDeleteZone.classList.remove("drag-over");
+    });
   }
 
   createTab(name, onClick) {
@@ -721,6 +782,169 @@ class ColorPicker {
         }
       ]);
     });
+  }
+    
+  loadFloatingColors(colors) {
+    if (!colors) return;
+    if (!colors.length || !colors.forEach) return;
+    this.removeAllFloatingPaletteColors();
+    colors.forEach(entry => {
+      this.addFloatingPaletteColor(entry.color, entry.x, entry.y);
+    });
+  }
+  
+  addFloatingPaletteColor(color, clientX, clientY) {
+    const colorElement = document.createElement("div");
+    colorElement.className = "palette-color floating";
+    colorElement.style.backgroundColor = color;
+    colorElement.style.cursor = "grab";
+    colorElement.style.position = "fixed";
+    colorElement.style.width = "30px";
+    colorElement.style.height = "30px";
+    colorElement.style.borderRadius = "4px";
+    colorElement.style.boxShadow = "0 0 5px rgba(0, 0, 0, 0.5)";
+    colorElement.style.transition = "all 0.1s";
+    
+    const id = `color_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    colorElement.dataset.color = color;
+    colorElement.dataset.id = id;
+    colorElement.dataset.x = clientX;
+    colorElement.dataset.y = clientY;
+    
+    colorElement.style.top = `${clientY}px`;
+    colorElement.style.left = `${clientX}px`;
+    colorElement.style.touchAction = "none";
+    colorElement.style.userSelect = "none";
+    
+    // Click to select color
+    colorElement.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.editor.updateColorSlidersFromHex(color);
+    });
+    
+    // Pointer event handlers for smooth dragging
+    let isDragging = false;
+    let startX, startY;
+    let startLeft, startTop;
+    
+    const onPointerDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      colorElement.setPointerCapture(e.pointerId);
+      
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = parseFloat(colorElement.style.left) || 0;
+      startTop = parseFloat(colorElement.style.top) || 0;
+      
+      colorElement.style.cursor = "grabbing";
+      colorElement.classList.add("dragging");
+      if (this.floatingColorsDeleteZone) {
+        this.floatingColorsDeleteZone.classList.add("visible");
+      }
+    };
+    
+    const onPointerMove = (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      const newLeft = startLeft + deltaX;
+      const newTop = startTop + deltaY;
+      
+      colorElement.style.left = `${newLeft}px`;
+      colorElement.style.top = `${newTop}px`;
+      colorElement.dataset.x = newLeft;
+      colorElement.dataset.y = newTop;
+      
+      if (this.floatingColorsDeleteZone) {
+        const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
+        const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom;
+        
+        if (isOverDelete) {
+          this.floatingColorsDeleteZone.classList.add("drag-over");
+        } else {
+          this.floatingColorsDeleteZone.classList.remove("drag-over");
+        }
+      }
+    };
+    
+    const onPointerUp = (e) => {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      if (this.floatingColorsDeleteZone) {
+        const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
+        const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
+                            e.clientY >= rect.top && e.clientY <= rect.bottom;
+        
+        if (isOverDelete) {
+          this.removeFloatingPaletteColor(colorElement.dataset.id);
+        } else {
+          this.saveFloatingColors();
+        }
+      }
+      
+      isDragging = false;
+      colorElement.style.cursor = "grab";
+      colorElement.classList.remove("dragging");
+      if (this.floatingColorsDeleteZone) {
+        this.floatingColorsDeleteZone.classList.remove("visible", "drag-over");
+      }
+      
+      colorElement.releasePointerCapture(e.pointerId);
+    };
+    
+    colorElement.addEventListener("pointerdown", onPointerDown);
+    colorElement.addEventListener("pointermove", onPointerMove);
+    colorElement.addEventListener("pointerup", onPointerUp);
+    colorElement.addEventListener("pointercancel", onPointerUp);
+    colorElement.addEventListener("contextmenu", (e) => e.preventDefault());
+    
+    this.editor.overlayLayer.appendChild(colorElement);
+    this.floatingColors.set(id, colorElement);
+    this.saveFloatingColors();
+  }
+  
+  removeFloatingPaletteColor(id) {
+    const element = this.floatingColors.get(id);
+    if (element) {
+      element.remove();
+      this.floatingColors.delete(id);
+      this.saveFloatingColors();
+    }
+  }
+  
+  removeAllFloatingPaletteColors() {
+    this.floatingColors.forEach((element, id) => {
+      if (element) element.remove();
+    });
+    this.floatingColors.clear();
+    this.saveFloatingColors();
+  }
+  
+  saveFloatingColors() {
+    localStorage.setItem("floatingColors", this.getFloatingColorsData());
+  }
+  
+  getFloatingColorsData() {
+    return JSON.stringify(
+      Array.from(this.floatingColors).map(entry => entry[1]).map(element => {
+        return {
+          color: element.dataset.color,
+          x: element.dataset.x,
+          y: element.dataset.y
+        };
+      })
+    );
   }
 
   // Color conversion utilities
