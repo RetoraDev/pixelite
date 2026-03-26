@@ -31,6 +31,8 @@ const jsFileOrder = [
   'js/SpritesheetLoader.js',
   'js/HistoryManager.js',
   'js/CollabManager.js',
+  'js/PaletteManager.js',
+  'js/ColorPicker.js',
   'js/FileBrowser.js',
   'js/PixelArtEditor.js'
 ];

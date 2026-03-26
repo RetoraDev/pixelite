@@ -281,6 +281,11 @@ button:active {
   background-position: center;
 }
 
+.ui-button.highlight {
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
 .undo-redo-buttons {
   display: flex;
   flex-direction: row;

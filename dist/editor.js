@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1
- * Built: 3/25/2026, 10:59:55 AM
+ * Built: 3/26/2026, 12:59:54 AM
  * Platform: Android (Cordova)
  * Debug: false
  * Minified: false
@@ -57,6 +57,154 @@ window.openExternalUrl = url => {
     a.click();
   }
 };
+
+// fetch() polyfill for file protocol 
+(function() {
+  'use strict';
+  
+  // Only apply polyfill if running in file protocol
+  if (window.location.protocol !== 'file:') {
+    return;
+  }
+
+  // Check if we need to polyfill
+  const originalFetch = window.fetch;
+
+  async function fileProtocolFetch(input, init = {}) {
+    // Handle Request object if passed
+    let url = input;
+    let options = { ...init };
+
+    if (input instanceof Request) {
+      url = input.url;
+      options = {
+        method: input.method,
+        headers: input.headers,
+        body: input.body,
+        mode: input.mode,
+        credentials: input.credentials,
+        cache: input.cache,
+        redirect: input.redirect,
+        referrer: input.referrer,
+        integrity: input.integrity,
+        ...init
+      };
+    }
+
+    // Parse URL to determine if it's relative or absolute
+    let fullUrl;
+    try {
+      fullUrl = new URL(url, window.location.href);
+    } catch (e) {
+      fullUrl = new URL(url);
+    }
+
+    // For absolute URLs with different protocol, use original fetch if available
+    if (fullUrl.protocol !== 'file:' && fullUrl.protocol !== 'about:' && originalFetch) {
+      return originalFetch(input, init);
+    }
+
+    // Handle file:// or relative paths
+    const filePath = fullUrl.href.replace(/^file:\/\//, '').replace(/^\//, '');
+    
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Determine method
+      const method = (options.method || 'GET').toUpperCase();
+      
+      xhr.open(method, fullUrl.href, true);
+      
+      // Set headers
+      if (options.headers) {
+        if (options.headers instanceof Headers) {
+          options.headers.forEach((value, key) => {
+            xhr.setRequestHeader(key, value);
+          });
+        } else if (Array.isArray(options.headers)) {
+          options.headers.forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+          });
+        } else if (typeof options.headers === 'object') {
+          Object.entries(options.headers).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+          });
+        }
+      }
+      
+      // Set response type for blob/buffer/etc
+      if (options.responseType) {
+        xhr.responseType = options.responseType;
+      }
+      
+      // Handle credentials
+      xhr.withCredentials = options.credentials === 'include';
+      
+      // Handle timeout
+      if (options.timeout) {
+        xhr.timeout = options.timeout;
+      }
+      
+      // Create Response object
+      function createResponse(xhr) {
+        const headers = new Headers();
+        const responseHeaders = xhr.getAllResponseHeaders();
+        responseHeaders.split('\r\n').forEach(line => {
+          const [key, value] = line.split(': ');
+          if (key && value) {
+            headers.append(key, value);
+          }
+        });
+        
+        let body = xhr.response;
+        
+        // Handle different response types
+        if (xhr.responseType === '' || xhr.responseType === 'text') {
+          body = xhr.responseText;
+        }
+        
+        const responseInit = {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: headers
+        };
+        
+        return new Response(body, responseInit);
+      }
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(createResponse(xhr));
+        } else {
+          reject(new TypeError(`Failed to fetch: ${xhr.status} ${xhr.statusText}`));
+        }
+      };
+      
+      xhr.onerror = () => {
+        reject(new TypeError('Failed to fetch: Network error'));
+      };
+      
+      xhr.ontimeout = () => {
+        reject(new TypeError('Failed to fetch: Timeout'));
+      };
+      
+      // Send request
+      if (options.body) {
+        xhr.send(options.body);
+      } else {
+        xhr.send();
+      }
+    });
+  }
+
+  // Override fetch
+  window.fetch = fileProtocolFetch;
+  
+  // Also polyfill window.fetch if needed for older browsers
+  if (!window.Promise) {
+    console.warn('Promise polyfill required for fetch polyfill');
+  }
+})();
 
 // Settings Manager Class
 class SettingsManager {
@@ -1246,7 +1394,7 @@ class ReferenceManager {
     const fileBrowser = this.editor.getFileBrowser({
       title: __("Cargar imagen||Load image"),
       mode: "open",
-      fileTypes: ["image"],
+      fileTypes: ["png", "jpg", "jpeg", "gif","webp"],
       onConfirm: async (fileInfo) => {
         try {
           const fileData = await this.editor.readFile(fileInfo);
@@ -5018,6 +5166,1431 @@ class CollabManager {
   }
 }
 
+// Handles multiple palettes, loading, saving, and Lospec import
+class PaletteManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.palettes = [];
+    this.currentPaletteId = null;
+    this.recentColors = JSON.parse(localStorage.getItem("recentColors")) || [];
+    
+    this.init();
+  }
+
+  init() {
+    this.loadPalettes();
+  }
+
+  getDefaultPalette() {
+    return {
+      id: 'default_' + Date.now(),
+      name: __('Sistema||System'),
+      colors: [
+        "#000000", "#7c7c7c", "#bcbcbc", "#fcfcfc",
+        "#a80020", "#e40058", "#f85898", "#f8a4c0",
+        "#940084", "#d800cc", "#f878f8", "#f8b8f8",
+        "#4428bc", "#6844fc", "#9878f8", "#d8b8f8",
+        "#0000bc", "#0000fc", "#6888fc", "#b8b8f8",
+        "#0058f8", "#0078f8", "#3cbcfc", "#a4e4fc",
+        "#004058", "#008888", "#00e8d8", "#00fcfc",
+        "#007800", "#00a800", "#00b800", "#b8f8d8",
+        "#006800", "#00a844", "#58f898", "#b8f8b8",
+        "#005800", "#58d854", "#b8f818", "#d8f878",
+        "#503000", "#ac7c00", "#f8b800", "#fce0a8",
+        "#a81000", "#fca044", "#f8d878", "#f0d0b0",
+        "#881400", "#f83800", "#e45c10", "#f87858"
+      ]
+    };
+  }
+
+  loadPalettes() {
+    try {
+      const saved = localStorage.getItem("palettes");
+      if (saved) {
+        this.palettes = JSON.parse(saved);
+        // Ensure each palette has an id
+        this.palettes.forEach(p => {
+          if (!p.id) p.id = 'palette_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        });
+      } else {
+        this.palettes = [this.getDefaultPalette()];
+      }
+      this.currentPaletteId = this.palettes[0]?.id || null;
+      this.savePalettes();
+    } catch (e) {
+      console.warn("Failed to load palettes:", e);
+      this.palettes = [this.getDefaultPalette()];
+      this.currentPaletteId = this.palettes[0].id;
+    }
+  }
+
+  savePalettes() {
+    localStorage.setItem("palettes", JSON.stringify(this.palettes));
+  }
+
+  getCurrentPalette() {
+    return this.palettes.find(p => p.id === this.currentPaletteId) || this.palettes[0];
+  }
+
+  getCurrentColors() {
+    const palette = this.getCurrentPalette();
+    return palette ? palette.colors : [];
+  }
+
+  addPalette(name, colors = []) {
+    const newPalette = {
+      id: 'palette_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+      name: name || __('Nueva paleta||New palette'),
+      colors: [...colors],
+      createdAt: Date.now()
+    };
+    this.palettes.push(newPalette);
+    this.currentPaletteId = newPalette.id;
+    this.savePalettes();
+    return newPalette;
+  }
+
+  removePalette(id) {
+    const index = this.palettes.findIndex(p => p.id === id);
+    if (index === -1) return;
+    
+    this.palettes.splice(index, 1);
+    
+    if (this.palettes.length === 0) {
+      this.palettes = [this.getDefaultPalette()];
+    }
+    
+    if (this.currentPaletteId === id) {
+      this.currentPaletteId = this.palettes[0].id;
+    }
+    
+    this.savePalettes();
+  }
+
+  renamePalette(id, newName) {
+    const palette = this.palettes.find(p => p.id === id);
+    if (palette) {
+      palette.name = newName;
+      this.savePalettes();
+    }
+  }
+
+  setCurrentPalette(id) {
+    if (this.palettes.find(p => p.id === id)) {
+      this.currentPaletteId = id;
+      this.savePalettes();
+    }
+  }
+
+  addColorToPalette(paletteId, color) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette && !palette.colors.includes(color)) {
+      palette.colors.push(color);
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  removeColorFromPalette(paletteId, index) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette && palette.colors[index]) {
+      palette.colors.splice(index, 1);
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  moveColorInPalette(paletteId, fromIndex, toIndex) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette && fromIndex >= 0 && toIndex >= 0 && fromIndex < palette.colors.length && toIndex < palette.colors.length) {
+      const color = palette.colors.splice(fromIndex, 1)[0];
+      palette.colors.splice(toIndex, 0, color);
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  updatePaletteColors(paletteId, colors) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (palette) {
+      palette.colors = [...colors];
+      this.savePalettes();
+      return true;
+    }
+    return false;
+  }
+
+  addToRecent(color) {
+    this.recentColors = [color, ...this.recentColors.filter(c => c !== color)].slice(0, 20);
+    localStorage.setItem("recentColors", JSON.stringify(this.recentColors));
+  }
+
+  getRecentColors() {
+    return this.recentColors;
+  }
+
+  // Lospec API integration
+  async importFromLospec(slug) {
+    const url = `https://lospec.com/palette-list/${slug}.json`;
+    
+    try {
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(__('Paleta no encontrada||Palette not found'));
+        }
+        throw new Error(__('Error al cargar paleta||Error loading palette'));
+      }
+      
+      const data = await response.json();
+      
+      if (!data.name || !data.colors || !Array.isArray(data.colors)) {
+        throw new Error(__('Formato de paleta inválido||Invalid palette format'));
+      }
+      
+      const colors = data.colors.map(c => c.startsWith('#') ? c : '#' + c);
+      
+      return {
+        name: data.name,
+        author: data.author,
+        colors: colors,
+        slug: slug
+      };
+    } catch (error) {
+      console.error('Lospec import error:', error);
+      throw error;
+    }
+  }
+
+  showLospecImportDialog() {
+    const content = document.createElement("div");
+    content.className = "lospec-import-dialog";
+    
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = __("Slug de la paleta (ej: greyt-bit)||Palette slug (e.g., greyt-bit)");
+    content.appendChild(input);
+    
+    this.editor.showPopup(
+      __("Importar de Lospec||Import from Lospec"),
+      content,
+      [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => this.editor.hidePopup()
+        },
+        {
+          text: __("Importar||Import"),
+          action: async () => {
+            const slug = input.value.trim().toLowerCase();
+            if (!slug) {
+              this.editor.showToast(__("Ingresa un slug válido||Enter a valid slug"), 2000);
+              return;
+            }
+            
+            try {
+              const paletteData = await this.importFromLospec(slug);
+              const existing = this.palettes.find(p => p.name.toLowerCase() === paletteData.name.toLowerCase());
+              
+              if (existing) {
+                this.editor.showPopup(
+                  __("Paleta existente||Existing palette"),
+                  __(`La paleta "${paletteData.name}" ya existe. ¿Deseas reemplazarla?||Palette "${paletteData.name}" already exists. Do you want to replace it?`),
+                  [
+                    {
+                      text: __("Cancelar||Cancel"),
+                      class: "cancel",
+                      action: () => this.editor.hidePopup()
+                    },
+                    {
+                      text: __("Reemplazar||Replace"),
+                      action: () => {
+                        this.updatePaletteColors(existing.id, paletteData.colors);
+                        this.editor.colorPicker?.updatePaletteGrid();
+                        this.editor.hidePopup();
+                        this.editor.showToast(__(`Paleta "${paletteData.name}" actualizada||Palette "${paletteData.name}" updated`));
+                      }
+                    }
+                  ]
+                );
+              } else {
+                this.addPalette(paletteData.name, paletteData.colors);
+                this.editor.colorPicker?.updatePaletteGrid();
+                this.editor.showToast(__(`Paleta "${paletteData.name}" importada||Palette "${paletteData.name}" imported`));
+                this.editor.hidePopup();
+              }
+            } catch (error) {
+              this.editor.showToast(error.message, 3000);
+            }
+          }
+        }
+      ]
+    );
+    
+    setTimeout(() => input.focus(), 100);
+  }
+
+  showPaletteManagerDialog() {
+    const container = document.createElement("div");
+    container.className = "palette-manager-container";
+    
+    const listContainer = document.createElement("div");
+    listContainer.className = "palette-manager-list";
+    container.appendChild(listContainer);
+    
+    const renderList = () => {
+      listContainer.innerHTML = "";
+      
+      this.palettes.forEach(palette => {
+        const item = document.createElement("div");
+        item.className = `palette-manager-item ${palette.id === this.currentPaletteId ? 'active' : ''}`;
+        
+        const preview = document.createElement("div");
+        preview.className = "palette-manager-preview";
+        palette.colors.slice(0, 6).forEach(color => {
+          const swatch = document.createElement("div");
+          swatch.className = "palette-manager-swatch";
+          swatch.style.backgroundColor = color;
+          preview.appendChild(swatch);
+        });
+        
+        const info = document.createElement("div");
+        info.className = "palette-manager-info";
+        
+        const nameSpan = document.createElement("div");
+        nameSpan.className = "palette-manager-name";
+        nameSpan.textContent = palette.name;
+        info.appendChild(nameSpan);
+        
+        const countSpan = document.createElement("div");
+        countSpan.className = "palette-manager-count";
+        countSpan.textContent = `${palette.colors.length} ${__("colores||colors")}`;
+        info.appendChild(countSpan);
+        
+        const actions = document.createElement("div");
+        actions.className = "palette-manager-actions";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "ui-button palette-manager-btn";
+        editBtn.innerHTML = '<div class="icon icon-settings"></div>';
+        editBtn.title = __("Editar||Edit");
+        editBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.showPaletteEditor(palette.id);
+        });
+        actions.appendChild(editBtn);
+        
+        const exportBtn = document.createElement("button");
+        exportBtn.className = "ui-button palette-manager-btn";
+        exportBtn.innerHTML = '<div class="icon icon-download"></div>';
+        exportBtn.title = __("Exportar||Export");
+        exportBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.exportPaletteToFile(palette.id);
+        });
+        actions.appendChild(exportBtn);
+        
+        if (this.palettes.length > 1) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "ui-button palette-manager-btn";
+          deleteBtn.innerHTML = '<div class="icon icon-close"></div>';
+          deleteBtn.title = __("Eliminar||Delete");
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            this.editor.showPopup(
+              __("Eliminar paleta||Delete palette"),
+              __(`¿Eliminar la paleta "${palette.name}"?||Delete palette "${palette.name}"?`),
+              [
+                {
+                  text: __("Cancelar||Cancel"),
+                  class: "cancel",
+                  action: () => this.editor.hidePopup()
+                },
+                {
+                  text: __("Eliminar||Delete"),
+                  action: () => {
+                    this.removePalette(palette.id);
+                    renderList();
+                    this.editor.colorPicker?.updatePaletteGrid();
+                    this.editor.hidePopup();
+                  }
+                }
+              ]
+            );
+          });
+          actions.appendChild(deleteBtn);
+        }
+        
+        item.appendChild(preview);
+        item.appendChild(info);
+        item.appendChild(actions);
+        
+        item.addEventListener("click", () => {
+          this.setCurrentPalette(palette.id);
+          this.editor.colorPicker?.updatePaletteGrid();
+          this.editor.hidePopup();
+        });
+        
+        listContainer.appendChild(item);
+      });
+    };
+    
+    renderList();
+    
+    const actionRow = document.createElement("div");
+    actionRow.className = "palette-manager-actions-row";
+    
+    const newBtn = document.createElement("button");
+    newBtn.className = "ui-button highlight palette-manager-action-btn";
+    newBtn.innerHTML = __("Nueva paleta||New palette");
+    newBtn.addEventListener("click", () => {
+      const name = prompt(__("Nombre de la paleta||Palette name"), __("Mi paleta||My palette"));
+      if (name) {
+        this.addPalette(name);
+        renderList();
+        this.editor.colorPicker?.updatePaletteGrid();
+      }
+    });
+    actionRow.appendChild(newBtn);
+    
+    const importBtn = document.createElement("button");
+    importBtn.className = "ui-button highlight palette-manager-action-btn";
+    importBtn.innerHTML = "JSON";
+    importBtn.addEventListener("click", () => {
+      this.showImportJsonDialog();
+    });
+    actionRow.appendChild(importBtn);
+    
+    const lospecBtn = document.createElement("button");
+    lospecBtn.className = "ui-button highlight palette-manager-action-btn";
+    lospecBtn.innerHTML = "Lospec";
+    lospecBtn.addEventListener("click", () => {
+      this.editor.hidePopup();
+      this.showLospecImportDialog();
+    });
+    actionRow.appendChild(lospecBtn);
+    
+    container.appendChild(actionRow);
+    
+    this.editor.showPopup(
+      __("Gestor de paletas||Palette Manager"),
+      container,
+      [
+        {
+          text: __("Cerrar||Close"),
+          action: () => this.editor.hidePopup()
+        }
+      ]
+    );
+  }
+
+  showPaletteEditor(paletteId) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (!palette) return;
+    
+    const container = document.createElement("div");
+    container.className = "palette-editor-container";
+    
+    // Name row
+    const nameRow = document.createElement("div");
+    nameRow.className = "palette-editor-name-row";
+    
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = palette.name;
+    nameInput.className = "palette-editor-name-input";
+    nameRow.appendChild(nameInput);
+    
+    nameInput.addEventListener("change", () => {
+      if (nameInput.value.trim()) {
+        this.renamePalette(paletteId, nameInput.value.trim());
+        this.editor.colorPicker?.updatePaletteGrid();
+        this.editor.showToast(__("Paleta renombrada||Palette renamed"));
+      }
+    });
+    
+    container.appendChild(nameRow);
+    
+    // Use the same palette-grid class as main color picker
+    const colorsGrid = document.createElement("div");
+    colorsGrid.className = "palette-grid";
+    colorsGrid.style.maxHeight = "300px";
+    colorsGrid.style.overflowY = "auto";
+    container.appendChild(colorsGrid);
+    
+    // Create delete zone for drag-to-delete
+    const deleteZone = document.createElement("div");
+    deleteZone.className = "delete-zone palette-delete-zone";
+    deleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    
+    // Delete zone events
+    let draggedIndex = null;
+    
+    deleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      deleteZone.classList.add("drag-over");
+    });
+    
+    deleteZone.addEventListener("dragleave", () => {
+      deleteZone.classList.remove("drag-over");
+    });
+    
+    deleteZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      deleteZone.classList.remove("drag-over");
+      if (draggedIndex !== null) {
+        this.removeColorFromPalette(paletteId, draggedIndex);
+        renderColors();
+        this.editor.colorPicker?.updatePaletteGrid();
+        draggedIndex = null;
+      }
+    });
+    
+    const renderColors = () => {
+      colorsGrid.innerHTML = "";
+      
+      palette.colors.forEach((color, index) => {
+        const colorElement = document.createElement("div");
+        colorElement.className = "palette-color";
+        colorElement.style.backgroundColor = color;
+        colorElement.style.cursor = "grab";
+        colorElement.draggable = true;
+        colorElement.dataset.index = index;
+        
+        // Click to select color
+        colorElement.addEventListener("click", () => {
+          this.editor.colorPicker?.updateSlidersFromHex(color);
+        });
+        
+        // Drag events
+        colorElement.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", index.toString());
+          draggedIndex = index;
+          colorElement.classList.add("dragging");
+          colorElement.style.cursor = "grabbing";
+          deleteZone.classList.add("visible");
+        });
+        
+        colorElement.addEventListener("dragend", () => {
+          colorElement.classList.remove("dragging");
+          colorElement.style.cursor = "grab";
+          deleteZone.classList.remove("visible", "drag-over");
+          draggedIndex = null;
+        });
+        
+        colorElement.addEventListener("dragover", (e) => {
+          e.preventDefault();
+        });
+        
+        colorElement.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+          const toIndex = index;
+          if (fromIndex !== toIndex) {
+            this.moveColorInPalette(paletteId, fromIndex, toIndex);
+            renderColors();
+            this.editor.colorPicker?.updatePaletteGrid();
+          }
+        });
+        
+        colorsGrid.appendChild(colorElement);
+      });
+      
+      // Add color button
+      const addButton = document.createElement("div");
+      addButton.className = "palette-add-button";
+      addButton.innerHTML = "+";
+      addButton.title = __("Añadir color||Add new color");
+      addButton.style.cursor = "pointer";
+      addButton.addEventListener("click", () => {
+        this.editor.showHexColorInputDialog().then(color => {
+          this.addColorToPalette(paletteId, color);
+          renderColors();
+          this.editor.colorPicker?.updatePaletteGrid();
+        }).catch(() => {});
+      });
+      colorsGrid.appendChild(addButton);
+    };
+    
+    renderColors();
+    container.appendChild(deleteZone);
+    
+    this.editor.showPopup(
+      palette.name,
+      container,
+      [
+        {
+          text: __("Cerrar||Close"),
+          action: () => {
+            this.editor.hidePopup();
+            this.showPaletteManagerDialog();
+          }
+        }
+      ]
+    );
+  }
+  
+  exportPaletteToFile(paletteId) {
+    const palette = this.palettes.find(p => p.id === paletteId);
+    if (!palette) return;
+    
+    const jsonData = JSON.stringify({
+      name: palette.name,
+      colors: palette.colors,
+      exportedAt: new Date().toISOString()
+    }, null, 2);
+    
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${palette.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    this.editor.showToast(__(`Paleta "${palette.name}" exportada||Palette "${palette.name}" exported`));
+  }
+
+  showImportJsonDialog() {
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Importar paleta JSON||Import JSON palette"),
+      mode: "open",
+      fileTypes: ["json"],
+      onConfirm: async (fileInfo) => {
+        try {
+          const fileData = await this.editor.readFile(fileInfo);
+          const data = JSON.parse(fileData);
+          
+          if (!data.name || !data.colors || !Array.isArray(data.colors)) {
+            throw new Error(__('Formato inválido||Invalid format'));
+          }
+          
+          const existing = this.palettes.find(p => p.name === data.name);
+          if (existing) {
+            const newName = `${data.name} (${__('copia||copy')})`;
+            this.addPalette(newName, data.colors);
+            this.editor.showToast(__(`Paleta importada como "${newName}"||Palette imported as "${newName}"`));
+          } else {
+            this.addPalette(data.name, data.colors);
+            this.editor.showToast(__(`Paleta "${data.name}" importada||Palette "${data.name}" imported`));
+          }
+          
+          this.editor.colorPicker?.updatePaletteGrid();
+          this.editor.hidePopup();
+        } catch (error) {
+          this.editor.showToast(error.message, 3000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+}
+
+// Handles all color picker UI and logic
+class ColorPicker {
+  constructor(editor) {
+    this.editor = editor;
+    
+    // Color state
+    this.selectedColorTab = 'rgb';
+    this.colorPickerPreviewColor = editor.primaryColor;
+    this.isColorPicking = false;
+    this.colorPickStartX = 0;
+    this.colorPickStartY = 0;
+    this.colorPickLine = null;
+    this.colorPickStartPos = null;
+    this.colorPickTimeout = null;
+    this.colorPickStartTime = null;
+    
+    // UI Elements
+    this.overlay = null;
+    this.colorPicker = null;
+    this.rgbTab = null;
+    this.hsvTab = null;
+    this.paletteTab = null;
+    this.rgbContent = null;
+    this.hsvContent = null;
+    this.paletteContent = null;
+    this.currentColorPreview = null;
+    this.recentColorsGrid = null;
+    this.paletteGrid = null;
+    this.deleteZone = null;
+    
+    this.init();
+  }
+
+  init() {
+    this.createColorPicker();
+    this.initColorPickerDrag();
+  }
+
+  createColorPicker() {
+    // Create overlay
+    this.overlay = document.createElement("div");
+    this.overlay.className = "color-picker-overlay";
+    this.overlay.style.display = "none";
+    this.editor.uiLayer.appendChild(this.overlay);
+    
+    // Create picker
+    this.colorPicker = document.createElement("div");
+    this.colorPicker.className = "color-picker";
+    this.overlay.appendChild(this.colorPicker);
+    
+    // Header
+    const header = document.createElement("div");
+    header.className = "color-picker-header";
+    this.colorPicker.appendChild(header);
+    
+    const title = document.createElement("div");
+    title.className = "color-picker-title";
+    title.textContent = __("Recoge Color||Color Picker");
+    header.appendChild(title);
+    
+    const closeBtn = document.createElement("div");
+    closeBtn.className = "panel-close color-picker-close";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.addEventListener("click", () => this.hide());
+    header.appendChild(closeBtn);
+    
+    // Tabs
+    const tabs = document.createElement("div");
+    tabs.className = "color-picker-tabs";
+    this.colorPicker.appendChild(tabs);
+    
+    this.rgbTab = this.createTab("RGB", () => this.showTab("rgb"));
+    this.hsvTab = this.createTab("HSV", () => this.showTab("hsv"));
+    this.paletteTab = this.createTab(__("Paleta||Palette"), () => this.showTab("palette"));
+    
+    // Content
+    const content = document.createElement("div");
+    content.className = "color-picker-content";
+    this.colorPicker.appendChild(content);
+    
+    // RGB Tab
+    this.rgbContent = document.createElement("div");
+    this.rgbContent.className = "color-picker-tab-content rgb-content";
+    content.appendChild(this.rgbContent);
+    this.createColorSlider("r", __("Rojo||Red"), 0, 255, this.rgbContent);
+    this.createColorSlider("g", __("Verde||Green"), 0, 255, this.rgbContent);
+    this.createColorSlider("b", __("Azul||Blue"), 0, 255, this.rgbContent);
+    
+    // HSV Tab
+    this.hsvContent = document.createElement("div");
+    this.hsvContent.className = "color-picker-tab-content hsv-content";
+    content.appendChild(this.hsvContent);
+    this.createColorSlider("h", __("Tono||Hue"), 0, 360, this.hsvContent);
+    this.createColorSlider("s", __("Saturación||Saturation"), 0, 100, this.hsvContent, "%");
+    this.createColorSlider("v", __("Valor||Value"), 0, 100, this.hsvContent, "%");
+    
+    // Palette Tab
+    this.paletteContent = document.createElement("div");
+    this.paletteContent.className = "color-picker-tab-content palette-content";
+    content.appendChild(this.paletteContent);
+    
+    const paletteActions = document.createElement("div");
+    paletteActions.className = "palette-actions";
+    this.paletteContent.appendChild(paletteActions);
+    
+    const loadBtn = this.editor.createButton("load-palette", "icon-folder", () => this.loadPalette());
+    loadBtn.textContent = __("Cargar||Load");
+    paletteActions.appendChild(loadBtn);
+    
+    const saveBtn = this.editor.createButton("save-palette", "icon-save", () => this.savePalette());
+    saveBtn.textContent = __("Guardar||Save");
+    paletteActions.appendChild(saveBtn);
+    
+    const manageBtn = this.editor.createButton("manage-palettes", "icon-settings", () => {
+      this.editor.paletteManager.showPaletteManagerDialog();
+    });
+    manageBtn.textContent = __("Gestionar||Manage");
+    paletteActions.appendChild(manageBtn);
+    
+    this.paletteGrid = document.createElement("div");
+    this.paletteGrid.className = "palette-grid";
+    this.paletteContent.appendChild(this.paletteGrid);
+    
+    // Recent Colors
+    const recentContainer = document.createElement("div");
+    recentContainer.className = "recent-colors";
+    this.colorPicker.appendChild(recentContainer);
+    
+    const recentTitle = document.createElement("div");
+    recentTitle.className = "recent-colors-title";
+    recentTitle.textContent = __("Colores Recientes||Recent Colors");
+    recentContainer.appendChild(recentTitle);
+    
+    this.recentColorsGrid = document.createElement("div");
+    this.recentColorsGrid.className = "recent-colors-grid";
+    recentContainer.appendChild(this.recentColorsGrid);
+    
+    // Footer
+    const footer = document.createElement("div");
+    footer.className = "color-picker-footer";
+    this.colorPicker.appendChild(footer);
+    
+    this.currentColorPreview = document.createElement("div");
+    this.currentColorPreview.className = "current-color-preview";
+    this.currentColorPreview.addEventListener("click", () => this.showHexInputDialog());
+    footer.appendChild(this.currentColorPreview);
+    
+    const confirmBtn = this.editor.createButton("confirm-color", null, () => this.confirmSelection());
+    confirmBtn.textContent = __("Usar color||Pick color");
+    footer.appendChild(confirmBtn);
+    
+    // Delete zone
+    this.deleteZone = document.createElement("div");
+    this.deleteZone.className = "delete-zone palette-delete-zone";
+    this.deleteZone.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
+    this.overlay.appendChild(this.deleteZone);
+    
+    this.setupDeleteZoneEvents();
+    
+    // Show RGB tab by default
+    this.showTab("rgb");
+    this.updatePaletteGrid();
+  }
+
+  createTab(name, onClick) {
+    const tab = document.createElement("div");
+    tab.className = "color-picker-tab";
+    tab.textContent = name;
+    tab.addEventListener("click", onClick);
+    this.colorPicker.querySelector(".color-picker-tabs").appendChild(tab);
+    return tab;
+  }
+
+  createColorSlider(channel, label, min, max, container, suffix = "") {
+    const sliderContainer = document.createElement("div");
+    sliderContainer.className = "color-slider-container";
+    
+    const labelElement = document.createElement("label");
+    labelElement.textContent = label;
+    sliderContainer.appendChild(labelElement);
+    
+    const controls = document.createElement("div");
+    controls.className = "slider-controls";
+    sliderContainer.appendChild(controls);
+    
+    const decreaseBtn = document.createElement("button");
+    decreaseBtn.className = "slider-btn decrease";
+    decreaseBtn.innerHTML = "&minus;";
+    decreaseBtn.addEventListener("click", () => this.adjustChannel(channel, -1));
+    controls.appendChild(decreaseBtn);
+    
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = min;
+    slider.max = max;
+    slider.value = channel === "r" ? 255 : 0;
+    slider.className = `color-slider ${channel}-slider`;
+    slider.addEventListener("input", e => this.handleSliderChange(channel, e.target.value));
+    controls.appendChild(slider);
+    
+    const increaseBtn = document.createElement("button");
+    increaseBtn.className = "slider-btn increase";
+    increaseBtn.innerHTML = "+";
+    increaseBtn.addEventListener("click", () => this.adjustChannel(channel, 1));
+    controls.appendChild(increaseBtn);
+    
+    const valueInput = document.createElement("input");
+    valueInput.type = "number";
+    valueInput.min = min;
+    valueInput.max = max;
+    valueInput.value = channel === "r" ? 255 : 0;
+    valueInput.className = `color-value ${channel}-value`;
+    valueInput.addEventListener("change", e => this.handleValueChange(channel, e.target.value));
+    controls.appendChild(valueInput);
+    
+    const suffixElement = document.createElement("span");
+    suffixElement.className = "suffix";
+    suffixElement.textContent = suffix;
+    controls.appendChild(suffixElement);
+    
+    container.appendChild(sliderContainer);
+  }
+
+  setupDeleteZoneEvents() {
+    this.deleteZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteZone.classList.add("drag-over");
+    });
+    
+    this.deleteZone.addEventListener("dragleave", () => {
+      this.deleteZone.classList.remove("drag-over");
+    });
+    
+    this.deleteZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteZone.classList.remove("drag-over");
+      const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+      this.removeColorFromPalette(fromIndex);
+    });
+  }
+
+  showTab(tabName) {
+    const tabContents = this.colorPicker.querySelectorAll(".color-picker-tab-content");
+    tabContents.forEach(content => content.style.display = "none");
+    
+    const tabs = this.colorPicker.querySelectorAll(".color-picker-tab");
+    tabs.forEach(tab => tab.classList.remove("active"));
+    
+    if (tabName === "rgb") {
+      this.rgbContent.style.display = "block";
+      this.rgbTab.classList.add("active");
+      this.updateSlidersFromHex(this.colorPickerPreviewColor);
+    } else if (tabName === "hsv") {
+      this.hsvContent.style.display = "block";
+      this.hsvTab.classList.add("active");
+      this.updateSlidersFromHex(this.colorPickerPreviewColor);
+    } else if (tabName === "palette") {
+      this.paletteContent.style.display = "block";
+      this.paletteTab.classList.add("active");
+      this.updatePaletteGrid();
+    }
+  }
+
+  updateSlidersFromHex(hex) {
+    if (!hex) return;
+    
+    const rgb = this.hexToRgb(hex);
+    this.updateSlider("r", rgb.r);
+    this.updateSlider("g", rgb.g);
+    this.updateSlider("b", rgb.b);
+    
+    const hsv = this.rgbToHsv(rgb.r, rgb.g, rgb.b);
+    this.updateSlider("h", hsv.h);
+    this.updateSlider("s", hsv.s);
+    this.updateSlider("v", hsv.v);
+    
+    this.currentColorPreview.style.backgroundColor = hex;
+    this.colorPickerPreviewColor = hex;
+  }
+
+  updateSlider(channel, value) {
+    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
+    const valueInput = this.colorPicker.querySelector(`.${channel}-value`);
+    if (slider) slider.value = value;
+    if (valueInput) valueInput.value = value;
+  }
+
+  handleSliderChange(channel, value) {
+    this.updateSlider(channel, value);
+    this.updateColorFromSliders(channel === "r" || channel === "g" || channel === "b");
+  }
+
+  handleValueChange(channel, value) {
+    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
+    const min = parseInt(slider.min);
+    const max = parseInt(slider.max);
+    value = Math.max(min, Math.min(max, parseInt(value) || 0));
+    this.updateSlider(channel, value);
+    this.updateColorFromSliders();
+  }
+
+  adjustChannel(channel, delta) {
+    const valueInput = this.colorPicker.querySelector(`.${channel}-value`);
+    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
+    const min = parseInt(slider.min);
+    const max = parseInt(slider.max);
+    let newValue = parseInt(valueInput.value) + delta;
+    newValue = Math.max(min, Math.min(max, newValue));
+    this.updateSlider(channel, newValue);
+    this.updateColorFromSliders();
+  }
+
+  updateColorFromSliders(rgbMode = true) {
+    if (rgbMode) {
+      const r = parseInt(this.colorPicker.querySelector(".r-value").value);
+      const g = parseInt(this.colorPicker.querySelector(".g-value").value);
+      const b = parseInt(this.colorPicker.querySelector(".b-value").value);
+      const hex = this.rgbToHex(r, g, b);
+      this.colorPickerPreviewColor = hex;
+      this.currentColorPreview.style.backgroundColor = hex;
+    } else {
+      const h = parseInt(this.colorPicker.querySelector(".h-value").value);
+      const s = parseInt(this.colorPicker.querySelector(".s-value").value);
+      const v = parseInt(this.colorPicker.querySelector(".v-value").value);
+      const rgb = this.hsvToRgb(h, s, v);
+      const hex = this.rgbToHex(rgb.r, rgb.g, rgb.b);
+      this.colorPickerPreviewColor = hex;
+      this.currentColorPreview.style.backgroundColor = hex;
+    }
+  }
+
+  confirmSelection() {
+    const hex = this.colorPickerPreviewColor;
+    if (!hex) return;
+    
+    if (this.editor.selectedColor === "primary") {
+      this.editor.primaryColor = hex;
+    } else {
+      this.editor.secondaryColor = hex;
+    }
+    
+    this.editor.updateColorIndicator();
+    this.editor.paletteManager.addToRecent(hex);
+    this.updateRecentColorsGrid();
+    this.hide();
+  }
+
+  updatePaletteGrid() {
+    if (!this.paletteGrid) return;
+    
+    this.paletteGrid.innerHTML = "";
+    const currentPalette = this.editor.paletteManager.getCurrentPalette();
+    if (!currentPalette) return;
+    
+    for (let i = 0; i < currentPalette.colors.length; i++) {
+      const color = currentPalette.colors[i];
+      const colorElement = document.createElement("div");
+      colorElement.className = "palette-color";
+      colorElement.style.backgroundColor = color;
+      colorElement.style.cursor = "grab";
+      colorElement.draggable = true;
+      colorElement.dataset.index = i;
+      
+      colorElement.addEventListener("click", () => {
+        this.updateSlidersFromHex(color);
+      });
+      
+      colorElement.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", i.toString());
+        colorElement.classList.add("dragging");
+        colorElement.style.cursor = "grabbing";
+        this.deleteZone.classList.add("visible");
+      });
+      
+      colorElement.addEventListener("dragend", () => {
+        colorElement.classList.remove("dragging");
+        colorElement.style.cursor = "grab";
+        this.deleteZone.classList.remove("visible");
+      });
+      
+      colorElement.addEventListener("dragover", e => e.preventDefault());
+      
+      colorElement.addEventListener("drop", e => {
+        e.preventDefault();
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+        const toIndex = i;
+        if (fromIndex !== toIndex) {
+          this.editor.paletteManager.moveColorInPalette(currentPalette.id, fromIndex, toIndex);
+          this.updatePaletteGrid();
+        }
+      });
+      
+      this.paletteGrid.appendChild(colorElement);
+    }
+    
+    const addButton = document.createElement("div");
+    addButton.className = "palette-add-button";
+    addButton.innerHTML = "+";
+    addButton.title = __("Añadir color||Add new color");
+    addButton.style.cursor = "pointer";
+    addButton.addEventListener("click", () => {
+      this.showHexInputDialog().then(color => {
+        this.editor.paletteManager.addColorToPalette(currentPalette.id, color);
+        this.updatePaletteGrid();
+        this.editor.showToast(__("Color añadido a la paleta||Color added to palette"));
+      }).catch(() => {});
+    });
+    this.paletteGrid.appendChild(addButton);
+  }
+
+  updateRecentColorsGrid() {
+    if (!this.recentColorsGrid) return;
+    
+    this.recentColorsGrid.innerHTML = "";
+    const recent = this.editor.paletteManager.getRecentColors();
+    
+    recent.forEach(color => {
+      const colorElement = document.createElement("div");
+      colorElement.className = "recent-color";
+      colorElement.style.backgroundColor = color;
+      colorElement.addEventListener("click", () => {
+        this.updateSlidersFromHex(color);
+      });
+      this.recentColorsGrid.appendChild(colorElement);
+    });
+  }
+
+  removeColorFromPalette(index) {
+    const currentPalette = this.editor.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.editor.paletteManager.removeColorFromPalette(currentPalette.id, index);
+      this.updatePaletteGrid();
+      this.editor.showToast(__("Color quitado de la paleta||Color removed from palette"));
+    }
+  }
+
+  loadPalette() {
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Cargar paleta||Load palette"),
+      mode: "open",
+      fileTypes: ["pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.editor.readFile(fileInfo);
+          this.editor.parsePalFile(fileData);
+          this.updatePaletteGrid();
+          this.editor.showToast(__("Paleta cargada||Palette loaded successfully"));
+        } catch (error) {
+          this.editor.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+
+  savePalette() {
+    const currentPalette = this.editor.paletteManager.getCurrentPalette();
+    if (!currentPalette || currentPalette.colors.length === 0) {
+      this.editor.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
+      return;
+    }
+    
+    const fileBrowser = this.editor.getFileBrowser({
+      title: __("Guardar paleta||Save palette"),
+      mode: "saveAs",
+      fileTypes: ["pal"],
+      defaultType: "pal",
+      defaultName: currentPalette.name || "palette",
+      onConfirm: async fileInfo => {
+        try {
+          const palContent = this.editor.generatePalFile();
+          await this.editor.saveFile(fileInfo.name, "pal", palContent);
+          this.editor.showToast(__("Paleta guardada||Palette saved successfully"));
+        } catch (error) {
+          this.editor.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+
+  initColorPickerDrag() {
+    this.colorPickLine = document.createElement("div");
+    this.colorPickLine.className = "color-pick-line";
+    this.colorPickLine.style.display = "none";
+    this.editor.uiLayer.appendChild(this.colorPickLine);
+    
+    this.editor.colorIndicator.addEventListener("mousedown", (e) => this.handleColorPickStart(e));
+    document.addEventListener("mousemove", (e) => this.handleColorPickMove(e));
+    document.addEventListener("mouseup", (e) => this.handleColorPickEnd(e));
+    
+    this.editor.colorIndicator.addEventListener("touchstart", (e) => this.handleColorPickStart(e), { passive: false });
+    document.addEventListener("touchmove", (e) => this.handleColorPickMove(e), { passive: false });
+    document.addEventListener("touchend", (e) => this.handleColorPickEnd(e));
+    document.addEventListener("touchcancel", (e) => this.handleColorPickEnd(e));
+    
+    this.editor.colorIndicator.addEventListener("click", (e) => {
+      if (!this.isColorPicking && !this.colorPickTimeout) {
+        this.toggleSelectedColor();
+      }
+    });
+  }
+
+  handleColorPickStart(e) {
+    if (this.editor.isDrawing || this.editor.isPanning) return;
+    
+    if (e.type.startsWith("touch")) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    this.colorPickStartTime = Date.now();
+    this.colorPickStartPos = {
+      x: e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX,
+      y: e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY
+    };
+    
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+    
+    this.colorPickTimeout = setTimeout(() => {
+      if (!this.isColorPicking) {
+        this.isColorPicking = true;
+        this.editor.colorIndicator.classList.add("dragging");
+        
+        const rect = this.editor.colorIndicator.getBoundingClientRect();
+        this.colorPickStartX = rect.left + rect.width / 2;
+        this.colorPickStartY = rect.top + rect.height / 2;
+        
+        this.colorPickLine.style.display = "block";
+        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, this.colorPickStartPos.x, this.colorPickStartPos.y);
+      }
+    }, 200);
+  }
+
+  handleColorPickMove(e) {
+    if (!this.colorPickStartPos) return;
+    
+    if (e.type.startsWith("touch")) {
+      e.preventDefault();
+    }
+    
+    let clientX, clientY;
+    if (e.type.startsWith("touch")) {
+      if (!e.touches || e.touches.length === 0) return;
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    if (!this.isColorPicking) {
+      const movedDistance = Math.hypot(clientX - this.colorPickStartPos.x, clientY - this.colorPickStartPos.y);
+      
+      if (movedDistance > 10 && this.colorPickTimeout) {
+        clearTimeout(this.colorPickTimeout);
+        this.colorPickTimeout = null;
+        this.isColorPicking = true;
+        this.editor.colorIndicator.classList.add("dragging");
+        
+        const rect = this.editor.colorIndicator.getBoundingClientRect();
+        this.colorPickStartX = rect.left + rect.width / 2;
+        this.colorPickStartY = rect.top + rect.height / 2;
+        
+        this.colorPickLine.style.display = "block";
+        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
+      }
+      return;
+    }
+    
+    this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
+  }
+
+  handleColorPickEnd(e) {
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+    
+    let clientX, clientY;
+    if (e.type.startsWith("touchend") || e.type.startsWith("touchcancel")) {
+      if (!e.changedTouches || e.changedTouches.length === 0) {
+        this.cleanupColorPicking();
+        return;
+      }
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    if (!this.isColorPicking) {
+      const isShortTap = Date.now() - this.colorPickStartTime < 300;
+      const movedDistance = this.colorPickStartPos ? 
+        Math.hypot(clientX - this.colorPickStartPos.x, clientY - this.colorPickStartPos.y) : 0;
+      
+      if (isShortTap && movedDistance < 15) {
+        this.toggleSelectedColor();
+      }
+      
+      this.colorPickStartPos = null;
+      return;
+    }
+    
+    const rect = this.editor.canvasContainer.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+      const canvasPos = this.editor.getCanvasPosition(clientX, clientY);
+      if (canvasPos) {
+        this.editor.pickColor(canvasPos.x, canvasPos.y);
+      }
+    }
+    
+    this.cleanupColorPicking();
+  }
+
+  cleanupColorPicking() {
+    this.isColorPicking = false;
+    this.colorPickStartPos = null;
+    this.colorPickLine.style.display = "none";
+    this.editor.colorIndicator.classList.remove("dragging");
+    
+    if (this.colorPickTimeout) {
+      clearTimeout(this.colorPickTimeout);
+      this.colorPickTimeout = null;
+    }
+  }
+
+  updateColorPickLine(startX, startY, endX, endY) {
+    const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+    const angle = (Math.atan2(endY - startY, endX - startX) * 180) / Math.PI;
+    
+    this.colorPickLine.style.width = `${length}px`;
+    this.colorPickLine.style.left = `${startX}px`;
+    this.colorPickLine.style.top = `${startY}px`;
+    this.colorPickLine.style.transform = `rotate(${angle}deg)`;
+    this.colorPickLine.style.transformOrigin = "0 0";
+  }
+
+  toggleSelectedColor() {
+    this.editor.selectedColor = this.editor.selectedColor === "primary" ? "secondary" : "primary";
+    this.editor.updateColorIndicator();
+  }
+
+  show() {
+    const color = this.editor.selectedColor === "primary" ? this.editor.primaryColor : this.editor.secondaryColor;
+    this.updateSlidersFromHex(color);
+    this.updateRecentColorsGrid();
+    this.updatePaletteGrid();
+    this.overlay.style.display = "flex";
+  }
+
+  hide() {
+    this.overlay.style.display = "none";
+  }
+
+  isVisible() {
+    return this.overlay.style.display === "flex";
+  }
+
+  showHexInputDialog() {
+    const content = document.createElement("div");
+    content.className = "hex-input-dialog";
+    
+    const textInput = document.createElement("input");
+    textInput.type = "text";
+    textInput.value = this.colorPickerPreviewColor;
+    textInput.placeholder = "#RRGGBB";
+    textInput.className = "hex-input-text";
+    content.appendChild(textInput);
+    
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = this.colorPickerPreviewColor;
+    colorInput.className = "hex-input-color";
+    colorInput.addEventListener("change", () => {
+      textInput.value = colorInput.value;
+    });
+    content.appendChild(colorInput);
+    
+    textInput.addEventListener("input", () => {
+      if (this.isValidHex(textInput.value)) {
+        let val = textInput.value;
+        if (!val.startsWith("#")) val = "#" + val;
+        colorInput.value = val;
+      }
+    });
+    
+    return new Promise((resolve, reject) => {
+      this.editor.showPopup(__("Entrada Hexadecimal||Hex Input"), content, [
+        {
+          text: __("Cancelar||Cancel"),
+          class: "cancel",
+          action: () => {
+            this.editor.hidePopup();
+            reject();
+          }
+        },
+        {
+          text: __("Seleccionar||Select"),
+          action: () => {
+            if (this.isValidHex(textInput.value)) {
+              let hex = textInput.value;
+              if (!hex.startsWith("#")) hex = "#" + hex;
+              this.editor.hidePopup();
+              resolve(hex);
+            } else {
+              this.editor.showToast(__("Expresión hexadecimal inválida||Invalid HEX color expression"));
+              reject();
+            }
+          }
+        }
+      ]);
+    });
+  }
+
+  // Color conversion utilities
+  rgbToHex(r, g, b) {
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+  }
+
+  hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return { r, g, b };
+  }
+
+  rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, v = max;
+    const d = max - min;
+    s = max === 0 ? 0 : d / max;
+    
+    if (max === min) {
+      h = 0;
+    } else {
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    
+    return {
+      h: Math.round(h * 360),
+      s: Math.round(s * 100),
+      v: Math.round(v * 100)
+    };
+  }
+
+  hsvToRgb(h, s, v) {
+    h /= 360; s /= 100; v /= 100;
+    let r, g, b;
+    
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+    
+    switch (i % 6) {
+      case 0: r = v; g = t; b = p; break;
+      case 1: r = q; g = v; b = p; break;
+      case 2: r = p; g = v; b = t; break;
+      case 3: r = p; g = q; b = v; break;
+      case 4: r = t; g = p; b = v; break;
+      case 5: r = v; g = p; b = q; break;
+    }
+    
+    return {
+      r: Math.round(r * 255),
+      g: Math.round(g * 255),
+      b: Math.round(b * 255)
+    };
+  }
+
+  isValidHex(text) {
+    return /^#?([a-f\d]{3}|[a-f\d]{6})$/i.test(text);
+  }
+}
+
 // File Browser class
 class FileBrowser {
   constructor(options = {}) {
@@ -5037,15 +6610,13 @@ class FileBrowser {
     this.mimeMap = {
       pxl: "text/plain, application/json, application/octet-stream",
       pal: "text/plain, application/octet-stream",
-      pg: "image/png",
+      png: "image/png",
       jpg: "image/jpeg",
       jpeg: "image/jpeg",
       gif: "image/gif",
       webp: "image/webp",
       psd: "applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
       txt: "text/plain, application/octet-stream",
-      image: "image/*",
-      video: "video/*",
       project: "application/*",
       default: "*"
     };
@@ -5680,16 +7251,8 @@ class PixelArtEditor {
     this.minScale = 1;
     this.maxScale = 35;
     this.popupOpen = false;
-    this.colorPickerOpen = false;
     this.toolDropdownOpen = false;
     this.toolSettingsOpen = false;
-    this.recentColors = JSON.parse(localStorage.getItem("recentColors")) || [];
-    this.lastPalette = JSON.parse(localStorage.getItem("lastPalette")) || this.getDefaultPalette();
-    this.colorPickerPreviewColor = null;
-    this.isColorPicking = false;
-    this.colorPickStartX = 0;
-    this.colorPickStartY = 0;
-    this.colorPickLine = null;
     this.isPlaying = false;
     this.animationInterval = null;
     this.defaultFrameTime = 1000 / 12; // Default frame time
@@ -5700,7 +7263,6 @@ class PixelArtEditor {
     this.fileBrowser = null;
     this.defaultFileBrowserPathUrl = null;
     this.timelapseFPS = 30;
-    this.floatingColors = new Map();
     this.registerLayerVisibilityChanges = false;
     this.isCanvasResizing = false;
     this.canvasResizeState = {
@@ -5727,15 +7289,13 @@ class PixelArtEditor {
       this.initBrushUI();
       this.initCanvas();
       this.initTools();
-      this.initColorPicker();
       this.initEventListeners();
-      this.updateColorSlidersFromHex(this.primaryColor);
-      this.initColorPickerDrag();
-      this.loadFloatingColors(JSON.parse(localStorage.getItem("floatingColors")) || []);
 
       this.gridManager = new GridManager(this);
       this.spritesheetLoader = new SpritesheetLoader(this);
       this.referenceManager = new ReferenceManager(this);
+      this.paletteManager = new PaletteManager(this);
+      this.colorPicker = new ColorPicker(this);
 
       if (this.useCordova) {
         this.initCordova();
@@ -6414,36 +7974,6 @@ class PixelArtEditor {
     this.overlayLayer.className = "editor-overlay-layer";
     this.editorElement.appendChild(this.overlayLayer);
     
-    // Create delete zone for floating palette colors
-    this.floatingColorsDeleteZone = document.createElement("div");
-    this.overlayLayer.appendChild(this.floatingColorsDeleteZone);
-    
-    setTimeout(() => {
-      this.floatingColorsDeleteZone.className = "delete-zone";
-      
-      this.floatingColorsDeleteZone.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      `;
-    });
-      
-    // Add event listeners
-    this.floatingColorsDeleteZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      this.floatingColorsDeleteZone.classList.add("drag-over");
-    });
-    
-    this.floatingColorsDeleteZone.addEventListener("dragleave", () => {
-      this.floatingColorsDeleteZone.classList.remove("drag-over");
-    });
-    
-    this.floatingColorsDeleteZone.addEventListener("drop", (e) => {
-      this.floatingColorsDeleteZone.classList.remove("drag-over");
-      const id = e.dataTransfer.getData("text/plain");
-      this.removeFloatingPaletteColor(id);
-    });
-    
     // Create UI layer
     this.uiLayer = document.createElement("div");
     this.uiLayer.className = "editor-ui";
@@ -6475,7 +8005,9 @@ class PixelArtEditor {
     this.colorSelector.className = "color-selector";
     this.colorIndicator.appendChild(this.colorSelector);
 
-    this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.showColorPicker());
+    this.colorIndicator.addEventListener("click", () => this.colorPicker.toggleSelectedColor());
+
+    this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.colorPicker.show());
     this.topBar.appendChild(this.colorPickerButton);
 
     // Bottom bar
@@ -7007,208 +8539,6 @@ class PixelArtEditor {
     this.lastTool = "Eraser";
   }
 
-  initColorPicker() {
-    this.colorPickerOverlay = document.createElement("div");
-    this.colorPickerOverlay.className = "color-picker-overlay";
-    this.colorPickerOverlay.style.display = "none";
-    this.uiLayer.appendChild(this.colorPickerOverlay);
-    
-    this.colorPicker = document.createElement("div");
-    this.colorPicker.className = "color-picker";
-    this.colorPickerOverlay.appendChild(this.colorPicker);
-    
-    // Block overlay events
-    this.colorPicker.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-    
-    this.colorPicker.addEventListener("dragleave", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-    
-    this.colorPicker.addEventListener("drop", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    // Add event listeners for floating color
-    this.colorPickerOverlay.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      this.colorPickerOverlay.classList.add("drag-over");
-    });
-    
-    this.colorPickerOverlay.addEventListener("dragleave", () => {
-      this.colorPickerOverlay.classList.remove("drag-over");
-    });
-    
-    this.colorPickerOverlay.addEventListener("drop", (e) => {
-      e.preventDefault();
-      this.deleteZone.classList.remove("drag-over");
-      const index = parseInt(e.dataTransfer.getData("text/plain"));
-      const color = this.lastPalette.colors[index];
-      if (color) {
-        this.addFloatingPaletteColor(color, event.clientX, event.clientY);
-      }
-    });
-
-    // Header
-    const header = document.createElement("div");
-    header.className = "color-picker-header";
-    this.colorPicker.appendChild(header);
-
-    this.colorPickerTitle = document.createElement("div");
-    this.colorPickerTitle.className = "color-picker-title";
-    this.colorPickerTitle.textContent = __("Recoge Color||Color Picker");
-    header.appendChild(this.colorPickerTitle);
-
-    const closeButton = document.createElement("div");
-    closeButton.className = "panel-close color-picker-close";
-    closeButton.innerHTML = "&times;";
-    closeButton.addEventListener("click", () => this.hideColorPicker());
-    header.appendChild(closeButton);
-
-    // Tabs
-    this.colorPickerTabs = document.createElement("div");
-    this.colorPickerTabs.className = "color-picker-tabs";
-    this.colorPicker.appendChild(this.colorPickerTabs);
-
-    this.rgbTab = this.createColorPickerTab("RGB", () => this.showColorPickerTab("rgb"));
-    this.hsvTab = this.createColorPickerTab("HSV", () => this.showColorPickerTab("hsv"));
-    this.paletteTab = this.createColorPickerTab(__("Paleta||Palette"), () => this.showColorPickerTab("palette"));
-
-    // Tab content
-    this.colorPickerContent = document.createElement("div");
-    this.colorPickerContent.className = "color-picker-content";
-    this.colorPicker.appendChild(this.colorPickerContent);
-
-    // RGB Tab Content
-    this.rgbContent = document.createElement("div");
-    this.rgbContent.className = "color-picker-tab-content rgb-content";
-    this.colorPickerContent.appendChild(this.rgbContent);
-
-    this.createColorSlider("r", __("Rojo||Red"), 0, 255, this.rgbContent);
-    this.createColorSlider("g", __("Verde||Green"), 0, 255, this.rgbContent);
-    this.createColorSlider("b", __("Azul||Blue"), 0, 255, this.rgbContent);
-
-    // HSV Tab Content
-    this.hsvContent = document.createElement("div");
-    this.hsvContent.className = "color-picker-tab-content hsv-content";
-    this.colorPickerContent.appendChild(this.hsvContent);
-
-    this.createColorSlider("h", __("Tono||Hue"), 0, 360, this.hsvContent);
-    this.createColorSlider("s", __("Saturación||Saturation"), 0, 100, this.hsvContent, "%");
-    this.createColorSlider("v", __("Valor||Value"), 0, 100, this.hsvContent, "%");
-
-    // Palette Tab Content
-    this.paletteContent = document.createElement("div");
-    this.paletteContent.className = "color-picker-tab-content palette-content";
-    this.colorPickerContent.appendChild(this.paletteContent);
-
-    const paletteActions = document.createElement("div");
-    paletteActions.className = "palette-actions";
-    this.paletteContent.appendChild(paletteActions);
-
-    this.loadPaletteButton = this.createButton("load-palette", "icon-folder", () => this.loadPalette());
-    this.loadPaletteButton.textContent = __("Cargar||Load");
-    paletteActions.appendChild(this.loadPaletteButton);
-
-    this.savePaletteButton = this.createButton("save-palette", "icon-save", () => this.savePalette());
-    this.savePaletteButton.textContent = __("Guardar||Save");
-    paletteActions.appendChild(this.savePaletteButton);
-
-    this.paletteGrid = document.createElement("div");
-    this.paletteGrid.className = "palette-grid";
-    this.paletteContent.appendChild(this.paletteGrid);
-
-    // Recent Colors
-    this.recentColorsContainer = document.createElement("div");
-    this.recentColorsContainer.className = "recent-colors";
-    this.colorPicker.appendChild(this.recentColorsContainer);
-
-    const recentTitle = document.createElement("div");
-    recentTitle.className = "recent-colors-title";
-    recentTitle.textContent = __("Colores Recientes||Recent Colors");
-    this.recentColorsContainer.appendChild(recentTitle);
-
-    this.recentColorsGrid = document.createElement("div");
-    this.recentColorsGrid.className = "recent-colors-grid";
-    this.recentColorsContainer.appendChild(this.recentColorsGrid);
-
-    // Footer
-    const footer = document.createElement("div");
-    footer.className = "color-picker-footer";
-    this.colorPicker.appendChild(footer);
-
-    this.currentColorPreview = document.createElement("div");
-    this.currentColorPreview.className = "current-color-preview";
-    this.currentColorPreview.addEventListener("click", () => this.showHexColorInputDialog().then(color => this.updateColorSlidersFromHex(color)));
-    footer.appendChild(this.currentColorPreview);
-
-    this.confirmColorButton = this.createButton("confirm-color", null, () => this.confirmColorSelection());
-    this.confirmColorButton.textContent = __("Usar color||Pick color");
-    footer.appendChild(this.confirmColorButton);
-
-    // Show RGB tab by default
-    this.showColorPickerTab("rgb");
-    
-    // Remove existing delete zone if any
-    const existingZone = document.querySelector('.palette-delete-zone');
-    if (existingZone) {
-      existingZone.remove();
-    }
-  
-    // Create fixed delete zone
-    this.deleteZone = document.createElement("div");
-    this.deleteZone.className = "delete-zone palette-delete-zone";
-    this.deleteZone.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    `;
-    
-    // Add event listeners
-    this.deleteZone.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.deleteZone.classList.add("drag-over");
-    });
-    
-    this.deleteZone.addEventListener("dragleave", () => {
-      this.deleteZone.classList.remove("drag-over");
-    });
-    
-    this.deleteZone.addEventListener("drop", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.deleteZone.classList.remove("drag-over");
-      const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
-      this.removeColorFromPalette(fromIndex);
-    });
-
-    this.colorPickerOverlay.appendChild(this.deleteZone);
-  }
-
-  initColorPickerDrag() {
-    // Create the drag line element
-    this.colorPickLine = document.createElement("div");
-    this.colorPickLine.className = "color-pick-line";
-    this.colorPickLine.style.display = "none";
-    this.uiLayer.appendChild(this.colorPickLine);
-  
-    // Mouse events
-    this.colorIndicator.addEventListener("mousedown", (e) => this.handleColorPickStart(e));
-    document.addEventListener("mousemove", (e) => this.handleColorPickMove(e));
-    document.addEventListener("mouseup", (e) => this.handleColorPickEnd(e));
-  
-    // Touch events
-    this.colorIndicator.addEventListener("touchstart", (e) => this.handleColorPickStart(e), { passive: false });
-    document.addEventListener("touchmove", (e) => this.handleColorPickMove(e), { passive: false });
-    document.addEventListener("touchend", (e) => this.handleColorPickEnd(e));
-    document.addEventListener("touchcancel", (e) => this.handleColorPickEnd(e));
-  }
-
   updateBrushSizeIndicator() {
     this.brushSizeText.textContent = __(`(Pincel|Brush): ${this.brushSize}px`);
     this.brushSizeBar.min = 0;
@@ -7223,962 +8553,6 @@ class PixelArtEditor {
   
   hideLoadingScreen() {
     this.loadingElement.style.display = "none";
-  }
-
-  handleColorPickStart(e) {
-    if (this.isDrawing || this.isPanning) return;
-  
-    // Prevent default for touch events
-    e.preventDefault();
-    e.stopPropagation();
-  
-    // Store start time and position for tap detection
-    this.colorPickStartTime = Date.now();
-    this.colorPickStartPos = {
-      x: e.type.startsWith("touch") ? e.touches[0].clientX : e.clientX,
-      y: e.type.startsWith("touch") ? e.touches[0].clientY : e.clientY
-    };
-  
-    // Clear any existing timeout
-    if (this.colorPickTimeout) {
-      clearTimeout(this.colorPickTimeout);
-      this.colorPickTimeout = null;
-    }
-  
-    // Set a timeout to distinguish between click and drag
-    this.colorPickTimeout = setTimeout(() => {
-      if (!this.isColorPicking) {
-        this.isColorPicking = true;
-  
-        // Add visual feedback
-        this.colorIndicator.classList.add("dragging");
-  
-        // Get start position from center of color indicator
-        const rect = this.colorIndicator.getBoundingClientRect();
-        this.colorPickStartX = rect.left + rect.width / 2;
-        this.colorPickStartY = rect.top + rect.height / 2;
-  
-        // Show the line
-        this.colorPickLine.style.display = "block";
-        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, this.colorPickStartPos.x, this.colorPickStartPos.y);
-      }
-    }, 200); // Shorter timeout for better responsiveness
-  }
-  
-  handleColorPickMove(e) {
-    // If not color picking and no start position, ignore
-    if (!this.colorPickStartPos) return;
-  
-    // Prevent default for touch events
-    if (e.type.startsWith("touch")) {
-      e.preventDefault();
-    }
-  
-    // Get current position
-    let clientX, clientY;
-    if (e.type.startsWith("touch")) {
-      if (!e.touches || e.touches.length === 0) return;
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-  
-    // If not yet color picking, check if we should start
-    if (!this.isColorPicking) {
-      const movedDistance = this.distance(clientX, clientY, this.colorPickStartPos.x, this.colorPickStartPos.y);
-  
-      if (movedDistance > 10 && this.colorPickTimeout) { // Lower threshold for better responsiveness
-        // Clear the timeout
-        clearTimeout(this.colorPickTimeout);
-        this.colorPickTimeout = null;
-        
-        // Start color picking immediately
-        this.isColorPicking = true;
-        this.colorIndicator.classList.add("dragging");
-  
-        const rect = this.colorIndicator.getBoundingClientRect();
-        this.colorPickStartX = rect.left + rect.width / 2;
-        this.colorPickStartY = rect.top + rect.height / 2;
-  
-        this.colorPickLine.style.display = "block";
-        this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
-      }
-      return;
-    }
-  
-    // Update the line position
-    this.updateColorPickLine(this.colorPickStartX, this.colorPickStartY, clientX, clientY);
-  }
-  
-  handleColorPickEnd(e) {
-    // Clear the timeout if it's still pending
-    if (this.colorPickTimeout) {
-      clearTimeout(this.colorPickTimeout);
-      this.colorPickTimeout = null;
-    }
-  
-    // Get end position
-    let clientX, clientY;
-    if (e.type.startsWith("touchend") || e.type.startsWith("touchcancel")) {
-      if (!e.changedTouches || e.changedTouches.length === 0) {
-        // If no changed touches, just clean up
-        this.cleanupColorPicking();
-        return;
-      }
-      clientX = e.changedTouches[0].clientX;
-      clientY = e.changedTouches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-  
-    // If we weren't color picking, this was a click/tap
-    if (!this.isColorPicking) {
-      // Only toggle if it was a short tap with minimal movement
-      const isShortTap = Date.now() - this.colorPickStartTime < 300;
-      const movedDistance = this.colorPickStartPos ? 
-        this.distance(clientX, clientY, this.colorPickStartPos.x, this.colorPickStartPos.y) : 0;
-  
-      if (isShortTap && movedDistance < 15) {
-        this.toggleSelectedColor();
-      }
-      
-      // Clean up
-      this.colorPickStartPos = null;
-      return;
-    }
-  
-    // Check if we're over the canvas
-    const rect = this.canvasContainer.getBoundingClientRect();
-    if (clientX >= rect.left && clientX <= rect.right && 
-        clientY >= rect.top && clientY <= rect.bottom) {
-      // Get the color from the canvas
-      const canvasPos = this.getCanvasPosition(clientX, clientY);
-      if (canvasPos) {
-        this.pickColor(canvasPos.x, canvasPos.y);
-      }
-    }
-  
-    // Clean up
-    this.cleanupColorPicking();
-  }
-  
-  cleanupColorPicking() {
-    this.isColorPicking = false;
-    this.colorPickStartPos = null;
-    this.colorPickLine.style.display = "none";
-    this.colorIndicator.classList.remove("dragging");
-  
-    if (this.colorPickTimeout) {
-      clearTimeout(this.colorPickTimeout);
-      this.colorPickTimeout = null;
-    }
-  }
-  
-  updateColorPickLine(startX, startY, endX, endY) {
-    const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-    const angle = (Math.atan2(endY - startY, endX - startX) * 180) / Math.PI;
-  
-    this.colorPickLine.style.width = `${length}px`;
-    this.colorPickLine.style.left = `${startX}px`;
-    this.colorPickLine.style.top = `${startY}px`;
-    this.colorPickLine.style.transform = `rotate(${angle}deg)`;
-    this.colorPickLine.style.transformOrigin = "0 0";
-  }
-
-  createColorPickerTab(name, onClick) {
-    const tab = document.createElement("div");
-    tab.className = "color-picker-tab";
-    tab.textContent = name;
-    tab.addEventListener("click", onClick);
-    this.colorPickerTabs.appendChild(tab);
-    return tab;
-  }
-
-  createColorSlider(channel, label, min, max, container, suffix = "") {
-    const sliderContainer = document.createElement("div");
-    sliderContainer.className = "color-slider-container";
-
-    const labelElement = document.createElement("label");
-    labelElement.textContent = label;
-    sliderContainer.appendChild(labelElement);
-
-    const controls = document.createElement("div");
-    controls.className = "slider-controls";
-    sliderContainer.appendChild(controls);
-
-    const decreaseBtn = document.createElement("button");
-    decreaseBtn.className = "slider-btn decrease";
-    decreaseBtn.innerHTML = "&minus;";
-    decreaseBtn.addEventListener("click", () => this.adjustColorChannel(channel, -1));
-    controls.appendChild(decreaseBtn);
-
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = min;
-    slider.max = max;
-    slider.value = channel === "r" ? 255 : 0;
-    slider.className = `color-slider ${channel}-slider`;
-    slider.addEventListener("input", e => this.handleColorSliderChange(channel, e.target.value));
-    controls.appendChild(slider);
-
-    const increaseBtn = document.createElement("button");
-    increaseBtn.className = "slider-btn increase";
-    increaseBtn.innerHTML = "+";
-    increaseBtn.addEventListener("click", () => this.adjustColorChannel(channel, 1));
-    controls.appendChild(increaseBtn);
-
-    const valueInput = document.createElement("input");
-    valueInput.type = "number";
-    valueInput.min = min;
-    valueInput.max = max;
-    valueInput.value = channel === "r" ? 255 : 0;
-    valueInput.className = `color-value ${channel}-value`;
-    valueInput.addEventListener("keyup", e => this.handleColorValueChange(channel, e.target.value));
-    controls.appendChild(valueInput);
-
-    const suffixElement = document.createElement("span");
-    suffixElement.className = "suffix";
-    suffixElement.textContent = suffix;
-    controls.appendChild(suffixElement);
-
-    container.appendChild(sliderContainer);
-  }
-
-  showColorPickerTab(tabName) {
-    // Hide all tab contents
-    const tabContents = this.colorPickerContent.querySelectorAll(".color-picker-tab-content");
-    tabContents.forEach(content => (content.style.display = "none"));
-
-    // Deactivate all tabs
-    const tabs = this.colorPickerTabs.querySelectorAll(".color-picker-tab");
-    tabs.forEach(tab => tab.classList.remove("active"));
-
-    // Show selected tab content
-    if (tabName === "rgb") {
-      this.rgbContent.style.display = "block";
-      this.rgbTab.classList.add("active");
-      this.updateColorSlidersFromHex(this.colorPickerPreviewColor);
-    } else if (tabName === "hsv") {
-      this.hsvContent.style.display = "block";
-      this.hsvTab.classList.add("active");
-      this.updateColorSlidersFromHex(this.colorPickerPreviewColor);
-    } else if (tabName === "palette") {
-      this.paletteContent.style.display = "block";
-      this.paletteTab.classList.add("active");
-      this.updatePaletteGrid();
-    }
-  }
-
-  updateColorSlidersFromHex(hex) {
-    if (!hex) return;
-
-    // Convert hex to RGB
-    const { r, g, b } = this.hexToRgb(hex);
-
-    // Update RGB sliders
-    this.updateColorSlider("r", r);
-    this.updateColorSlider("g", g);
-    this.updateColorSlider("b", b);
-
-    // Convert RGB to HSV and update those sliders
-    const hsv = this.rgbToHsv(r, g, b);
-    this.updateColorSlider("h", hsv.h);
-    this.updateColorSlider("s", hsv.s);
-    this.updateColorSlider("v", hsv.v);
-
-    // Update preview
-    this.currentColorPreview.style.backgroundColor = hex;
-
-    // Save color
-    this.colorPickerPreviewColor = hex;
-  }
-
-  updateColorSlider(channel, value) {
-    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
-    const valueInput = this.colorPicker.querySelector(`.${channel}-value`);
-
-    if (slider) slider.value = value;
-    if (valueInput) valueInput.value = value;
-  }
-
-  handleColorSliderChange(channel, value) {
-    this.updateColorSlider(channel, value);
-    this.updateColorFromSliders(channel == "r" || channel == "g" || channel == "b");
-  }
-
-  handleColorValueChange(channel, value) {
-    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
-    const min = parseInt(slider.min);
-    const max = parseInt(slider.max);
-    value = Math.max(min, Math.min(max, parseInt(value) || 0));
-
-    this.updateColorSlider(channel, value);
-    this.updateColorFromSliders();
-  }
-
-  adjustColorChannel(channel, delta) {
-    const valueInput = this.colorPicker.querySelector(`.${channel}-value`);
-    const slider = this.colorPicker.querySelector(`.${channel}-slider`);
-    const min = parseInt(slider.min);
-    const max = parseInt(slider.max);
-
-    let newValue = parseInt(valueInput.value) + delta;
-    newValue = Math.max(min, Math.min(max, newValue));
-
-    this.updateColorSlider(channel, newValue);
-    this.updateColorFromSliders();
-  }
-
-  updateColorFromSliders(rgbMode = true) {
-    if (rgbMode) {
-      // Get RGB values
-      const r = parseInt(this.colorPicker.querySelector(".r-value").value);
-      const g = parseInt(this.colorPicker.querySelector(".g-value").value);
-      const b = parseInt(this.colorPicker.querySelector(".b-value").value);
-
-      // Convert to hex
-      const hex = this.rgbToHex(r, g, b);
-
-      // Save color
-      this.colorPickerPreviewColor = hex;
-
-      // Update preview
-      this.currentColorPreview.style.backgroundColor = hex;
-    } else {
-      // Get HSV values
-      const h = parseInt(this.colorPicker.querySelector(".h-value").value);
-      const s = parseInt(this.colorPicker.querySelector(".s-value").value);
-      const v = parseInt(this.colorPicker.querySelector(".v-value").value);
-
-      // Convert values to RGB
-      const color = this.hsvToRgb(h, s, v);
-
-      // Convert to hex
-      const hex = this.rgbToHex(color.r, color.g, color.b);
-
-      // Save color
-      this.colorPickerPreviewColor = hex;
-
-      // Update preview
-      this.currentColorPreview.style.backgroundColor = hex;
-    }
-  }
-  
-  getDefaultPalette() {
-    return {
-      name: "System Palette",
-      colors: [
-        "#a80020",
-        "#e40058",
-        "#f85898",
-        "#f8a4c0",
-        "#940084",
-        "#d800cc",
-        "#f878f8",
-        "#f8b8f8",
-        "#4428bc",
-        "#6844fc",
-        "#9878f8",
-        "#d8b8f8",
-        "#0000bc",
-        "#0000fc",
-        "#6888fc",
-        "#b8b8f8",
-        "#0058f8",
-        "#0078f8",
-        "#3cbcfc",
-        "#a4e4fc",
-        "#004058",
-        "#008888",
-        "#00e8d8",
-        "#00fcfc",
-        "#007800",
-        "#00a800",
-        "#00b800",
-        "#b8f8d8",
-        "#006800",
-        "#00a844",
-        "#58f898",
-        "#b8f8b8",
-        "#005800",
-        "#58d854",
-        "#b8f818",
-        "#d8f878",
-        "#503000",
-        "#ac7c00",
-        "#f8b800",
-        "#fce0a8",
-        "#a81000",
-        "#fca044",
-        "#f8d878",
-        "#f0d0b0",
-        "#881400",
-        "#f83800",
-        "#e45c10",
-        "#f87858",
-        "#bcbcbc",
-        "#d8d8d8",
-        "#f8f8f8",
-        "#fcfcfc",
-        "#080808",
-        "#7c7c7c",
-        "#787878",
-        "#000000"
-      ]
-    };
-  }
-
-  rgbToHex(r, g, b) {
-    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-  }
-
-  hexToRgb(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return { r, g, b };
-  }
-
-  rgbToHsv(r, g, b) {
-    (r /= 255), (g /= 255), (b /= 255);
-    const max = Math.max(r, g, b),
-      min = Math.min(r, g, b);
-    let h,
-      s,
-      v = max;
-    const d = max - min;
-    s = max === 0 ? 0 : d / max;
-
-    if (max === min) {
-      h = 0; // achromatic
-    } else {
-      switch (max) {
-        case r:
-          h = (g - b) / d + (g < b ? 6 : 0);
-          break;
-        case g:
-          h = (b - r) / d + 2;
-          break;
-        case b:
-          h = (r - g) / d + 4;
-          break;
-      }
-      h /= 6;
-    }
-
-    return {
-      h: Math.round(h * 360),
-      s: Math.round(s * 100),
-      v: Math.round(v * 100)
-    };
-  }
-
-  hsvToRgb(h, s, v) {
-    (h /= 360), (s /= 100), (v /= 100);
-    let r, g, b;
-
-    const i = Math.floor(h * 6);
-    const f = h * 6 - i;
-    const p = v * (1 - s);
-    const q = v * (1 - f * s);
-    const t = v * (1 - (1 - f) * s);
-
-    switch (i % 6) {
-      case 0:
-        (r = v), (g = t), (b = p);
-        break;
-      case 1:
-        (r = q), (g = v), (b = p);
-        break;
-      case 2:
-        (r = p), (g = v), (b = t);
-        break;
-      case 3:
-        (r = p), (g = q), (b = v);
-        break;
-      case 4:
-        (r = t), (g = p), (b = v);
-        break;
-      case 5:
-        (r = v), (g = p), (b = q);
-        break;
-    }
-
-    return {
-      r: Math.round(r * 255),
-      g: Math.round(g * 255),
-      b: Math.round(b * 255)
-    };
-  }
-
-  showColorPicker() {
-    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
-    this.updateColorSlidersFromHex(color);
-    this.updateRecentColorsGrid();
-    this.colorPickerOverlay.style.display = "flex";
-    this.colorPickerOpen = true;
-  }
-
-  hideColorPicker() {
-    this.colorPickerOverlay.style.display = "none";
-    this.colorPickerOpen = false;
-  }
-
-  confirmColorSelection() {
-    const hex = this.colorPickerPreviewColor;
-    if (!hex) return;
-
-    if (this.selectedColor === "primary") {
-      this.primaryColor = hex;
-    } else {
-      this.secondaryColor = hex;
-    }
-
-    this.updateColorIndicator();
-    this.addToRecentColors(hex);
-    this.hideColorPicker();
-  }
-
-  addToRecentColors(hex) {
-    // Remove if already exists
-    this.recentColors = this.recentColors.filter(c => c !== hex);
-
-    // Add to beginning
-    this.recentColors.unshift(hex);
-
-    // Limit to 20 colors
-    if (this.recentColors.length > 20) {
-      this.recentColors.pop();
-    }
-
-    // Save to localStorage
-    localStorage.setItem("recentColors", JSON.stringify(this.recentColors));
-
-    // Update UI
-    this.updateRecentColorsGrid();
-  }
-
-  updateRecentColorsGrid() {
-    this.recentColorsGrid.innerHTML = "";
-
-    this.recentColors.forEach(color => {
-      const colorElement = document.createElement("div");
-      colorElement.className = "recent-color";
-      colorElement.style.backgroundColor = color;
-      colorElement.addEventListener("click", () => {
-        this.updateColorSlidersFromHex(color);
-      });
-      this.recentColorsGrid.appendChild(colorElement);
-    });
-  }
-
-  updatePaletteGrid() {
-    this.paletteGrid.innerHTML = "";
-
-    if (!this.lastPalette) {
-      this.lastPalette = {
-        name: "Custom Palette",
-        colors: []
-      };
-    }
-    
-    // Create color elements
-    for (let i = 0; i < this.lastPalette.colors.length; i++) {
-        const color = this.lastPalette.colors[i];
-  
-        const colorElement = document.createElement("div");
-        colorElement.className = "palette-color";
-        colorElement.style.backgroundColor = color;
-        colorElement.style.cursor = "grab";
-        colorElement.draggable = true;
-        colorElement.dataset.index = i;
-  
-        // Click to select color
-        colorElement.addEventListener("click", () => {
-          this.updateColorSlidersFromHex(color);
-        });
-  
-        // Drag events
-        colorElement.addEventListener("dragstart", e => {
-          e.dataTransfer.setData("text/plain", i.toString());
-          colorElement.classList.add("dragging");
-          colorElement.style.cursor = "grabbing";
-          this.deleteZone.classList.add("visible");
-        });
-  
-        colorElement.addEventListener("dragend", () => {
-          colorElement.classList.remove("dragging");
-          colorElement.style.cursor = "grab";
-          this.deleteZone.classList.remove("visible");
-          this.colorPickerOverlay.classList.remove("drag-over");
-        });
-  
-        colorElement.addEventListener("dragover", e => {
-          e.preventDefault();
-        });
-  
-        colorElement.addEventListener("drop", e => {
-          e.preventDefault();
-          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
-          const toIndex = i;
-          if (fromIndex !== toIndex) {
-            this.moveColor(fromIndex, toIndex);
-          }
-        });
-  
-        this.paletteGrid.appendChild(colorElement);
-      }
-
-    // Add + button at the end
-    const addButton = document.createElement("div");
-    addButton.className = "palette-add-button";
-    addButton.innerHTML = "+";
-    addButton.title = __("Añadir color||Add new color");
-    addButton.style.cursor = "pointer";
-    addButton.addEventListener("click", () => {
-      this.showHexColorInputDialog().then(color => this.addColorToPalette(color));
-    });
-    this.paletteGrid.appendChild(addButton);
-  }
-
-  addColorToPalette(color) {
-    if (!this.lastPalette) {
-      this.lastPalette = {
-        name: "Custom Palette",
-        colors: []
-      };
-    }
-
-    if (!this.lastPalette.colors) {
-      this.lastPalette.colors = [];
-    }
-
-    this.lastPalette.colors.push(color);
-    this.updatePaletteGrid();
-    this.showToast(__("Color añadido a la paleta||Color added to palette"));
-    
-    localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
-  }
-
-  removeColorFromPalette(index) {
-    if (this.lastPalette && this.lastPalette.colors) {
-      this.lastPalette.colors.splice(index, 1);
-      this.updatePaletteGrid();
-      this.showToast(__("Color quitado de la paleta||Color removed from palette"));
-      localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
-    }
-  }
-
-  moveColor(fromIndex, toIndex) {
-    if (this.lastPalette && this.lastPalette.colors) {
-      const color = this.lastPalette.colors.splice(fromIndex, 1)[0];
-      this.lastPalette.colors.splice(toIndex, 0, color);
-      this.updatePaletteGrid();
-      localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
-    }
-  }
-
-  removeColor(container, index) {
-    container.splice(index, 1);
-    if (container === this.recentColors) {
-      this.updateRecentColorsGrid();
-      this.showToast(__("Color quitado de recientes||Color removed from recent colors"));
-    } else {
-      this.updatePaletteGrid();
-      this.showToast(__("Color quitado de la paleta||Color removed from palette"));
-    }
-    this.hideColorMenu();
-  }
-
-  loadPalette() {
-    const fileBrowser = this.getFileBrowser({
-      title: __("Cargar paleta||Load palette"),
-      mode: "open",
-      fileTypes: ["pal"],
-      onConfirm: async fileInfo => {
-        try {
-          const fileData = await this.readFile(fileInfo);
-          this.parsePalFile(fileData);
-          this.updatePaletteGrid();
-          this.showToast(__("Paleta cargada||Palette loaded successfully"));
-        } catch (error) {
-          this.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
-          console.error(error);
-        }
-      }
-    });
-
-    fileBrowser.show();
-  }
-
-  savePalette() {
-    if (!this.lastPalette || !this.lastPalette.colors || this.lastPalette.colors.length === 0) {
-      this.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
-      return;
-    }
-
-    const fileBrowser = this.getFileBrowser({
-      title: __("Guardar paleta||Save palette"),
-      mode: "saveAs",
-      fileTypes: ["pal"],
-      defaultType: "pal",
-      defaultName: this.lastPalette.name || "palette",
-      onConfirm: async fileInfo => {
-        try {
-          const palContent = this.generatePalFile();
-          await this.saveFile(fileInfo.name, "pal", palContent);
-          this.showToast(__("Paleta guardada||Palette saved successfully"));
-        } catch (error) {
-          this.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
-          console.error(error);
-        }
-      }
-    });
-
-    fileBrowser.show();
-  }
-
-  parsePalFile(content) {
-    // Split into lines and filter out empty lines
-    const lines = content
-      .split("\n")
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-
-    // Check header
-    if (lines.length < 3 || lines[0] !== "JASC-PAL") {
-      throw new Error("Invalid PAL file format - missing JASC-PAL header");
-    }
-
-    // Check version
-    if (lines[1] !== "0100") {
-      throw new Error("Unsupported PAL version - expected 0100");
-    }
-
-    // Get color count
-    const colorCount = parseInt(lines[2]);
-    if (isNaN(colorCount)) {
-      throw new Error("Invalid color count - not a number");
-    }
-
-    // Verify we have enough lines
-    if (lines.length < 3 + colorCount) {
-      throw new Error(`File claims to have ${colorCount} colors but only ${lines.length - 3} found`);
-    }
-
-    const colors = [];
-    for (let i = 3; i < 3 + colorCount; i++) {
-      // Split line into components and filter out empty strings
-      const components = lines[i].split(/\s+/).filter(c => c.length > 0);
-
-      if (components.length < 3) {
-        throw new Error(`Invalid color at line ${i + 1} - expected 3 components`);
-      }
-
-      // Parse RGB values
-      const r = parseInt(components[0]);
-      const g = parseInt(components[1]);
-      const b = parseInt(components[2]);
-
-      if (isNaN(r) || isNaN(g) || isNaN(b)) {
-        throw new Error(`Invalid RGB values at line ${i + 1}`);
-      }
-
-      // Validate range (0-255)
-      if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
-        throw new Error(`RGB values out of range (0-255) at line ${i + 1}`);
-      }
-
-      colors.push(this.rgbToHex(r, g, b));
-    }
-
-    this.lastPalette = {
-      name: "Imported Palette",
-      colors: colors
-    };
-
-    localStorage.setItem("lastPalette", JSON.stringify(this.lastPalette));
-  }
-
-  generatePalFile() {
-    const colors = this.lastPalette.colors.map(hex => {
-      const { r, g, b } = this.hexToRgb(hex);
-      return `${r} ${g} ${b}`;
-    });
-
-    return ["JASC-PAL", "0100", colors.length.toString(), ...colors].join("\n");
-  }
-  
-  loadFloatingColors(colors) {
-    if (!colors) return;
-    if (!colors.length || !colors.forEach) return;
-    this.removeAllFloatingPaletteColors();
-    colors.forEach(entry => {
-      this.addFloatingPaletteColor(entry.color, entry.x, entry.y);
-    });
-  }
-  
-  addFloatingPaletteColor(color, clientX, clientY) {
-    const colorElement = document.createElement("div");
-    colorElement.className = "palette-color floating";
-    colorElement.style.backgroundColor = color;
-    colorElement.style.cursor = "grab";
-    
-    const id = `color_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    colorElement.dataset.color = color;
-    colorElement.dataset.id = id;
-    colorElement.dataset.x = clientX;
-    colorElement.dataset.y = clientY;
-    
-    colorElement.style.top = `${clientY}px`;
-    colorElement.style.left = `${clientX}px`;
-    colorElement.style.touchAction = "none"; // Prevent scrolling while interacting
-    colorElement.style.userSelect = "none"; // Prevent text selection
-    
-    // Click to select color
-    colorElement.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.setColor(color);
-    });
-    
-    // Pointer event handlers for smooth dragging
-    let isDragging = false;
-    let startX, startY;
-    let startLeft, startTop;
-    
-    const onPointerDown = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Capture pointer to continue receiving events even outside the element
-      colorElement.setPointerCapture(e.pointerId);
-      
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startLeft = parseFloat(colorElement.style.left) || 0;
-      startTop = parseFloat(colorElement.style.top) || 0;
-      
-      // Visual feedback
-      colorElement.style.cursor = "grabbing";
-      colorElement.classList.add("dragging");
-      this.floatingColorsDeleteZone.classList.add("visible");
-      
-      // Store initial state for potential undo
-      this._dragStartPos = { x: startLeft, y: startTop };
-    };
-    
-    const onPointerMove = (e) => {
-      if (!isDragging) return;
-      
-      e.preventDefault();
-      
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
-      
-      const newLeft = startLeft + deltaX;
-      const newTop = startTop + deltaY;
-      
-      colorElement.style.left = `${newLeft}px`;
-      colorElement.style.top = `${newTop}px`;
-      colorElement.dataset.x = newLeft;
-      colorElement.dataset.y = newTop;
-      
-      // Check if over delete zone
-      const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
-      const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
-                          e.clientY >= rect.top && e.clientY <= rect.bottom;
-      
-      if (isOverDelete) {
-        this.floatingColorsDeleteZone.classList.add("drag-over");
-      } else {
-        this.floatingColorsDeleteZone.classList.remove("drag-over");
-      }
-    };
-    
-    const onPointerUp = (e) => {
-      if (!isDragging) return;
-      
-      e.preventDefault();
-      
-      // Check if released over delete zone
-      const rect = this.floatingColorsDeleteZone.getBoundingClientRect();
-      const isOverDelete = e.clientX >= rect.left && e.clientX <= rect.right &&
-                          e.clientY >= rect.top && e.clientY <= rect.bottom;
-      
-      if (isOverDelete) {
-        // Delete the color
-        this.removeFloatingPaletteColor(id);
-      } else {
-        // Save new position
-        this.saveFloatingColors();
-      }
-      
-      // Clean up
-      isDragging = false;
-      colorElement.style.cursor = "grab";
-      colorElement.classList.remove("dragging");
-      this.floatingColorsDeleteZone.classList.remove("visible", "drag-over");
-      
-      // Release pointer capture
-      colorElement.releasePointerCapture(e.pointerId);
-    };
-    
-    // Add pointer event listeners
-    colorElement.addEventListener("pointerdown", onPointerDown);
-    colorElement.addEventListener("pointermove", onPointerMove);
-    colorElement.addEventListener("pointerup", onPointerUp);
-    colorElement.addEventListener("pointercancel", onPointerUp);
-    
-    // Prevent context menu on long press
-    colorElement.addEventListener("contextmenu", (e) => e.preventDefault());
-    
-    this.overlayLayer.appendChild(colorElement);
-    this.floatingColors.set(id, colorElement);
-    this.saveFloatingColors();
-  }  
-  
-  removeFloatingPaletteColor(id) {
-    const element = this.floatingColors.get(id);
-    if (element) {
-      // Remove all pointer event listeners
-      element.removeEventListener("pointerdown", element._pointerDown);
-      element.removeEventListener("pointermove", element._pointerMove);
-      element.removeEventListener("pointerup", element._pointerUp);
-      element.removeEventListener("pointercancel", element._pointerUp);
-      
-      element.remove(); // Remove from DOM
-      this.floatingColors.delete(id); // Remove from Map
-      this.saveFloatingColors();
-    }
-  }  
-  
-  removeAllFloatingPaletteColors() {
-    this.floatingColors.forEach(element => element[1]?.remove?.());
-    this.floatingColors.clear();
-    this.saveFloatingColors();
-  }
-  
-  saveFloatingColors() {
-    localStorage.setItem("floatingColors", this.getFloatingColorsData());
-  }
-  
-  getFloatingColorsData() {
-    return JSON.stringify(
-      Array.from(this.floatingColors).map(entry => entry[1]).map(
-        element => {
-          return {
-            color: element.dataset.color,
-            x: element.dataset.x,
-            y: element.dataset.y
-          }
-        }
-      )
-    );
   }
   
   createButton(id, iconClass, onClick) {
@@ -10367,7 +10741,7 @@ class PixelArtEditor {
 
     // Get fill color
     const fillColor = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
-    const fillRgb = this.hexToRgb(fillColor);
+    const fillRgb = this.colorPicker.hexToRgb(fillColor);
 
     // If already the same color, return
     if (fillRgb && fillRgb.r === targetColor[0] && fillRgb.g === targetColor[1] && fillRgb.b === targetColor[2] && targetColor[3] === 255) {
@@ -10653,16 +11027,167 @@ class PixelArtEditor {
   updateColorIndicator() {
     this.colorPrimary.style.backgroundColor = this.primaryColor;
     this.colorSecondary.style.backgroundColor = this.secondaryColor;
-
+    
     this.colorSelector.className = "color-selector";
     if (this.selectedColor === "secondary") {
       this.colorSelector.classList.add("secondary");
     }
-
+    
     localStorage.setItem("primaryColor", this.primaryColor);
     localStorage.setItem("secondaryColor", this.secondaryColor);
   }
-
+  
+  showColorPicker() {
+    this.colorPicker.show();
+  }
+  
+  hideColorPicker() {
+    this.colorPicker.hide();
+  }
+  
+  updatePaletteGrid() {
+    // Delegate to colorPicker to update its UI
+    if (this.colorPicker) {
+      this.colorPicker.updatePaletteGrid();
+    }
+  }
+  
+  addToRecentColors(hex) {
+    this.paletteManager.addToRecent(hex);
+  }
+  
+  updateRecentColorsGrid() {
+    if (this.colorPicker) {
+      this.colorPicker.updateRecentColorsGrid();
+    }
+  }
+  
+  updatePaletteGrid() {
+    if (this.colorPicker) {
+      this.colorPicker.updatePaletteGrid();
+    }
+  }
+  
+  addColorToPalette(color) {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.paletteManager.addColorToPalette(currentPalette.id, color);
+      this.updatePaletteGrid();
+    }
+  }
+  
+  removeColorFromPalette(index) {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.paletteManager.removeColorFromPalette(currentPalette.id, index);
+      this.updatePaletteGrid();
+    }
+  }
+  
+  loadPalette() {
+    const fileBrowser = this.getFileBrowser({
+      title: __("Cargar paleta||Load palette"),
+      mode: "open",
+      fileTypes: ["pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.readFile(fileInfo);
+          this.parsePalFile(fileData);
+          this.updatePaletteGrid();
+          this.showToast(__("Paleta cargada||Palette loaded successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+  
+  savePalette() {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (!currentPalette || currentPalette.colors.length === 0) {
+      this.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
+      return;
+    }
+    
+    const fileBrowser = this.getFileBrowser({
+      title: __("Guardar paleta||Save palette"),
+      mode: "saveAs",
+      fileTypes: ["pal"],
+      defaultType: "pal",
+      defaultName: currentPalette.name || "palette",
+      onConfirm: async fileInfo => {
+        try {
+          const palContent = this.generatePalFile();
+          await this.saveFile(fileInfo.name, "pal", palContent);
+          this.showToast(__("Paleta guardada||Palette saved successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+  
+  parsePalFile(content) {
+    const lines = content.split("\n").map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length < 3 || lines[0] !== "JASC-PAL") {
+      throw new Error("Invalid PAL file format - missing JASC-PAL header");
+    }
+    if (lines[1] !== "0100") {
+      throw new Error("Unsupported PAL version - expected 0100");
+    }
+    
+    const colorCount = parseInt(lines[2]);
+    if (isNaN(colorCount)) {
+      throw new Error("Invalid color count - not a number");
+    }
+    
+    if (lines.length < 3 + colorCount) {
+      throw new Error(`File claims to have ${colorCount} colors but only ${lines.length - 3} found`);
+    }
+    
+    const colors = [];
+    for (let i = 3; i < 3 + colorCount; i++) {
+      const components = lines[i].split(/\s+/).filter(c => c.length > 0);
+      if (components.length < 3) {
+        throw new Error(`Invalid color at line ${i + 1} - expected 3 components`);
+      }
+      
+      const r = parseInt(components[0]);
+      const g = parseInt(components[1]);
+      const b = parseInt(components[2]);
+      
+      if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        throw new Error(`Invalid RGB values at line ${i + 1}`);
+      }
+      
+      if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+        throw new Error(`RGB values out of range (0-255) at line ${i + 1}`);
+      }
+      
+      colors.push(this.colorPicker.rgbToHex(r, g, b));
+    }
+    
+    const name = __("Paleta importada||Imported palette");
+    let uniqueName = name;
+    let counter = 1;
+    while (this.paletteManager.palettes.some(p => p.name === uniqueName)) {
+      uniqueName = `${name} ${counter++}`;
+    }
+    this.paletteManager.addPalette(uniqueName, colors);
+  }
+  
+  generatePalFile() {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    const colors = currentPalette.colors.map(hex => {
+      const rgb = this.colorPicker.hexToRgb(hex);
+      return `${rgb.r} ${rgb.g} ${rgb.b}`;
+    });
+    return ["JASC-PAL", "0100", colors.length.toString(), ...colors].join("\n");
+  }
+    
   // UI helpers
   showToast(message, duration = 3000) {
     this.notificationElement.innerHTML = message;
@@ -10736,7 +11261,7 @@ class PixelArtEditor {
       });
     }
   }
-  
+
   // Menu actions
   showNewProjectDialog() {
     const content = document.createElement("div");
@@ -10772,66 +11297,6 @@ class PixelArtEditor {
         }
       }
     ]);
-  }
-
-  showHexColorInputDialog() {
-    const content = document.createElement("div");
-
-    const textInput = document.createElement("input");
-    textInput.type = "text";
-    textInput.value = this.colorPickerPreviewColor;
-    textInput.placeholder = this.colorPickerPreviewColor;
-    textInput.addEventListener("keyup", event => {
-      const characters = textInput.value.trim().split("");
-      if (!"#0123456789abcdefABCDEF".includes(characters.pop())) {
-        characters.pop();
-        textInput.value = characters.join("");
-        colorInput.value = textInput.value;
-      } else {
-        if (this.isValidHex(textInput.value)) {
-          if (!textInput.value.startsWith("#")) {
-            textInput.value = "#" + textInput.value;
-          }
-        }
-        colorInput.value = textInput.value;
-      }
-    });
-    content.appendChild(textInput);
-    
-    const colorInput = document.createElement("input");
-    colorInput.type = "color";
-    colorInput.value = this.colorPickerPreviewColor;
-    colorInput.addEventListener("change", () => {
-      textInput.value = colorInput.value;
-    });
-    colorInput.style.marginTop = '0.3rem';
-    content.appendChild(colorInput);
-    
-    return new Promise((resolve, reject) => {
-      this.showPopup(__("Entrada Hexadecimal||Hex Input"), content, [
-        {
-          text: __("Cancelar"),
-          class: "cancel",
-          action: () => {
-            this.hidePopup();
-            reject();
-          }
-        },
-        {
-          text: __("Selecionar||Select"),
-          action: () => {
-            // Validate
-            if (this.isValidHex(textInput.value)) {
-              this.hidePopup();
-              resolve(textInput.value);
-            } else {
-              this.showToast(__("Expresión hexadecimal inválida||Invalid HEX color expression"));
-              reject();
-            }
-          }
-        }
-      ]);
-    });
   }
 
   flipHorizontal() {
@@ -13510,10 +13975,6 @@ class PixelArtEditor {
   formatDate(date) {
     const pad = n => n.toString().padStart(2, "0");
     return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-  }
-  
-  isValidHex(text) {
-    return /^#?([a-f\d]{3}|[a-f\d]{6})$/i.test(text);
   }
   
   getColor() {

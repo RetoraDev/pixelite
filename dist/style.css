@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1
- * Built: 3/25/2026, 10:59:55 AM
+ * Built: 3/26/2026, 12:59:54 AM
  * Platform: Android (Cordova)
  * Debug: false
  * Minified: false
@@ -292,6 +292,11 @@ button:active {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+.ui-button.highlight {
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
 }
 
 .undo-redo-buttons {
@@ -862,15 +867,18 @@ button:active {
 .icon-merge-down {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 10l5 5 5-5H7z"/><path d="M5 6h14v2H5z"/></svg>');
 }
-.icon.icon-trace {
+.icon-trace {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>');
 }
-.icon.icon-floating {
+.icon-floating {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 4h-4v4h4V7zm-6 0H7v4h4V7zm6 6h-4v4h4v-4zm-6 0H7v4h4v-4z"/></svg>');
+}
+.icon-download {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>');
 }
 
 /* Tool Icons */
-.tool-pencil {
+.tool-pencil, .icon-pencil {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>');
 }
 .tool-eraser {
@@ -2777,7 +2785,7 @@ button:active {
 }
 
 .recent-colors-title {
-  margin-bottom: 10px;
+  margin-top: 10px;
   font-size: 14px;
   color: var(--text-dim);
 }
@@ -2877,6 +2885,115 @@ button:active {
   padding: 20px;
   color: var(--text-dim);
   font-style: italic;
+}
+
+/* Palette Manager Styles */
+.palette-manager-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.palette-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palette-manager-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background-color: var(--ui-highlight);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.palette-manager-item.active {
+  background-color: var(--primary-color);
+}
+
+.palette-manager-preview {
+  display: flex;
+  gap: 2px;
+  width: 60px;
+  height: 30px;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.palette-manager-swatch {
+  flex: 1;
+}
+
+.palette-manager-info {
+  flex: 1;
+}
+
+.palette-manager-name {
+  font-weight: bold;
+}
+
+.palette-manager-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.palette-manager-item.active .palette-manager-count {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.palette-manager-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.palette-manager-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.palette-manager-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.palette-manager-action-btn {
+  flex: 1;
+  padding: 8px;
+}
+
+/* Palette Editor */
+.palette-editor-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 70vh;
+  overflow-y: auto;
+  min-width: 280px;
+}
+
+.palette-editor-name-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.palette-editor-name-input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 4px;
+  border: 2px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-color);
 }
 
 /* Settings */
