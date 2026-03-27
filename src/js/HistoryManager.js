@@ -3,7 +3,7 @@ class HistoryManager {
   constructor(editor) {
     this.editor = editor;
     this.history = [];
-    this.historyIndex = -1;
+    this.historyIndex = 0;
     this.maxHistoryLength = Infinity;
     this.currentBatch = null;
   }
@@ -22,9 +22,16 @@ class HistoryManager {
   }
 
   // End the current batch and add to history
-  endBatch() {
+  endBatch(forced = false) {
     if (this.currentBatch && this.currentBatch.operations.length > 0) {
-      this.addToHistory(this.currentBatch);
+      if (forced) {
+        // Forced batch end means user canceled the current operation
+        // We need to silently undo every single change
+        this.applyHistoryEntry(this.currentBatch, true); // true for undo mode
+        this.currentBatch = null;
+      } else {
+        this.addToHistory(this.currentBatch);
+      }
     }
     this.currentBatch = null;
   }

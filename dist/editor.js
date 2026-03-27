@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1 dev
- * Built: 3/26/2026, 3:41:58 AM
+ * Built: 3/27/2026, 5:57:11 AM
  * Platform: Development
  * Debug: false
  * Minified: false
@@ -2761,7 +2761,7 @@ class HistoryManager {
   constructor(editor) {
     this.editor = editor;
     this.history = [];
-    this.historyIndex = -1;
+    this.historyIndex = 0;
     this.maxHistoryLength = Infinity;
     this.currentBatch = null;
   }
@@ -2780,9 +2780,16 @@ class HistoryManager {
   }
 
   // End the current batch and add to history
-  endBatch() {
+  endBatch(forced = false) {
     if (this.currentBatch && this.currentBatch.operations.length > 0) {
-      this.addToHistory(this.currentBatch);
+      if (forced) {
+        // Forced batch end means user canceled the current operation
+        // We need to silently undo every single change
+        this.applyHistoryEntry(this.currentBatch, true); // true for undo mode
+        this.currentBatch = null;
+      } else {
+        this.addToHistory(this.currentBatch);
+      }
     }
     this.currentBatch = null;
   }
@@ -8461,6 +8468,8 @@ class PixelArtEditor {
     this.menuContent = document.createElement("div");
     this.menuContent.className = "menu-content";
     this.menuPanel.appendChild(this.menuContent);
+    
+    this.menuPanel.addEventListener("click", e => e.stopPropagation());
 
     // Create menu tabs
     this.createMenuTab("File");
@@ -10315,7 +10324,7 @@ class PixelArtEditor {
     this.updateAnimationPreview();
     this.updateFramesUIQuick();
   }
-
+  
   getProjectSnapshot() {
     if (!this.project) return null;
 
@@ -10420,8 +10429,8 @@ class PixelArtEditor {
   
   cancelDrawing() {
     if (this.isDrawing) {
-      this.historyManager.endBatch();
-      this.historyManager.undo();
+      this.historyManager.endBatch(true);
+      this.render();
     }
   }
 
@@ -10432,55 +10441,17 @@ class PixelArtEditor {
 
   // Drawing Operations
   drawPixel(x, y, options = {}) {
-    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
-
-    const color = options.color || (this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor);
-    const frame = this.project.frames[this.project.currentFrame];
-    const layer = frame.layers[this.project.currentLayer];
-    const ctx = layer.ctx;
-
-    // Should use brush?
-    const useBrush = true;
-
-    if (useBrush && this.brushSize > 1) {
-      // Use brush for larger sizes
-      let pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color)
-      if (pixels && pixels.length) {
-        this.recordDrawOperation(pixels.filter(p => p.newColor != p.oldColor));
-      }
-    } else {
-      // Save old pixel color
-      const oldColor = this.getPixelColorFromCtx(ctx, x, y);
-      
-      if (color != oldColor) {
-        // Single pixel
-        if (color === "transparent") {
-          ctx.clearRect(x, y, 1, 1);
-        } else {
-          ctx.fillStyle = color;
-          ctx.fillRect(x, y, 1, 1);
-        }
-        
-        // Add to history
-        this.recordDrawOperation([{
-          x: x,
-          y: y,
-          oldColor: oldColor,
-          newColor: color
-        }]);
-      }
-    }
-
+    const pixels = this.pencilDraw(x, y, {
+      ctx: this.getCurrentLayerContext(),
+      color: this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor,
+      useBrush: true,
+      brushSize: this.brushSize,
+      ...options
+    });
+    this.recordDrawOperation(pixels);
     this.render();
   }
-
-  drawBrushCircle(ctx, centerX, centerY, radius, color) {
-    if (radius <= 0) return [];
-
-    // Use midpoint circle algorithm for pixel-perfect circles
-    return this.midpointEllipse(ctx, centerX, centerY, radius / 2, radius / 2, color, true);
-  }
-
+  
   startLine(x, y, color) {
     this.tempLine = { startX: x, startY: y };
     this.getTempCanvas();
@@ -10500,8 +10471,7 @@ class PixelArtEditor {
     this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, this.tempCtx, this.tempColor, useBrush);
 
     // Combine with main canvas
-    this.ctx.clearRect(0, 0, this.project.width, this.project.height);
-    this.render();
+    this.renderQuick();
     this.ctx.drawImage(this.tempCanvas, 0, 0);
   }
 
@@ -10515,11 +10485,11 @@ class PixelArtEditor {
     // Should use brush?
     const useBrush = true; // TODO: Get this setting from tool
 
+    // Force render before drawing
+    this.renderQuick();
+
     // Draw final line
-    let pixels = this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, ctx, this.tempColor, useBrush);
-    
-    // Only saved pixels that really changed
-    pixels = pixels.filter(p => p.newColor != p.oldColor);
+    let pixels = this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, ctx, this.tempColor, useBrush);;
     
     this.recordDrawOperation(pixels);
 
@@ -10530,65 +10500,7 @@ class PixelArtEditor {
 
     this.render();
   }
-
-  drawBresenhamLine(x0, y0, x1, y1, ctx, color, useBrush) {
-    const dx = Math.abs(x1 - x0);
-    const dy = -Math.abs(y1 - y0);
-    const sx = x0 < x1 ? 1 : -1;
-    const sy = y0 < y1 ? 1 : -1;
-    let err = dx + dy;
-    let e2;
-    
-    let linePixels = [];
-    let lineStrokePixels = [];
-
-    while (true) {
-      if (color === "transparent") {
-        if (useBrush && this.brushSize > 1) {
-          const radius = this.brushSize / 2;
-          lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, "transparent", true)];
-        } else {
-          const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
-          ctx.clearRect(x0, y0, 1, 1);
-          linePixels.push({
-            x: x0,
-            y: y0,
-            newColor: color,
-            oldColor
-          });
-        }
-      } else {
-        if (useBrush && this.brushSize > 1) {
-          const radius = this.brushSize / 2;
-          lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, color, true)];
-        } else {
-          const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
-          ctx.fillStyle = color;
-          ctx.fillRect(x0, y0, 1, 1);
-          linePixels.push({
-            x: x0,
-            y: y0,
-            newColor: color,
-            oldColor
-          });
-        }
-      }
-
-      if (x0 === x1 && y0 === y1) break;
-      e2 = 2 * err;
-      if (e2 >= dy) {
-        err += dy;
-        x0 += sx;
-      }
-      if (e2 <= dx) {
-        err += dx;
-        y0 += sy;
-      }
-    }
-    
-    return [...linePixels, ...lineStrokePixels];
-  }
-
+  
   startRect(x, y) {
     this.tempRect = {
       startX: x,
@@ -10620,37 +10532,23 @@ class PixelArtEditor {
     this.tempRect.currentX = this.tempRect.startX + width;
     this.tempRect.currentY = this.tempRect.startY + height;
 
-    // Draw rectangle preview using lines
+    // Settings
     const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
-    this.tempCtx.strokeStyle = color;
-    this.tempCtx.lineWidth = 1;
-
-    // Should use brush?
     const useBrush = true; // TODO: Get this setting from tool
-
-    if (this.currentTool.settings?.filled?.value) {
-      this.tempCtx.fillStyle = color;
-      this.tempCtx.fillRect(this.tempRect.startX, this.tempRect.startY, width + 1, height + 1);
-    } else {
-      // Draw four lines to form a rectangle
-      this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY, this.tempCtx, color, useBrush);
-      this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY + height, this.tempCtx, color, useBrush);
-      this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY + height, this.tempCtx, color, useBrush);
-      this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY, this.tempCtx, color, useBrush);
-    }
+    const filled = this.currentTool.settings?.filled?.value;
+    
+    // Draw rectangle preview
+    this.drawRectangle(this.tempCtx, this.tempRect.startX, this.tempRect.startY, width, height, color, filled, useBrush);
 
     // Combine with main canvas
-    this.ctx.clearRect(0, 0, this.project.width, this.project.height);
-    this.render();
+    this.renderQuick();
     this.ctx.drawImage(this.tempCanvas, 0, 0);
   }
 
   finishRect(x, y) {
     if (!this.tempRect || !this.project) return;
 
-    const frame = this.project.frames[this.project.currentFrame];
-    const layer = frame.layers[this.project.currentLayer];
-    const ctx = layer.ctx;
+    const ctx = this.getCurrentLayerContext(); 
 
     // Calculate rectangle dimensions
     let width = this.tempRect.currentX - this.tempRect.startX ;
@@ -10663,37 +10561,19 @@ class PixelArtEditor {
       height = height < 0 ? -size : size;
     }
 
-    // Should use brush?
-    const useBrush = true; // TODO: Get this setting from tool
-
-    // Draw final rectangle
+    // Settings
     const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
-
-    if (this.currentTool.settings?.filled?.value) {
-      let pixels = [];
-      for (let y = this.tempRect.startY; y <= this.tempRect.startY + height; y++) {
-        for (let x = this.tempRect.startX; x <= this.tempRect.startX + width + 1; x++) {
-          pixels.push({
-            x, y,
-            newColor: color,
-            oldColor: this.getPixelColorFromCtx(ctx, x, y)
-          });
-        }
-      }
-      ctx.fillStyle = color;
-      ctx.fillRect(this.tempRect.startX, this.tempRect.startY, width, height);
-      this.recordDrawOperation(pixels.filter(p => p.newColor != p.oldColor));
-    } else {
-      // Draw four lines to form a rectangle
-      let pixels = [
-        ...this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY, ctx, color, useBrush),
-        ...this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY, this.tempRect.startX + width, this.tempRect.startY + height, ctx, color, useBrush),
-        ...this.drawBresenhamLine(this.tempRect.startX + width, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY + height, ctx, color, useBrush),
-        ...this.drawBresenhamLine(this.tempRect.startX, this.tempRect.startY + height, this.tempRect.startX, this.tempRect.startY, ctx, color, useBrush)
-      ].filter(p => p.newColor != p.oldColor);
-      if (pixels.length) {
-        this.recordDrawOperation(pixels);
-      }
+    const useBrush = true; // TODO: Get this setting from tool
+    const filled = this.currentTool.settings?.filled?.value;
+    
+    // Force render before drawing
+    this.renderQuick();
+    
+    // Draw final rectangle
+    const pixels = this.drawRectangle(ctx, this.tempRect.startX, this.tempRect.startY, width, height, color, filled, useBrush);
+    
+    if (pixels.length) {
+      this.recordDrawOperation(pixels);
     }
 
     // Clean up
@@ -10753,7 +10633,6 @@ class PixelArtEditor {
     }
 
     // Combine with main canvas
-    this.ctx.clearRect(0, 0, this.project.width, this.project.height);
     this.render();
     this.ctx.drawImage(this.tempCanvas, 0, 0);
   }
@@ -10780,13 +10659,17 @@ class PixelArtEditor {
     if (Math.abs(width) < 1) width = width < 0 ? -1 : 1;
     if (Math.abs(height) < 1) height = height < 0 ? -1 : 1;
 
-    // Draw final ellipse with integer coordinates
+    // Settings
     const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
     const startX = Math.floor(this.tempEllipse.startX);
     const startY = Math.floor(this.tempEllipse.startY);
+    
+    // Force render before drawing
+    this.renderQuick();
 
     let pixels = [];
 
+    // Draw final ellipse
     if (this.currentTool.settings?.filled?.value) {
       pixels = this.drawFilledEllipse(ctx, startX, startY, width, height, color);
     } else {
@@ -10806,397 +10689,6 @@ class PixelArtEditor {
     this.tempCtx = null;
 
     this.render();
-  }
-
-  drawEllipse(ctx, x, y, width, height, color) {
-    const centerX = Math.floor(x + width / 2);
-    const centerY = Math.floor(y + height / 2);
-    const radiusX = Math.floor(Math.abs(width / 2));
-    const radiusY = Math.floor(Math.abs(height / 2));
-
-    // Should use brush?
-    const useBrush = true; // TODO: Get this setting from Tools
-
-    if (useBrush && this.brushSize > 1) {
-      return this.midpointEllipseWithBrush(ctx, centerX, centerY, radiusX, radiusY, color, false);
-    } else {
-      return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, false);
-    }
-  }
-
-  drawFilledEllipse(ctx, x, y, width, height, color) {
-    const centerX = Math.floor(x + width / 2);
-    const centerY = Math.floor(y + height / 2);
-    const radiusX = Math.floor(Math.abs(width / 2));
-    const radiusY = Math.floor(Math.abs(height / 2));
-
-    return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, true);
-  }
-
-  midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, filled) {
-    if (radiusX <= 0 || radiusY <= 0) return [];
-
-    // Convert to integer coordinates for pixel perfection
-    const cx = Math.floor(centerX);
-    const cy = Math.floor(centerY);
-    const rx = Math.floor(Math.abs(radiusX));
-    const ry = Math.floor(Math.abs(radiusY));
-
-    if (rx === 0 || ry === 0) return [];
-    
-    let pixels = [];
-
-    // Draw pixels function - ensures integer coordinates
-    const drawPixel = (x, y) => {
-      const px = Math.floor(x);
-      const py = Math.floor(y);
-      if (px < 0 || px >= ctx.width || py < 0 || py >= ctx.height) return;
-
-      const oldColor = this.getPixelColorFromCtx(ctx, px, py);
-
-      if (oldColor !== color) {
-        if (color === "transparent") {
-          ctx.clearRect(px, py, 1, 1);
-        } else {
-          ctx.fillStyle = color;
-          ctx.fillRect(px, py, 1, 1);
-        }
-        pixels.push({
-          x, y,
-          newColor: color,
-          oldColor
-        });
-      }
-    };
-
-    // For filled ellipses, use scanline approach
-    if (filled) {
-      return this.fillEllipseScanline(ctx, cx, cy, rx, ry, color);
-    }
-
-    // Outline drawing using integer-only midpoint algorithm
-    let x = 0;
-    let y = ry;
-
-    // Initial decision parameter for region 1
-    let d1 = ry * ry - rx * rx * ry + Math.floor(0.25 * rx * rx);
-    let dx = 2 * ry * ry * x;
-    let dy = 2 * rx * rx * y;
-
-    // Region 1
-    while (dx < dy) {
-      // Draw 4 symmetric points
-      drawPixel(cx + x, cy + y);
-      drawPixel(cx - x, cy + y);
-      drawPixel(cx + x, cy - y);
-      drawPixel(cx - x, cy - y);
-
-      x++;
-      dx += 2 * ry * ry;
-
-      if (d1 < 0) {
-        d1 += dx + ry * ry;
-      } else {
-        y--;
-        dy -= 2 * rx * rx;
-        d1 += dx - dy + ry * ry;
-      }
-    }
-
-    // Decision parameter for region 2
-    let d2 = ry * ry * ((x + 0.5) * (x + 0.5)) + rx * rx * ((y - 1) * (y - 1)) - rx * rx * ry * ry;
-
-    // Region 2
-    while (y >= 0) {
-      // Draw 4 symmetric points
-      drawPixel(cx + x, cy + y);
-      drawPixel(cx - x, cy + y);
-      drawPixel(cx + x, cy - y);
-      drawPixel(cx - x, cy - y);
-
-      y--;
-      dy -= 2 * rx * rx;
-
-      if (d2 > 0) {
-        d2 += rx * rx - dy;
-      } else {
-        x++;
-        dx += 2 * ry * ry;
-        d2 += dx - dy + rx * rx;
-      }
-    }
-    
-    return pixels;
-  }
-  
-  midpointEllipseWithBrush(ctx, centerX, centerY, radiusX, radiusY, color, filled) {
-    // TODO: Integrate with midpointEllipse() logic
-    if (radiusX <= 0 || radiusY <= 0) return [];
-
-    // Convert to integer coordinates for pixel perfection
-    const cx = Math.floor(centerX);
-    const cy = Math.floor(centerY);
-    const rx = Math.floor(Math.abs(radiusX));
-    const ry = Math.floor(Math.abs(radiusY));
-
-    if (rx === 0 || ry === 0) return [];
-    
-    let pixels = [];
-
-    // Draw pixels function - ensures integer coordinates
-    const drawPixel = (x, y) => {
-      if (this.brushSize > 1) {
-        pixels = [...pixels, ...this.drawBrushCircle(ctx, x, y, this.brushSize, color)];
-      } else {
-        const oldColor = this.getPixelColorFromCtx(ctx, x, y);
-        if (oldColor !== color) {
-          if (color === "transparent") {
-            ctx.clearRect(x, y, 1, 1);
-          } else {
-            ctx.fillStyle = color;
-            ctx.fillRect(x, y, 1, 1);
-          }
-          pixels.push({
-            x, y,
-            newColor: color,
-            oldColor
-          });
-        }
-      }
-    };
-
-    // For filled ellipses, use scanline approach
-    if (filled) {
-      return this.fillEllipseScanline(ctx, cx, cy, rx, ry, color);
-    }
-
-    // Outline drawing using integer-only midpoint algorithm
-    let x = 0;
-    let y = ry;
-
-    // Initial decision parameter for region 1
-    let d1 = ry * ry - rx * rx * ry + Math.floor(0.25 * rx * rx);
-    let dx = 2 * ry * ry * x;
-    let dy = 2 * rx * rx * y;
-
-    // Region 1
-    while (dx < dy) {
-      // Draw 4 symmetric points
-      drawPixel(cx + x, cy + y);
-      drawPixel(cx - x, cy + y);
-      drawPixel(cx + x, cy - y);
-      drawPixel(cx - x, cy - y);
-
-      x++;
-      dx += 2 * ry * ry;
-
-      if (d1 < 0) {
-        d1 += dx + ry * ry;
-      } else {
-        y--;
-        dy -= 2 * rx * rx;
-        d1 += dx - dy + ry * ry;
-      }
-    }
-
-    // Decision parameter for region 2
-    let d2 = ry * ry * ((x + 0.5) * (x + 0.5)) + rx * rx * ((y - 1) * (y - 1)) - rx * rx * ry * ry;
-
-    // Region 2
-    while (y >= 0) {
-      // Draw 4 symmetric points
-      drawPixel(cx + x, cy + y);
-      drawPixel(cx - x, cy + y);
-      drawPixel(cx + x, cy - y);
-      drawPixel(cx - x, cy - y);
-
-      y--;
-      dy -= 2 * rx * rx;
-
-      if (d2 > 0) {
-        d2 += rx * rx - dy;
-      } else {
-        x++;
-        dx += 2 * ry * ry;
-        d2 += dx - dy + rx * rx;
-      }
-    }
-    
-    return pixels;
-  }
-
-  fillEllipseScanline(ctx, cx, cy, rx, ry, color) {
-    if (rx <= 0 || ry <= 0) return [];
-
-    let pixels = [];
-
-    const drawPixel = (x, y) => {
-      if (x < 0 || x >= ctx.width || y < 0 || y >= ctx.height) return;
-
-      const oldColor = this.getPixelColorFromCtx(ctx, x, y);
-
-      if (oldColor !== color) {
-        if (color === "transparent") {
-          ctx.clearRect(x, y, 1, 1);
-        } else {
-          ctx.fillStyle = color;
-          ctx.fillRect(x, y, 1, 1);
-        }
-        pixels.push({
-          x, y,
-          newColor: color,
-          oldColor
-        });
-      }
-    };
-
-    // Precompute squared values for efficiency
-    const rx2 = rx * rx;
-    const ry2 = ry * ry;
-    const twoRx2 = 2 * rx2;
-    const twoRy2 = 2 * ry2;
-
-    // Region 1: Slope < 1
-    let x = 0;
-    let y = ry;
-    let px = 0;
-    let py = twoRx2 * y;
-
-    // Initial decision parameter for region 1
-    let d1 = Math.floor(ry2 - rx2 * ry + 0.25 * rx2);
-
-    while (px < py) {
-      // Fill horizontal lines for this y level
-      for (let i = cx - x; i <= cx + x; i++) {
-        drawPixel(i, cy + y);
-        drawPixel(i, cy - y);
-      }
-
-      x++;
-      px += twoRy2;
-
-      if (d1 < 0) {
-        d1 += ry2 + px;
-      } else {
-        y--;
-        py -= twoRx2;
-        d1 += ry2 + px - py;
-      }
-    }
-
-    // Region 2: Slope >= 1
-    let d2 = Math.floor(ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2);
-
-    while (y >= 0) {
-      // Fill horizontal lines for this y level
-      for (let i = cx - x; i <= cx + x; i++) {
-        drawPixel(i, cy + y);
-        drawPixel(i, cy - y);
-      }
-
-      y--;
-      py -= twoRx2;
-
-      if (d2 > 0) {
-        d2 += rx2 - py;
-      } else {
-        x++;
-        px += twoRy2;
-        d2 += rx2 - py + px;
-      }
-    }
-    
-    return pixels;
-  }
-  
-  fillArea(x, y) {
-    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
-
-    const frame = this.project.frames[this.project.currentFrame];
-    const layer = frame.layers[this.project.currentLayer];
-    const ctx = layer.ctx;
-
-    // Get target color
-    const imageData = ctx.getImageData(x, y, 1, 1);
-    const targetColor = Array.from(imageData.data);
-
-    // Get fill color
-    const fillColor = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
-    const fillRgb = this.colorPicker.hexToRgb(fillColor);
-
-    // If already the same color, return
-    if (fillRgb && fillRgb.r === targetColor[0] && fillRgb.g === targetColor[1] && fillRgb.b === targetColor[2] && targetColor[3] === 255) {
-      return;
-    }
-
-    // Perform flood fill
-    let pixels = this.floodFill(ctx, x, y, targetColor, fillRgb);
-    
-    pixels = pixels.filter(p => p.newColor != p.oldColor);
-    
-    if (pixels.length) {
-      this.recordDrawOperation(pixels);
-    }
-    
-    this.render();
-  }
-
-  floodFill(ctx, x, y, targetColor, fillColor) {
-    const canvasWidth = this.project.width;
-    const canvasHeight = this.project.height;
-    const stack = [[x, y]];
-    const visited = new Set();
-    
-    let pixels = [];
-
-    while (stack.length > 0) {
-      const [currentX, currentY] = stack.pop();
-      const key = `${currentX},${currentY}`;
-
-      if (visited.has(key) || currentX < 0 || currentX >= canvasWidth || currentY < 0 || currentY >= canvasHeight) {
-        continue;
-      }
-
-      visited.add(key);
-
-      // Get pixel color
-      const imageData = ctx.getImageData(currentX, currentY, 1, 1);
-      const currentColor = Array.from(imageData.data);
-
-      // Check if pixel matches target color
-      if (this.colorsMatch(currentColor, targetColor)) {
-        // Fill the pixel
-        const oldColor = this.getPixelColorFromCtx(ctx, currentX, currentY);
-        if (fillColor) {
-          const fillData = new Uint8ClampedArray([fillColor.r, fillColor.g, fillColor.b, 255]);
-          ctx.putImageData(new ImageData(fillData, 1, 1), currentX, currentY);
-          pixels.push({
-            x: currentX,
-            y: currentY,
-            newColor: `rgba(${fillColor.r}, ${fillColor.g}, ${fillColor.b}, 255)`,
-            oldColor
-          });
-        } else {
-          // Transparent fill
-          ctx.clearRect(currentX, currentY, 1, 1);
-          pixels.push({
-            x: currentX,
-            y: currentY,
-            newColor: "transparent",
-            oldColor
-          });
-        }
-
-        // Add neighbors to stack
-        stack.push([currentX + 1, currentY], [currentX - 1, currentY], [currentX, currentY + 1], [currentX, currentY - 1]);
-      }
-    }
-    
-    return pixels;
-  }
-
-  colorsMatch(color1, color2) {
-    return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3];
   }
 
   pickColor(x, y, includeReferenceImage = true, silent = false) {
@@ -11236,6 +10728,625 @@ class PixelArtEditor {
     if (includeReferenceImage && this.referenceManager.traceImage) {
       if (pickFromCtx(this.ctx)) return;
     }
+  }
+
+  fillArea(x, y) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Get target color
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    const targetColor = Array.from(imageData.data);
+
+    // Get fill color
+    const fillColor = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const fillRgb = this.colorPicker.hexToRgb(fillColor);
+
+    // If already the same color, return
+    if (fillRgb && fillRgb.r === targetColor[0] && fillRgb.g === targetColor[1] && fillRgb.b === targetColor[2] && targetColor[3] === 255) {
+      return;
+    }
+
+    // Perform flood fill
+    let pixels = this.floodFill(ctx, x, y, targetColor, fillRgb);
+    
+    if (pixels.length) {
+      this.recordDrawOperation(pixels);
+    }
+    
+    this.render();
+  }
+
+  // Drawing algorithms
+  pencilDraw(x, y, options = {}) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+
+    const ctx = options.ctx || this.getCurrentLayerContext();
+    const brushSize = options.brushSize || this.brushSize;
+    const color = options.color || (this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor);
+    
+    // Should use brush?
+    const useBrush = !!options.useBrush;
+    
+    let pixels = [];
+
+    if (useBrush && brushSize > 1) {
+      // Use brush for larger sizes
+      pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color)
+      pixels = pixels.filter(p => p.newColor != p.oldColor);
+    } else {
+      // Save old pixel color
+      const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+      
+      if (color != oldColor) {
+        // Single pixel
+        if (color === "transparent") {
+          ctx.clearRect(x, y, 1, 1);
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, 1, 1);
+        }
+        
+        pixels = [
+          {
+            x: x,
+            y: y,
+            oldColor: oldColor,
+            newColor: color
+          }
+        ];
+      }
+    }
+    
+    return pixels;
+  }
+  
+  drawBrushCircle(ctx, centerX, centerY, radius, color) {
+    if (radius <= 2) return [];
+
+    // Use midpoint circle algorithm for pixel-perfect circles
+    return this.midpointEllipse(ctx, centerX, centerY, radius / 2, radius / 2, color, true);
+  }
+  
+  drawBresenhamLine(x0, y0, x1, y1, ctx, color, useBrush) {
+    const dx = Math.abs(x1 - x0);
+    const dy = -Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    let e2;
+    
+    let linePixels = [];
+    let lineStrokePixels = [];
+
+    while (true) {
+      if (color === "transparent") {
+        if (useBrush && this.brushSize > 1) {
+          const radius = this.brushSize / 2;
+          lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, "transparent", true)];
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
+          ctx.clearRect(x0, y0, 1, 1);
+          linePixels.push({
+            x: x0,
+            y: y0,
+            newColor: color,
+            oldColor
+          });
+        }
+      } else {
+        if (useBrush && this.brushSize > 1) {
+          const radius = this.brushSize / 2;
+          lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, color, true)];
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
+          ctx.fillStyle = color;
+          ctx.fillRect(x0, y0, 1, 1);
+          linePixels.push({
+            x: x0,
+            y: y0,
+            newColor: color,
+            oldColor
+          });
+        }
+      }
+
+      if (x0 === x1 && y0 === y1) break;
+      e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x0 += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+    
+    return [...linePixels, ...lineStrokePixels].filter(p => p.newColor != p.oldColor);
+  }
+  
+  drawRectangle(ctx, startX, startY, width, height, color, filled, useBrush) {
+    let pixels = [];
+    
+    if (filled) {
+      // Register pixel changes
+      for (let y = startY; y <= startY + height; y++) {
+        for (let x = startX; x <= startX + width + 1; x++) {
+          pixels.push({
+            x, y,
+            newColor: color,
+            oldColor: this.getPixelColorFromCtx(ctx, x, y)
+          });
+        }
+      }
+      
+      // Draw filled rectangle
+      ctx.fillStyle = color;
+      ctx.fillRect(startX, startY, width, height);
+    } else {
+      // Draw four lines to form a rectangle
+      pixels = [
+        ...this.drawBresenhamLine(startX, startY, startX + width, startY, ctx, color, useBrush),
+        ...this.drawBresenhamLine(startX + width, startY, startX + width, startY + height, ctx, color, useBrush),
+        ...this.drawBresenhamLine(startX + width, startY + height, startX, startY + height, ctx, color, useBrush),
+        ...this.drawBresenhamLine(startX, startY + height, startX, startY, ctx, color, useBrush)
+      ];
+    }
+
+    // Clean up
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+          
+    return pixels;
+  }
+
+  drawEllipse(ctx, x, y, width, height, color) {
+    const centerX = Math.floor(x + width / 2);
+    const centerY = Math.floor(y + height / 2);
+    const radiusX = Math.floor(Math.abs(width / 2));
+    const radiusY = Math.floor(Math.abs(height / 2));
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from Tools
+    
+    return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, false, useBrush);
+  }
+
+  drawFilledEllipse(ctx, x, y, width, height, color) {
+    const centerX = Math.floor(x + width / 2);
+    const centerY = Math.floor(y + height / 2);
+    const radiusX = Math.floor(Math.abs(width / 2));
+    const radiusY = Math.floor(Math.abs(height / 2));
+
+    const useBrush = true; // TODO: Get this setting from Tools
+    
+    return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, true, useBrush);
+  }
+
+  midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, filled, useBrush) {
+    // Handle zero or negative radii
+    if (radiusX <= 0 || radiusY <= 0) {
+      // For 1x1 ellipse (single pixel)
+      if (radiusX > 0 && radiusY > 0) {
+        const cx = Math.floor(centerX);
+        const cy = Math.floor(centerY);
+        const pixels = [];
+        
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, cx, cy, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, cx, cy);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(cx, cy, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(cx, cy, 1, 1);
+            }
+            pixels.push({ x: cx, y: cy, newColor: color, oldColor });
+          }
+        }
+        return pixels;
+      }
+      return [];
+    }
+  
+    // Round radii to nearest integer for pixel-perfect drawing
+    // For even sizes, ensure we get proper pixel alignment
+    const rx = Math.round(radiusX);
+    const ry = Math.round(radiusY);
+    
+    // For 1x1 or very small ellipses
+    if (rx === 0 && ry === 0) return [];
+    if (rx === 0) {
+      // Draw vertical line of single pixel width
+      const cx = Math.floor(centerX);
+      let pixels = [];
+      for (let y = -ry; y <= ry; y++) {
+        const py = Math.floor(centerY + y);
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, cx, py, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, cx, py);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(cx, py, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(cx, py, 1, 1);
+            }
+            pixels.push({ x: cx, y: py, newColor: color, oldColor });
+          }
+        }
+      }
+      return pixels;
+    }
+    if (ry === 0) {
+      // Draw horizontal line of single pixel height
+      const cy = Math.floor(centerY);
+      let pixels = [];
+      for (let x = -rx; x <= rx; x++) {
+        const px = Math.floor(centerX + x);
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, px, cy, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, px, cy);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(px, cy, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(px, cy, 1, 1);
+            }
+            pixels.push({ x: px, y: cy, newColor: color, oldColor });
+          }
+        }
+      }
+      return pixels;
+    }
+  
+    // For even dimensions, adjust center to maintain symmetry
+    const cx = Math.floor(centerX);
+    const cy = Math.floor(centerY);
+    
+    let pixels = [];
+  
+    const drawPixel = (x, y) => {
+      const px = Math.floor(x);
+      const py = Math.floor(y);
+      if (px < 0 || px >= ctx.width || py < 0 || py >= ctx.height) return;
+  
+      if (useBrush && this.brushSize > 1) {
+        pixels = [...pixels, ...this.drawBrushCircle(ctx, px, py, this.brushSize, color)];
+      } else {
+        const oldColor = this.getPixelColorFromCtx(ctx, px, py);
+        if (oldColor !== color) {
+          if (color === "transparent") {
+            ctx.clearRect(px, py, 1, 1);
+          } else {
+            ctx.fillStyle = color;
+            ctx.fillRect(px, py, 1, 1);
+          }
+          pixels.push({ x: px, y: py, newColor: color, oldColor });
+        }
+      }
+    };
+  
+    // For filled ellipses, use scanline approach
+    if (filled) {
+      return this.fillEllipseScanline(ctx, cx, cy, rx, ry, color, useBrush);
+    }
+  
+    // Special handling for small ellipses (1x2, 2x1, 2x2, etc.)
+    if (rx === 1 && ry === 1) {
+      // Draw a diamond/circle for 2x2
+      drawPixel(cx, cy);
+      drawPixel(cx + 1, cy);
+      drawPixel(cx, cy + 1);
+      drawPixel(cx + 1, cy + 1);
+      return pixels;
+    }
+  
+    // Outline drawing using integer-only midpoint algorithm
+    let x = 0;
+    let y = ry;
+    let rx2 = rx * rx;
+    let ry2 = ry * ry;
+  
+    // Initial decision parameter for region 1
+    let d1 = ry2 - rx2 * ry + Math.floor(rx2 / 4);
+    let dx = 2 * ry2 * x;
+    let dy = 2 * rx2 * y;
+  
+    // Region 1
+    while (dx < dy) {
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+  
+      x++;
+      dx += 2 * ry2;
+  
+      if (d1 < 0) {
+        d1 += dx + ry2;
+      } else {
+        y--;
+        dy -= 2 * rx2;
+        d1 += dx - dy + ry2;
+      }
+    }
+  
+    // Decision parameter for region 2
+    let d2 = ry2 * ((x + 0.5) * (x + 0.5)) + rx2 * ((y - 1) * (y - 1)) - rx2 * ry2;
+  
+    // Region 2
+    while (y >= 0) {
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+  
+      y--;
+      dy -= 2 * rx2;
+  
+      if (d2 > 0) {
+        d2 += rx2 - dy;
+      } else {
+        x++;
+        dx += 2 * ry2;
+        d2 += dx - dy + rx2;
+      }
+    }
+    
+    return pixels;
+  }  
+  
+  fillEllipseScanline(ctx, cx, cy, rx, ry, color, useBrush) {
+    if (rx <= 0 || ry <= 0) {
+      // Handle 1x1 case
+      if (rx > 0 && ry > 0) {
+        const pixels = [];
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, cx, cy, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, cx, cy);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(cx, cy, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(cx, cy, 1, 1);
+            }
+            pixels.push({ x: cx, y: cy, newColor: color, oldColor });
+          }
+        }
+        return pixels;
+      }
+      return [];
+    }
+  
+    let pixels = [];
+  
+    const drawPixel = (x, y) => {
+      if (x < 0 || x >= ctx.width || y < 0 || y >= ctx.height) return;
+  
+      if (useBrush && this.brushSize > 1) {
+        pixels = [...pixels, ...this.drawBrushCircle(ctx, x, y, this.brushSize, color)];
+      } else {
+        const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+        if (oldColor !== color) {
+          if (color === "transparent") {
+            ctx.clearRect(x, y, 1, 1);
+          } else {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, 1, 1);
+          }
+          pixels.push({ x, y, newColor: color, oldColor });
+        }
+      }
+    };
+  
+    // Precompute squared values for efficiency
+    const rx2 = rx * rx;
+    const ry2 = ry * ry;
+    const twoRx2 = 2 * rx2;
+    const twoRy2 = 2 * ry2;
+  
+    // Region 1: Slope < 1
+    let x = 0;
+    let y = ry;
+    let px = 0;
+    let py = twoRx2 * y;
+  
+    let d1 = Math.floor(ry2 - rx2 * ry + rx2 / 4);
+  
+    while (px < py) {
+      // Fill horizontal lines for this y level
+      for (let i = cx - x; i <= cx + x; i++) {
+        drawPixel(i, cy + y);
+        drawPixel(i, cy - y);
+      }
+  
+      x++;
+      px += twoRy2;
+  
+      if (d1 < 0) {
+        d1 += ry2 + px;
+      } else {
+        y--;
+        py -= twoRx2;
+        d1 += ry2 + px - py;
+      }
+    }
+  
+    // Region 2: Slope >= 1
+    let d2 = Math.floor(ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2);
+  
+    while (y >= 0) {
+      // Fill horizontal lines for this y level
+      for (let i = cx - x; i <= cx + x; i++) {
+        drawPixel(i, cy + y);
+        drawPixel(i, cy - y);
+      }
+  
+      y--;
+      py -= twoRx2;
+  
+      if (d2 > 0) {
+        d2 += rx2 - py;
+      } else {
+        x++;
+        px += twoRy2;
+        d2 += rx2 - py + px;
+      }
+    }
+    
+    return pixels;
+  }  
+  
+  floodFill(ctx, x, y, targetColor, fillColor) {
+    const width = this.project.width;
+    const height = this.project.height;
+    
+    if (x < 0 || x >= width || y < 0 || y >= height) return [];
+    
+    const fillRgb = fillColor ? { r: fillColor.r, g: fillColor.g, b: fillColor.b } : null;
+    
+    const targetR = targetColor[0];
+    const targetG = targetColor[1];
+    const targetB = targetColor[2];
+    const targetA = targetColor[3];
+    
+    // Get image data once
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    
+    // Check if start pixel already matches fill color
+    const startIndex = (y * width + x) * 4;
+    if (fillRgb && 
+        data[startIndex] === fillRgb.r &&
+        data[startIndex + 1] === fillRgb.g &&
+        data[startIndex + 2] === fillRgb.b &&
+        data[startIndex + 3] === 255) {
+      return [];
+    }
+    
+    // Scanline flood fill using stack of segments
+    const stack = [];
+    let pixels = [];
+    
+    // Push initial segment
+    stack.push({ x: x, y: y, left: x, right: x, dir: 0 });
+    
+    const visited = new Uint8Array(width * height);
+    
+    while (stack.length > 0) {
+      const segment = stack.pop();
+      let left = segment.left;
+      let right = segment.right;
+      const yPos = segment.y;
+      
+      // Scan left
+      let xPos = segment.x;
+      while (xPos > 0) {
+        const idx = (yPos * width + (xPos - 1)) * 4;
+        if (data[idx] === targetR && data[idx + 1] === targetG && 
+            data[idx + 2] === targetB && data[idx + 3] === targetA) {
+          xPos--;
+          left = xPos;
+        } else {
+          break;
+        }
+      }
+      
+      // Scan right
+      xPos = segment.x;
+      while (xPos < width - 1) {
+        const idx = (yPos * width + (xPos + 1)) * 4;
+        if (data[idx] === targetR && data[idx + 1] === targetG && 
+            data[idx + 2] === targetB && data[idx + 3] === targetA) {
+          xPos++;
+          right = xPos;
+        } else {
+          break;
+        }
+      }
+      
+      // Fill the segment
+      for (let i = left; i <= right; i++) {
+        const idx = (yPos * width + i) * 4;
+        const oldColor = this.getPixelColorFromCtx(ctx, i, yPos);
+        
+        if (fillRgb) {
+          data[idx] = fillRgb.r;
+          data[idx + 1] = fillRgb.g;
+          data[idx + 2] = fillRgb.b;
+          data[idx + 3] = 255;
+          
+          pixels.push({
+            x: i,
+            y: yPos,
+            newColor: fillColor,
+            oldColor: oldColor
+          });
+        } else {
+          data[idx + 3] = 0;
+          pixels.push({
+            x: i,
+            y: yPos,
+            newColor: "transparent",
+            oldColor: oldColor
+          });
+        }
+      }
+      
+      // Scan above and below for new segments
+      for (let dy = -1; dy <= 1; dy += 2) {
+        const newY = yPos + dy;
+        if (newY < 0 || newY >= height) continue;
+        
+        let inSegment = false;
+        let startX = left;
+        
+        for (let i = left; i <= right; i++) {
+          const idx = (newY * width + i) * 4;
+          const matches = data[idx] === targetR && data[idx + 1] === targetG && 
+                         data[idx + 2] === targetB && data[idx + 3] === targetA;
+          
+          if (matches && !inSegment && !visited[newY * width + i]) {
+            inSegment = true;
+            startX = i;
+          }
+          
+          if ((!matches || i === right) && inSegment) {
+            const endX = (!matches && i > startX) ? i - 1 : i;
+            if (startX <= endX) {
+              stack.push({ x: startX, y: newY, left: startX, right: endX, dir: dy });
+              // Mark as visited to prevent reprocessing
+              for (let j = startX; j <= endX; j++) {
+                visited[newY * width + j] = 1;
+              }
+            }
+            inSegment = false;
+          }
+        }
+      }
+    }
+    
+    // Write back to canvas
+    ctx.putImageData(imageData, 0, 0);
+    
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+    
+    return pixels;
+  }
+  
+  colorsMatch(color1, color2) {
+    return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3];
   }
 
   // Tools management
@@ -14365,10 +14476,14 @@ class PixelArtEditor {
   }
 
   exitApp() {
-    this.showPopup(__("Cerrar App||Exit App"), __("¿Estás seguro de que quieres irte ahora? Cualquier cambio no guardado se perderá para siempre.||Are you sure you want to leave now? Any unsaved changes will be lost forever."), [
-      { text: "No", class: "cancel", action: () => this.hidePopup() },
-      { text: __("Sí||Yes"), action: () => navigator.app.exitApp() }
-    ]);
+    this.showPopup(
+      __("Cerrar App||Exit App"),
+      __("¿Estás seguro de que quieres irte ahora? Cualquier cambio no guardado se perderá para siempre.||Are you sure you want to leave now? Any unsaved changes will be lost forever."),
+      [
+        { text: "No", class: "cancel", action: () => this.hidePopup() },
+        { text: __("Sí||Yes"), action: () => navigator.app.exitApp() }
+      ]
+    );
   }
 }
 
