@@ -55,6 +55,7 @@ class PixelArtEditor {
     this.registerLayerVisibilityChanges = false;
     this.autoLoadRecentFloatingColors = false;
     this.usePerProjectFloatingColors = false;
+    this.ensureBoundsDrawing = false;
     
     // Collab Session
     this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
@@ -277,7 +278,7 @@ class PixelArtEditor {
     });
 
     canvasCat.addSetting({
-      id: 'smooth-panning',
+      id: 'smoothPanning',
       label: 'Paneo Suave||Smooth Panning',
       description: 'Movimiento suave del lienzo||Smooth movement of the canvas',
       type: 'boolean',
@@ -295,6 +296,20 @@ class PixelArtEditor {
         } else {
           editor.setSmoothPanning(false);
         }
+      }
+    });
+    
+    canvasCat.addSetting({
+      id: 'ensureBoundsDrawing',
+      label: 'Asegurar límites de dibujo||Ensure drawing bounds',
+      description: 'Si se activa, se dejará de emular el dibujo fuera del lienzo||If enabled, it will ensure drawing is inside the canvas bounds',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.ensureBoundsDrawing = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.ensureBoundsDrawing = value;
       }
     });
 
@@ -1188,7 +1203,7 @@ class PixelArtEditor {
       icon: "tool-pencil",
       cursor: "crosshair",
       shortcut: "d",
-      onDown: (x, y, remote) => {
+      onDown: (x, y) => {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
         this.historyManager.startBatch("draw", __('Dibujar||Draw'));
@@ -1210,7 +1225,7 @@ class PixelArtEditor {
           this.isDrawing = false;
           this.historyManager.endBatch();
         }
-        this._previousPencilPosition = null;
+        this._previousPencilPositi = null;
       }
     });
     
@@ -1819,7 +1834,7 @@ class PixelArtEditor {
     if (e.touches.length === 1) {
       // Single touch - potential drawing
       const touch = e.touches[0];
-      const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
+      const pos = this.getCanvasPosition(touch.clientX, touch.clientY, this.ensureBoundsDrawing);
       if (!pos) return;
   
       // Store touch start info
@@ -1842,7 +1857,7 @@ class PixelArtEditor {
           }
         }
         this._touchTimer = null;
-      }, 50);
+      }, 64);
     } else if (e.touches.length === 2) {
       this.cancelDrawing();
             
@@ -1943,15 +1958,13 @@ class PixelArtEditor {
         }
       }
       
-      const pos = this.getCanvasPosition(touch.clientX, touch.clientY);
-      if (!pos) return;
+      const pos = this.getCanvasPosition(touch.clientX, touch.clientY, this.ensureBoundsDrawing);
   
-      if (this.currentTool && this.currentTool.onMove) {
+      if (pos && this.currentTool && this.currentTool.onMove) {
         this.currentTool.onMove(pos.x, pos.y);
         this.lastX = pos.x;
         this.lastY = pos.y;
       }
-      
     } else if (e.touches.length === 2 && this.isPanning) {
       // Two-finger pan and zoom
       const touch1 = e.touches[0];
@@ -2046,7 +2059,6 @@ class PixelArtEditor {
           this.brushSizeIndicator.style.display = "none";
         }, 2000);
       }
-      
     } else if (e.touches.length === 1) {
       // One finger remaining - prepare for drawing
       this.touchDistance = 0;
@@ -3204,7 +3216,7 @@ class PixelArtEditor {
 
   // Drawing algorithms
   pencilDraw(x, y, options = {}) {
-    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+    if (!this.project) return;
 
     const ctx = options.ctx || this.getCurrentLayerContext();
     const brushSize = options.brushSize || this.brushSize;
