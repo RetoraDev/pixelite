@@ -5,7 +5,7 @@
  * 
  * Source: https://github.com/RetoraDev/pixelite
  * Version: v1.0.1 dev
- * Built: 3/27/2026, 8:25:23 AM
+ * Built: 3/28/2026, 3:08:20 PM
  * Platform: Development
  * Debug: false
  * Minified: false
@@ -26,7 +26,7 @@ body {
   --border-color: #1d1d1d;
   --shadow-color: rgba(0, 0, 0, 0.5);
   --svg-filter: none;
-  --transparent-bg: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%);
+  --transparent-bg: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mP5DwRnz55lYAERxsbGDABtsAlsI5l9xgAAAABJRU5ErkJggg==');
 }
 
 /* Themes */
@@ -40,7 +40,7 @@ body.theme-light {
   --text-color: #0e0e0e;
   --text-dim: #000000;
   --border-color: #d1d1d1;
-  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-color: rgba(0, 0, 0, 0.5);
   --svg-filter: invert();
 }
 
@@ -53,6 +53,11 @@ body.theme-dark {}
   padding: 0;
   user-select: none;
   -webkit-user-select: none;
+}
+  
+*, canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
   image-rendering: pixelated;
 }

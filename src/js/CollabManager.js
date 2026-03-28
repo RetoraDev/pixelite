@@ -172,7 +172,7 @@ class CollabManager {
     
     this.sessionOverlay.appendChild(header);
     this.sessionOverlay.appendChild(this.sessionContent);
-    document.body.appendChild(this.sessionOverlay);
+    this.editor.uiLayer.appendChild(this.sessionOverlay);
   }
 
   hookEditorMethods() {

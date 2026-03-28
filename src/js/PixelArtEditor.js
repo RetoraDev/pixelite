@@ -1775,7 +1775,8 @@ class PixelArtEditor {
         this.startPan(e);
         break;
       case 2: // Right click
-        this.onMouseUp(e);
+        e.preventDefault();
+        this.handleMouseUp(e);
         // TODO: Context menu
         break;
     }
@@ -1799,19 +1800,20 @@ class PixelArtEditor {
   handleMouseUp(e) {
     this.isPanning = false;
     
+    this.canvas.style.cursor = this.canvas.style.cursor = this.currentTool.cursor;
+    
     if (!this.isDrawing) return;
 
     const pos = this.getCanvasPosition(e.clientX, e.clientY);
     if (pos && this.currentTool && this.currentTool.onUp) {
       this.currentTool.onUp(pos.x, pos.y, this.startX, this.startY);
     }
-    
-    this.canvas.style.cursor = this.currentTool ? this.currentTool.cursor : "crosshair";
 
     this.isDrawing = false;
   }
   
   handleMouseWheel(e) {
+    e.preventDefault();
     if (e && e.deltaY != 0) {
       if (e.deltaY < 0) {
         this.zoom(1.2, e.clientX, e.clientY);
@@ -1832,7 +1834,7 @@ class PixelArtEditor {
     e.preventDefault();
   
     if (e.touches.length === 1) {
-      // Single touch - potential drawing
+      // Single touch: potential drawing
       const touch = e.touches[0];
       const pos = this.getCanvasPosition(touch.clientX, touch.clientY, this.ensureBoundsDrawing);
       if (!pos) return;
@@ -1861,7 +1863,7 @@ class PixelArtEditor {
     } else if (e.touches.length === 2) {
       this.cancelDrawing();
             
-      // Two fingers - pan and zoom
+      // Two fingers: pan and zoom
       this.isPanning = true;
       this.isDrawing = false;
       
@@ -1901,7 +1903,7 @@ class PixelArtEditor {
         this.touchCenterCanvasY = canvasPoint.y;
       }
     } else if (e.touches.length === 3) {
-      // Three fingers - brush size adjustment
+      // Three fingers: brush size adjustment
       e.preventDefault();
       
       // Get all three touch points
@@ -2060,7 +2062,7 @@ class PixelArtEditor {
         }, 2000);
       }
     } else if (e.touches.length === 1) {
-      // One finger remaining - prepare for drawing
+      // One finger remaining: prepare for drawing
       this.touchDistance = 0;
       this._isPotentialTap = true;
       
@@ -2176,7 +2178,7 @@ class PixelArtEditor {
   
   startPan(e) {
     this.isPanning = true;
-    this.canvasContainer.style.cursor = "grab";
+    this.canvas.style.cursor = "grabbing";
     this.panStartX = e.clientX;
     this.panStartY = e.clientY;
     this.panStartCanvasPoint = this.getCanvasPosition(e.clientX, e.clientY);
@@ -2433,7 +2435,7 @@ class PixelArtEditor {
       let needsUpdate = false;
       
       switch(edge) {
-        case 'x': // Left edge - only X changes
+        case 'x': // Left edge: only X changes
           {
             const newX = Math.round(pos.x);
             if (newX !== this.canvasResizeState.x) {
@@ -2443,7 +2445,7 @@ class PixelArtEditor {
             }
             break;
           }
-        case 'y': // Top edge - only Y changes
+        case 'y': // Top edge: only Y changes
           {
             const newY = Math.round(pos.y);
             if (newY !== this.canvasResizeState.y) {
@@ -2453,7 +2455,7 @@ class PixelArtEditor {
             }
             break;
           }
-        case 'width': // Right edge - only width changes
+        case 'width': // Right edge: only width changes
           {
             const newWidth = Math.round(pos.x - start.x);
             if (newWidth !== this.canvasResizeState.width) {
@@ -2462,7 +2464,7 @@ class PixelArtEditor {
             }
             break;
           }
-        case 'height': // Bottom edge - only height changes
+        case 'height': // Bottom edge: only height changes
           {
             const newHeight = Math.round(pos.y - start.y);
             if (newHeight !== this.canvasResizeState.height) {
@@ -2751,12 +2753,11 @@ class PixelArtEditor {
     this.updateAnimationPreview();
   }
   
-  renderQuick() {
+  renderQuick(drawReference) {
     if (!this.project) return;
 
     const frame = this.project.frames[this.project.currentFrame];
     if (!frame) return;
-
 
     // Draw background if not transparent
     if (!this.transparentBackground) {
@@ -2764,6 +2765,11 @@ class PixelArtEditor {
       this.ctx.fillRect(0, 0, this.project.width, this.project.height);
     } else {
       this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    }
+    
+    // Draw trace reference (bottom layer)
+    if (this.referenceManager && drawReference) {
+      this.referenceManager.renderBottom(this.ctx, this.project.width, this.project.height);
     }
     
     // Draw layers
@@ -2774,6 +2780,11 @@ class PixelArtEditor {
       }
     }
 
+    // Draw trace reference (top layer)
+    if (this.referenceManager && drawReference) {
+      this.referenceManager.renderTop(this.ctx, this.project.width, this.project.height);
+    }
+    
     //  UI
     this.updateAnimationPreview();
     this.updateFramesUIQuick();
@@ -2925,7 +2936,7 @@ class PixelArtEditor {
     this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, this.tempCtx, this.tempColor, useBrush);
 
     // Combine with main canvas
-    this.renderQuick();
+    this.renderQuick(true);
     this.ctx.drawImage(this.tempCanvas, 0, 0);
   }
 
@@ -2995,7 +3006,7 @@ class PixelArtEditor {
     this.drawRectangle(this.tempCtx, this.tempRect.startX, this.tempRect.startY, width, height, color, filled, useBrush);
 
     // Combine with main canvas
-    this.renderQuick();
+    this.renderQuick(true);
     this.ctx.drawImage(this.tempCanvas, 0, 0);
   }
 
@@ -4079,15 +4090,15 @@ class PixelArtEditor {
     const lines = content.split("\n").map(line => line.trim()).filter(line => line.length > 0);
     
     if (lines.length < 3 || lines[0] !== "JASC-PAL") {
-      throw new Error("Invalid PAL file format - missing JASC-PAL header");
+      throw new Error("Invalid PAL file format: missing JASC-PAL header");
     }
     if (lines[1] !== "0100") {
-      throw new Error("Unsupported PAL version - expected 0100");
+      throw new Error("Unsupported PAL version: expected 0100");
     }
     
     const colorCount = parseInt(lines[2]);
     if (isNaN(colorCount)) {
-      throw new Error("Invalid color count - not a number");
+      throw new Error("Invalid color count: not a number");
     }
     
     if (lines.length < 3 + colorCount) {
@@ -4098,7 +4109,7 @@ class PixelArtEditor {
     for (let i = 3; i < 3 + colorCount; i++) {
       const components = lines[i].split(/\s+/).filter(c => c.length > 0);
       if (components.length < 3) {
-        throw new Error(`Invalid color at line ${i + 1} - expected 3 components`);
+        throw new Error(`Invalid color at line ${i + 1}: expected 3 components`);
       }
       
       const r = parseInt(components[0]);
@@ -5416,7 +5427,7 @@ class PixelArtEditor {
       const layerActions = document.createElement("div");
       layerActions.className = "layer-actions";
   
-      // Move up button - disabled if at top
+      // Move up button
       const moveUpBtn = document.createElement("button");
       moveUpBtn.className = "ui-button layer-action";
       moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
@@ -5432,7 +5443,7 @@ class PixelArtEditor {
       }
       layerActions.appendChild(moveUpBtn);
   
-      // Move down button - disabled if at bottom
+      // Move down button
       const moveDownBtn = document.createElement("button");
       moveDownBtn.className = "ui-button layer-action";
       moveDownBtn.innerHTML = '<div class="icon icon-down"></div>';
@@ -5461,7 +5472,7 @@ class PixelArtEditor {
       });
       layerActions.appendChild(visibilityBtn);
   
-      // Merge up button - disabled if at top
+      // Merge up button
       const mergeUpBtn = document.createElement("button");
       mergeUpBtn.className = "ui-button layer-action";
       mergeUpBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
@@ -5477,7 +5488,7 @@ class PixelArtEditor {
       }
       layerActions.appendChild(mergeUpBtn);
   
-      // Merge down button - disabled if at bottom
+      // Merge down button
       const mergeDownBtn = document.createElement("button");
       mergeDownBtn.className = "ui-button layer-action";
       mergeDownBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
@@ -5493,7 +5504,7 @@ class PixelArtEditor {
       }
       layerActions.appendChild(mergeDownBtn);
   
-      // Remove button - always enabled if more than one layer
+      // Remove button
       const removeBtn = document.createElement("button");
       removeBtn.className = "ui-button layer-action";
       removeBtn.innerHTML = '<div class="icon icon-close"></div>';
@@ -5604,7 +5615,7 @@ class PixelArtEditor {
       const deltaY = currentY - startY;
 
       if (deltaY < -60) {
-        // Swipe threshold reached - delete frame
+        // Swipe threshold reached: delete frame
         this.removeFrame(index);
       }
 

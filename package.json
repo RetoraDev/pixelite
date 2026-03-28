@@ -11,6 +11,7 @@
     "build:cordova": "node build.js --cordova",
     "build:android": "npm run build:cordova",
     "build:min": "node build.js --all --minify",
+    "build:none": "node build.js --none",
     "build:dev": "node build.js --none --debug",
     "build:release": "node build.js --all --minify --zipalign",
     "serve": "node index.js",
