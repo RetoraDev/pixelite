@@ -152,6 +152,9 @@ class HistoryManager {
         case 'resize_canvas':
           this.applyResizeCanvasOperation(project, operation, isUndo);
           break;
+        case 'toggle_transparency':
+          this.applyToggleTransparencyOperation(project, operation, isUndo);
+          break;
       }
     });
     
@@ -563,6 +566,23 @@ class HistoryManager {
     
     // Update transform and render
     this.editor.updateCanvasTransform();
+    this.editor.render();
+  }
+  
+  applyToggleTransparencyOperation(_, operation, isUndo) {
+    // TODO: Make transparente background work per project
+    let transparent = operation.transparent;
+    
+    if (isUndo) transparent = !transparent;
+    
+    if (transparent) {
+      this.editor.removeTransparentColor();
+    } else {
+      this.editor.restoreTransparentColor();
+    }
+    
+    // Toggle transparency and render
+    this.editor.transparentBackground = transparent;
     this.editor.render();
   }
   
