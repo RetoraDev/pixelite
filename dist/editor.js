@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.1 dev
- * Built: 4/16/2026, 4:29:54 AM
- * Platform: Development
+ * Version: v1.0.0
+ * Built: 4/16/2026, 5:07:28 AM
+ * Platform: Android (Cordova)
  * Debug: false
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.1 dev";
+const VERSION = "v1.0.0";
 const HOST = "wss://pixelite.onrender.com";
 const DEBUG = false;
 
@@ -1081,7 +1081,11 @@ class LockScreen {
     tapArea.appendChild(tapIcon);
     tapArea.appendChild(tapText);
     
-    this.overlay.addEventListener('click', () => this.unlock());
+    this.overlay.addEventListener('click', () => {
+      if (this.lockScreenMode == 'tap') {
+        this.unlock();
+      }
+    });
     
     this.dynamicContent.appendChild(tapArea);
   }

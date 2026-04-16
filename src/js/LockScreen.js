@@ -251,7 +251,11 @@ class LockScreen {
     tapArea.appendChild(tapIcon);
     tapArea.appendChild(tapText);
     
-    this.overlay.addEventListener('click', () => this.unlock());
+    this.overlay.addEventListener('click', () => {
+      if (this.lockScreenMode == 'tap') {
+        this.unlock();
+      }
+    });
     
     this.dynamicContent.appendChild(tapArea);
   }
