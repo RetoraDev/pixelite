@@ -83,6 +83,7 @@ class PixelArtEditor {
       this.referenceManager = new ReferenceManager(this);
       this.paletteManager = new PaletteManager(this);
       this.colorPicker = new ColorPicker(this);
+      this.lockScreen = new LockScreen(this);
 
       if (this.useCordova) {
         this.initCordova();
@@ -443,6 +444,135 @@ class PixelArtEditor {
         this.collabManager.memberColor = value;
         this.collabManager.updateMemberColor(value);
         localStorage.setItem('collab_user_color', value);
+      }
+    });
+    
+    // Lock Screen Category
+    const lockScreenCategory = this.settings.addCategory({
+      id: 'lock_screen',
+      title: __('Bloqueo||Lock Screen'),
+      icon: 'icon-lock'
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_mode',
+      label: __('Modo de bloqueo||Lock mode'),
+      description: __('Tipo de pantalla de bloqueo||Lock screen type'),
+      type: 'select',
+      defaultValue: this.lockScreen?.lockScreenMode || 'tap',
+      options: [
+        { value: 'tap', label: __('Toque||Tap') },
+        { value: 'pin', label: __('PIN||PIN') },
+        { value: 'password', label: __('Contraseña||Password') }
+      ],
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ mode: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_pin',
+      label: __('PIN de bloqueo||Lock PIN'),
+      description: __('Código numérico de 4 dígitos||4-digit numeric code'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenKey || '1234',
+      placeholder: '',
+      onUpdate: (value) => {
+        if (this.lockScreen && /^\d{0,4}$/.test(value)) {
+          this.lockScreen.updateSettings({ pin: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_password',
+      label: __('Contraseña||Password'),
+      description: __('Contraseña para desbloquear||Password to unlock'),
+      placeholder: __('Dejar vacío para usar el PIN||Leave empty to use PIN'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenPassword || '',
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ password: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_message',
+      label: __('Mensaje||Message'),
+      description: __('Mensaje mostrado en la pantalla de bloqueo||Message shown on lock screen'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenMessage || __('Pantalla bloqueada||Pixelite is locked'),
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ message: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_show_startup',
+      label: __('Mostrar al inicio||Show at startup'),
+      description: __('Bloquear al iniciar la aplicación||Lock when app starts'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.showAtStartup || false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ showAtStartup: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_page_hide',
+      label: __('Bloquear al cambiar de app||Lock on app switch'),
+      description: __('Bloquear al cambiar de aplicación o pestaña||Lock when switching apps or tabs'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.lockOnPageHide !== false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ lockOnPageHide: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_inactivity',
+      label: __('Bloquear por inactividad||Lock after inactivity'),
+      description: __('Bloquear automáticamente después de inactividad||Auto-lock after inactivity'),
+      type: 'select',
+      defaultValue: this.lockScreen?.lockAfterInactivity || 'never',
+      options: [
+        { value: 'never', label: __('Nunca||Never') },
+        { value: '10s', label: __('10 segundos||10 seconds') },
+        { value: '30s', label: __('30 segundos||30 seconds') },
+        { value: '1m', label: __('1 minuto||1 minute') },
+        { value: '5m', label: __('5 minutos||5 minutes') },
+        { value: '10m', label: __('10 minutos||10 minutes') },
+        { value: '15m', label: __('15 minutos||15 minutes') },
+        { value: '30m', label: __('30 minutos||30 minutes') },
+        { value: '1h', label: __('1 hora||1 hour') }
+      ],
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ lockAfterInactivity: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_blur',
+      label: __('Desenfoque de fondo||Blur background'),
+      description: __('Usar efecto de desenfoque en el fondo||Use blur effect on background'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.useBlurBackdrop !== false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ useBlurBackdrop: value });
+        }
       }
     });
     

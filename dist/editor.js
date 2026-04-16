@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.1
- * Built: 4/2/2026, 9:54:43 AM
- * Platform: Android (Cordova)
+ * Version: v1.0.1 dev
+ * Built: 4/16/2026, 4:29:54 AM
+ * Platform: Development
  * Debug: false
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.1";
+const VERSION = "v1.0.1 dev";
 const HOST = "wss://pixelite.onrender.com";
 const DEBUG = false;
 
@@ -825,6 +825,436 @@ class SettingsUI {
     } else {
       this.show();
     }
+  }
+}
+
+class LockScreen {
+  constructor(editor) {
+    this.editor = editor;
+    
+    // Lock screen state
+    this.visible = false;
+    this.pinInput = '';
+    this.passwordInput = '';
+    this.errorMessage = '';
+    this.inactivityTimer = null;
+    this.pageHideTriggered = false;
+    this.blurOverlay = null;
+    
+    // Lock screen settings
+    this.lockScreenMode = 'tap';
+    this.lockScreenKey = '1234';
+    this.lockScreenPassword = '';
+    this.showAtStartup = false;
+    this.lockOnPageHide = true;
+    this.lockAfterInactivity = 'never';
+    this.lockScreenMessage = __('Pantalla bloqueada||Pixelite is locked');
+    this.useBlurBackdrop = true;
+    
+    // Load settings
+    this.loadSettings();
+    
+    // Initialize UI
+    this.init();
+    
+    // Setup event listeners
+    this.setupEventListeners();
+  }
+  
+  loadSettings() {
+    try {
+      const saved = localStorage.getItem('lock_screen_settings');
+      if (saved) {
+        const settings = JSON.parse(saved);
+        this.lockScreenMode = settings.mode || 'tap';
+        this.lockScreenKey = settings.pin || '1234';
+        this.lockScreenPassword = settings.password || '';
+        this.showAtStartup = settings.showAtStartup || false;
+        this.lockOnPageHide = settings.lockOnPageHide !== false;
+        this.lockAfterInactivity = settings.lockAfterInactivity || 'never';
+        this.lockScreenMessage = settings.message || __('Pantalla bloqueada||Pixelite is locked');
+        this.useBlurBackdrop = settings.useBlurBackdrop !== false;
+      }
+    } catch (e) {
+      console.warn('Failed to load lock screen settings:', e);
+    }
+  }
+  
+  saveSettings() {
+    const settings = {
+      mode: this.lockScreenMode,
+      pin: this.lockScreenKey,
+      password: this.lockScreenPassword,
+      showAtStartup: this.showAtStartup,
+      lockOnPageHide: this.lockOnPageHide,
+      lockAfterInactivity: this.lockAfterInactivity,
+      message: this.lockScreenMessage,
+      useBlurBackdrop: this.useBlurBackdrop
+    };
+    localStorage.setItem('lock_screen_settings', JSON.stringify(settings));
+  }
+  
+  init() {
+    this.createLockScreen();
+    if (this.showAtStartup) {
+      setTimeout(() => this.show(), 100);
+    }
+    this.startInactivityTimer();
+  }
+  
+  createLockScreen() {
+    // Create overlay
+    this.overlay = document.createElement('div');
+    this.overlay.className = 'lock-screen-overlay';
+    if (this.useBlurBackdrop) {
+      this.overlay.classList.add('blur-backdrop');
+    }
+    this.editor.uiLayer.appendChild(this.overlay);
+    
+    // Create container (fullscreen)
+    this.container = document.createElement('div');
+    this.container.className = 'lock-screen-container';
+    this.overlay.appendChild(this.container);
+    
+    // Content wrapper
+    this.content = document.createElement('div');
+    this.content.className = 'lock-screen-content';
+    this.container.appendChild(this.content);
+    
+    // Lock icon
+    const icon = document.createElement('div');
+    icon.className = 'lock-screen-icon icon icon-lock';
+    this.content.appendChild(icon);
+    
+    // Message
+    this.messageEl = document.createElement('div');
+    this.messageEl.className = 'lock-screen-message';
+    this.messageEl.textContent = this.lockScreenMessage;
+    this.content.appendChild(this.messageEl);
+    
+    // Dynamic content container
+    this.dynamicContent = document.createElement('div');
+    this.content.appendChild(this.dynamicContent);
+    
+    // Error message
+    this.errorEl = document.createElement('div');
+    this.errorEl.className = 'lock-screen-error';
+    this.content.appendChild(this.errorEl);
+  }
+  
+  renderMode() {
+    this.dynamicContent.innerHTML = '';
+    this.errorEl.textContent = '';
+    this.pinInput = '';
+    this.passwordInput = '';
+    
+    switch (this.lockScreenMode) {
+      case 'pin':
+        this.renderPinMode();
+        break;
+      case 'password':
+        this.renderPasswordMode();
+        break;
+      case 'tap':
+      default:
+        this.renderTapMode();
+        break;
+    }
+  }
+  
+  renderPinMode() {
+    // PIN display
+    const pinDisplay = document.createElement('div');
+    pinDisplay.className = 'lock-screen-pin-display';
+    this.pinDots = [];
+    for (let i = 0; i < 4; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'pin-dot';
+      pinDisplay.appendChild(dot);
+      this.pinDots.push(dot);
+    }
+    this.dynamicContent.appendChild(pinDisplay);
+    
+    // Keyboard
+    const keyboard = document.createElement('div');
+    keyboard.className = 'lock-screen-keyboard';
+    
+    const rows = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['backspace', '0', 'check']
+    ];
+    
+    rows.forEach(row => {
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'keyboard-row';
+      
+      row.forEach(key => {
+        const keyBtn = document.createElement('button');
+        keyBtn.className = 'keyboard-key';
+        
+        if (key === 'backspace' || key === 'check') {
+          const iconSpan = document.createElement('span');
+          iconSpan.className = `icon icon-${key === 'backspace' ? 'backspace' : 'check-circle'}`;
+          keyBtn.appendChild(iconSpan);
+          
+          if (key === 'backspace') {
+            keyBtn.addEventListener('click', () => this.handlePinBackspace());
+          } else {
+            keyBtn.addEventListener('click', () => this.checkPin(this.pinInput));
+          }
+        } else {
+          keyBtn.textContent = key;
+          keyBtn.addEventListener('click', () => this.handlePinInput(key));
+        }
+        
+        rowDiv.appendChild(keyBtn);
+      });
+      
+      keyboard.appendChild(rowDiv);
+    });
+    
+    this.dynamicContent.appendChild(keyboard);
+  }
+  
+  handlePinInput(digit) {
+    if (this.pinInput.length < 4) {
+      this.pinInput += digit;
+      this.updatePinDots();
+      
+      if (this.pinInput.length === 4) {
+        setTimeout(() => this.checkPin(this.pinInput), 100);
+      }
+    }
+  }
+  
+  handlePinBackspace() {
+    this.pinInput = this.pinInput.slice(0, -1);
+    this.updatePinDots();
+  }
+  
+  updatePinDots() {
+    if (!this.pinDots) return;
+    for (let i = 0; i < this.pinDots.length; i++) {
+      if (i < this.pinInput.length) {
+        this.pinDots[i].classList.add('filled');
+      } else {
+        this.pinDots[i].classList.remove('filled');
+      }
+    }
+  }
+  
+  renderPasswordMode() {
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.className = 'lock-screen-password-input';
+    input.placeholder = __('Contraseña||Password');
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.checkPassword(input.value);
+      }
+    });
+    this.dynamicContent.appendChild(input);
+    this.passwordInputEl = input;
+    
+    const unlockBtn = document.createElement('button');
+    unlockBtn.className = 'lock-screen-unlock-btn';
+    unlockBtn.textContent = __('Desbloquear||Unlock');
+    unlockBtn.addEventListener('click', () => this.checkPassword(input.value));
+    this.dynamicContent.appendChild(unlockBtn);
+    
+    setTimeout(() => input.focus(), 100);
+  }
+  
+  renderTapMode() {
+    const tapArea = document.createElement('div');
+    tapArea.className = 'lock-screen-tap-area';
+    
+    const tapIcon = document.createElement('span');
+    tapIcon.className = 'icon icon-tap';
+    
+    const tapText = document.createElement('div');
+    tapText.className = 'lock-screen-tap-text';
+    tapText.textContent = __('Toque para desbloquear||Tap to unlock');
+    
+    tapArea.appendChild(tapIcon);
+    tapArea.appendChild(tapText);
+    
+    this.overlay.addEventListener('click', () => this.unlock());
+    
+    this.dynamicContent.appendChild(tapArea);
+  }
+  
+  checkPin(pin) {
+    const expectedPin = this.lockScreenKey;
+    if (pin === expectedPin) {
+      this.unlock();
+    } else {
+      this.showError(__('PIN incorrecto||Invalid PIN'));
+      this.pinInput = '';
+      this.updatePinDots();
+    }
+  }
+  
+  checkPassword(password) {
+    const expectedPassword = this.lockScreenPassword || this.lockScreenKey;
+    if (password === expectedPassword) {
+      this.unlock();
+    } else {
+      this.showError(__('Contraseña incorrecta||Invalid password'));
+      if (this.passwordInputEl) {
+        this.passwordInputEl.value = '';
+        this.passwordInputEl.focus();
+      }
+    }
+  }
+  
+  showError(message) {
+    this.errorEl.textContent = message;
+    setTimeout(() => {
+      if (this.errorEl.textContent === message) {
+        this.errorEl.textContent = '';
+      }
+    }, 2000);
+  }
+  
+  setupEventListeners() {
+    // Page hide event (tab switch, app background, etc)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.lockOnPageHide && !this.visible) {
+        this.pageHideTriggered = true;
+        this.show();
+      }
+    });
+    
+    // Page hide for older browsers
+    window.addEventListener('pagehide', () => {
+      if (this.lockOnPageHide && !this.visible) {
+        this.pageHideTriggered = true;
+        this.show();
+      }
+    });
+    
+    // User activity for inactivity timer
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach(event => {
+      document.addEventListener(event, () => this.resetInactivityTimer());
+    });
+    
+    // Prevent lock screen from being closed via back button
+    window.addEventListener('popstate', (e) => {
+      if (this.visible) {
+        e.preventDefault();
+        history.pushState(null, '', location.href);
+      }
+    });
+  }
+  
+  startInactivityTimer() {
+    this.resetInactivityTimer();
+  }
+  
+  resetInactivityTimer() {
+    if (this.inactivityTimer) {
+      clearTimeout(this.inactivityTimer);
+      this.inactivityTimer = null;
+    }
+    
+    if (this.lockAfterInactivity !== 'never' && !this.visible) {
+      const timeout = this.getInactivityTimeout();
+      if (timeout > 0) {
+        this.inactivityTimer = setTimeout(() => {
+          if (!this.visible) {
+            this.show();
+          }
+        }, timeout);
+      }
+    }
+  }
+  
+  getInactivityTimeout() {
+    const timeouts = {
+      '10s': 10000,
+      '30s': 30000,
+      '1m': 60000,
+      '5m': 300000,
+      '10m': 600000,
+      '15m': 900000,
+      '30m': 1800000,
+      '1h': 3600000
+    };
+    return timeouts[this.lockAfterInactivity] || 0;
+  }
+  
+  show() {
+    if (this.visible) return;
+    
+    // Save current state before locking
+    if (this.editor.saveProjectToLocalStorage) {
+      this.editor.saveProjectToLocalStorage();
+    }
+    
+    this.renderMode();
+    this.messageEl.textContent = this.lockScreenMessage;
+    
+    if (this.useBlurBackdrop) {
+      this.overlay.classList.add('blur-backdrop');
+    } else {
+      this.overlay.classList.remove('blur-backdrop');
+    }
+    
+    // Reset overlay styles
+    if (this.overlay) {
+      this.overlay.style.backdropFilter = '';
+      this.overlay.style.backgroundColor = '';
+    }
+    
+    this.overlay.classList.add('visible');
+    this.visible = true;
+    
+    // Push history state to prevent back button from bypassing lock
+    history.pushState(null, '', location.href);
+  }
+  
+  hide() {
+    if (!this.visible) return;
+    this.overlay.classList.remove('visible');
+    this.visible = false;
+    this.pageHideTriggered = false;
+    this.resetInactivityTimer();
+  }
+  
+  unlock() {
+    this.hide();
+    if (this.editor.onUnlock) {
+      this.editor.onUnlock();
+    }
+  }
+  
+  updateSettings(settings) {
+    if (settings.mode !== undefined) this.lockScreenMode = settings.mode;
+    if (settings.pin !== undefined) this.lockScreenKey = settings.pin;
+    if (settings.password !== undefined) this.lockScreenPassword = settings.password;
+    if (settings.showAtStartup !== undefined) this.showAtStartup = settings.showAtStartup;
+    if (settings.lockOnPageHide !== undefined) this.lockOnPageHide = settings.lockOnPageHide;
+    if (settings.lockAfterInactivity !== undefined) {
+      this.lockAfterInactivity = settings.lockAfterInactivity;
+      this.resetInactivityTimer();
+    }
+    if (settings.message !== undefined) this.lockScreenMessage = settings.message;
+    if (settings.useBlurBackdrop !== undefined) this.useBlurBackdrop = settings.useBlurBackdrop;
+    
+    this.saveSettings();
+    
+    if (this.visible) {
+      this.renderMode();
+      this.messageEl.textContent = this.lockScreenMessage;
+    }
+  }
+  
+  isLocked() {
+    return this.visible;
   }
 }
 
@@ -7661,6 +8091,7 @@ class PixelArtEditor {
       this.referenceManager = new ReferenceManager(this);
       this.paletteManager = new PaletteManager(this);
       this.colorPicker = new ColorPicker(this);
+      this.lockScreen = new LockScreen(this);
 
       if (this.useCordova) {
         this.initCordova();
@@ -8021,6 +8452,135 @@ class PixelArtEditor {
         this.collabManager.memberColor = value;
         this.collabManager.updateMemberColor(value);
         localStorage.setItem('collab_user_color', value);
+      }
+    });
+    
+    // Lock Screen Category
+    const lockScreenCategory = this.settings.addCategory({
+      id: 'lock_screen',
+      title: __('Bloqueo||Lock Screen'),
+      icon: 'icon-lock'
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_mode',
+      label: __('Modo de bloqueo||Lock mode'),
+      description: __('Tipo de pantalla de bloqueo||Lock screen type'),
+      type: 'select',
+      defaultValue: this.lockScreen?.lockScreenMode || 'tap',
+      options: [
+        { value: 'tap', label: __('Toque||Tap') },
+        { value: 'pin', label: __('PIN||PIN') },
+        { value: 'password', label: __('Contraseña||Password') }
+      ],
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ mode: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_pin',
+      label: __('PIN de bloqueo||Lock PIN'),
+      description: __('Código numérico de 4 dígitos||4-digit numeric code'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenKey || '1234',
+      placeholder: '',
+      onUpdate: (value) => {
+        if (this.lockScreen && /^\d{0,4}$/.test(value)) {
+          this.lockScreen.updateSettings({ pin: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_password',
+      label: __('Contraseña||Password'),
+      description: __('Contraseña para desbloquear||Password to unlock'),
+      placeholder: __('Dejar vacío para usar el PIN||Leave empty to use PIN'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenPassword || '',
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ password: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_message',
+      label: __('Mensaje||Message'),
+      description: __('Mensaje mostrado en la pantalla de bloqueo||Message shown on lock screen'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenMessage || __('Pantalla bloqueada||Pixelite is locked'),
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ message: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_show_startup',
+      label: __('Mostrar al inicio||Show at startup'),
+      description: __('Bloquear al iniciar la aplicación||Lock when app starts'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.showAtStartup || false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ showAtStartup: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_page_hide',
+      label: __('Bloquear al cambiar de app||Lock on app switch'),
+      description: __('Bloquear al cambiar de aplicación o pestaña||Lock when switching apps or tabs'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.lockOnPageHide !== false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ lockOnPageHide: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_inactivity',
+      label: __('Bloquear por inactividad||Lock after inactivity'),
+      description: __('Bloquear automáticamente después de inactividad||Auto-lock after inactivity'),
+      type: 'select',
+      defaultValue: this.lockScreen?.lockAfterInactivity || 'never',
+      options: [
+        { value: 'never', label: __('Nunca||Never') },
+        { value: '10s', label: __('10 segundos||10 seconds') },
+        { value: '30s', label: __('30 segundos||30 seconds') },
+        { value: '1m', label: __('1 minuto||1 minute') },
+        { value: '5m', label: __('5 minutos||5 minutes') },
+        { value: '10m', label: __('10 minutos||10 minutes') },
+        { value: '15m', label: __('15 minutos||15 minutes') },
+        { value: '30m', label: __('30 minutos||30 minutes') },
+        { value: '1h', label: __('1 hora||1 hour') }
+      ],
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ lockAfterInactivity: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_blur',
+      label: __('Desenfoque de fondo||Blur background'),
+      description: __('Usar efecto de desenfoque en el fondo||Use blur effect on background'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.useBlurBackdrop !== false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ useBlurBackdrop: value });
+        }
       }
     });
     
@@ -12028,7 +12588,6 @@ class PixelArtEditor {
     this.historyManager.startBatch("toggle_transparency", __("Alternar Transparencia||Toggle Transparency"));
     
     if (!this.transparentBackground) {
-      // Remove transparent color
       this.removeTransparentColor();
     } else {
       this.restoreTransparentColor();
@@ -12047,6 +12606,35 @@ class PixelArtEditor {
     
     this.historyManager.addChange(operation);
     this.historyManager.endBatch();
+  }
+  
+  checkTransparentColor(transparentColor = this.secondaryColor) {
+    let isTransparent = false;
+    
+    // Check transparent color in the bottom layer of each frames
+    this.project.frames.forEach(frame => {
+      const layer = frame.layers[0];
+      const ctx = layer.ctx;
+      
+      // Perform the operation
+      const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        const hex = this.colorPicker.rgbToHex(r, g, b);
+        
+        // Check if it's transparent
+        if (a < 1 || hex == transparentColor) {
+          isTransparent = true;
+        }
+      }
+    });
+    
+    return isTransparent;
   }
   
   removeTransparentColor() {
@@ -13632,7 +14220,7 @@ class PixelArtEditor {
     }
     this.spritesheetLoader.show();
   }
-
+  
   async readFile(fileInfo) {
     if (fileInfo.entry) {
       // Cordova file entry
@@ -13971,21 +14559,13 @@ class PixelArtEditor {
 
     // Create new project structure
     this.project = {
-      width: projectData.width,
-      height: projectData.height,
-      frames: [],
-      floatingColors: projectData.floatingColors || [],
-      currentFrame: projectData.currentFrame || 0,
-      currentLayer: projectData.currentLayer || 0,
-      name: projectData.name || "untitled",
+      ...projectData
     };
 
     // Load frame times or set defaults
     this.project.frameTimes = projectData.frameTimes || new Array(projectData.frames.length).fill(1000 / (projectData.fps || 12));
 
-    this.project.currentFrameTime = projectData.animation ? projectData.currentFrameTime : 1000 / 12;
-
-    // TODO: Check image data of each frame to see if there's transparent background or not
+    this.project.currentFrameTime = projectData.currentFrameTime;
 
     // Load frames
     if (!projectData.frames || !Array.isArray(projectData.frames)) {
@@ -14035,6 +14615,13 @@ class PixelArtEditor {
 
       this.project.frames.push(frame);
     }
+    
+    // Reset transparent background state
+    if (this.project.backgroundColor) {
+      this.secondaryColor = this.project.backgroundColor;
+    }
+    
+    this.transparentBackground = this.checkTransparentColor(this.transparentBackground);
 
     // Load history if available
     if (projectData.history) {
@@ -14268,6 +14855,7 @@ class PixelArtEditor {
       height: this.project.height,
       frames: [],
       floatingColors: this.colorPicker.getFloatingColorsData(),
+      backgroundColor: this.transparentBackground ? this.secondaryColor : 'transparent',
       currentFrameTime: this.project.currentFrameTime,
       frameTimes: this.project.frameTimes,
       createdAt: new Date().toISOString(),

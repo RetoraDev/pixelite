@@ -151,3 +151,8 @@
 #debug-canvas {
   z-index: 9999;
 }
+
+/* ========== Lock Screen (Highest) ========== */
+.lock-screen-overlay {
+  z-index: 10005;
+}

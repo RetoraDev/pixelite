@@ -26,6 +26,7 @@ const jsFileOrder = [
   'js/main.js',
   'js/SettingsManager.js',
   'js/SettingsUI.js',
+  'js/LockScreen.js',
   'js/GridManager.js',
   'js/ReferenceManager.js',
   'js/SpritesheetLoader.js',
@@ -52,6 +53,7 @@ const cssFileOrder = [
   "css/color-picker.css",
   "css/settings.css",
   "css/collab.css",
+  "css/lock-screen.css",
   "css/z-index.css",
   "css/keyframes.css"
 ];
