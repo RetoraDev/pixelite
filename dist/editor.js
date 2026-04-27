@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.0
- * Built: 4/16/2026, 5:07:28 AM
+ * Version: v1.0.2
+ * Built: 4/27/2026, 10:31:40 AM
  * Platform: Android (Cordova)
  * Debug: false
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.0";
+const VERSION = "v1.0.2";
 const HOST = "wss://pixelite.onrender.com";
 const DEBUG = false;
 
@@ -7409,9 +7409,8 @@ class FileBrowser {
       jpeg: "image/jpeg",
       gif: "image/gif",
       webp: "image/webp",
-      psd: "applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
+      psd: ".psd, applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
       txt: "text/plain, application/octet-stream",
-      project: "application/*",
       default: "*"
     };
     
@@ -14703,7 +14702,7 @@ class PixelArtEditor {
         let buffer;
         if (typeof fileData === 'string') {
           // Handle base64 or data URL
-          if (fileData.starsWith('data:')) {
+          if (fileData.startsWith('data:')) {
             // Convert data URL to ArrayBuffer
             const base64 = fileData.split(',')[1];
             const binary = atob(base64);
@@ -14751,6 +14750,8 @@ class PixelArtEditor {
           for (let i = 0; i < psd.children.length; i++) {
             const psdLayer = psd.children[i];
             
+            console.log(psdLayer)
+            
             // Create new layer
             const layer = this.createBlankLayer(
               psd.width, 
@@ -14759,11 +14760,11 @@ class PixelArtEditor {
             );
             
             // Set visibility
-            layer.visible = psdLayer.visible !== false;
+            layer.visible = psdLayer.hidden === false;
             
             // If the layer has canvas data, draw it
             if (psdLayer.canvas) {
-              layer.ctx.drawImage(psdLayer.canvas, 0, 0);
+              layer.ctx.drawImage(psdLayer.canvas, psdLayer.left, psdLayer.top, psdLayer.canvas.width, psdLayer.canvas.height);
             } else if (psdLayer.imageData) {
               // Some PSD libraries provide imageData
               const imageData = new ImageData(

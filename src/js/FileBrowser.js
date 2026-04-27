@@ -22,9 +22,8 @@ class FileBrowser {
       jpeg: "image/jpeg",
       gif: "image/gif",
       webp: "image/webp",
-      psd: "applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
+      psd: ".psd, applicationimage/vnd.adobe.photoshop, application/x-photoshop, application/photoshop, application/psd, image/psd, application/octet-stream",
       txt: "text/plain, application/octet-stream",
-      project: "application/*",
       default: "*"
     };
     
