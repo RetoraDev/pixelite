@@ -3365,7 +3365,7 @@ class PixelArtEditor {
 
     if (useBrush && brushSize > 1) {
       // Use brush for larger sizes
-      pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color)
+      pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color);
       pixels = pixels.filter(p => p.newColor != p.oldColor);
     } else {
       // Save old pixel color
@@ -3395,10 +3395,12 @@ class PixelArtEditor {
   }
   
   drawBrushCircle(ctx, centerX, centerY, radius, color) {
-    if (radius <= 2) return [];
-
-    // Use midpoint circle algorithm for pixel-perfect circles
-    return this.midpointEllipse(ctx, centerX, centerY, radius / 2, radius / 2, color, true);
+    if (radius < 2) {
+      return [];
+    } else {
+      // Use midpoint circle algorithm for pixel-perfect circles
+      return this.midpointEllipse(ctx, centerX, centerY, radius / 2, radius / 2, color, true);
+    }
   }
   
   drawBresenhamLine(x0, y0, x1, y1, ctx, color, useBrush) {
@@ -6080,7 +6082,7 @@ class PixelArtEditor {
       onConfirm: async fileInfo => {
         try {
           const fileData = await this.readFile(fileInfo);
-
+          
           if (fileInfo.type === "pxl") {
             this.loadProject(fileData);
           } else if (fileInfo.type === "psd") {
@@ -6549,10 +6551,8 @@ class PixelArtEditor {
       throw new Error("Invalid project file format: Missing width or height");
     }
 
-    // Create new project structure
-    this.project = {
-      ...projectData
-    };
+    this.project = JSON.parse(JSON.stringify(projectData));
+    this.project.frames = [];
 
     // Load frame times or set defaults
     this.project.frameTimes = projectData.frameTimes || new Array(projectData.frames.length).fill(1000 / (projectData.fps || 12));
@@ -6585,7 +6585,7 @@ class PixelArtEditor {
       for (let l = 0; l < frameData.layers.length; l++) {
         const layerData = frameData.layers[l];
         const layer = this.createBlankLayer(this.project.width, this.project.height);
-
+        
         // Set layer properties with defaults
         layer.name = layerData.name || `Layer ${l + 1}`;
         layer.visible = layerData.visible !== undefined ? layerData.visible : true;
@@ -6601,13 +6601,12 @@ class PixelArtEditor {
             // Continue with blank layer
           }
         }
-
         frame.layers.push(layer);
       }
 
       this.project.frames.push(frame);
     }
-    
+
     // Reset transparent background state
     if (this.project.backgroundColor) {
       this.secondaryColor = this.project.backgroundColor;
