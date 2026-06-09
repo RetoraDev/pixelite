@@ -4,17 +4,17 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.4
- * Built: 5/11/2026, 11:08:41 AM
- * Platform: Android (Cordova)
- * Debug: false
+ * Version: v1.0.5 dev
+ * Built: 6/8/2026, 11:34:41 PM
+ * Platform: Development
+ * Debug: true
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.4";
-const HOST = "wss://pixelite.onrender.com";
-const DEBUG = false;
+const VERSION = "v1.0.5 dev";
+const HOST = "ws://localhost:8080";
+const DEBUG = true;
 
 // Global language processor
 window.__ = function(text) {
@@ -3761,22 +3761,65 @@ class HistoryManager {
     this.editor.render();
   }
   
-  applyToggleTransparencyOperation(_, operation, isUndo) {
-    // TODO: Make transparente background work per project
-    let transparent = operation.transparent;
+  applyToggleTransparencyOperation(project, operation, isUndo) {
+    // Determinar si estamos restaurando o eliminando transparencia
+    let shouldRestoreTransparency = operation.transparent;
     
-    if (isUndo) transparent = !transparent;
+    if (isUndo) shouldRestoreTransparency = !shouldRestoreTransparency;
     
-    if (transparent) {
-      this.editor.removeTransparentColor();
-    } else {
-      this.editor.restoreTransparentColor();
+    const targetProject = project || this.editor.project;
+    const secondaryColor = this.editor.secondaryColor;
+    const rgb = this.editor.hexToRgb(secondaryColor);
+    let totalPixelsModified = 0;
+    
+    for (let f = 0; f < targetProject.frames.length; f++) {
+      const frame = targetProject.frames[f];
+      
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, targetProject.width, targetProject.height);
+        const data = imageData.data;
+        
+        if (shouldRestoreTransparency) {
+          // Modo RESTORE: Píxeles del color secundario → transparentes
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i] === rgb.r && 
+                data[i + 1] === rgb.g && 
+                data[i + 2] === rgb.b && 
+                data[i + 3] === 255) {
+              data[i + 3] = 0;
+              totalPixelsModified++;
+            }
+          }
+        } else {
+          // Modo REMOVE: Píxeles transparentes → color secundario opaco
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] === 0) {
+              data[i] = rgb.r;
+              data[i + 1] = rgb.g;
+              data[i + 2] = rgb.b;
+              data[i + 3] = 255;
+              totalPixelsModified++;
+            }
+          }
+        }
+        
+        layer.ctx.putImageData(imageData, 0, 0);
+      }
     }
     
-    // Toggle transparency and render
-    this.editor.transparentBackground = transparent;
-    this.editor.render();
-  }
+    // Actualizar el estado en el editor principal
+    if (project === this.editor.project) {
+      this.editor.transparentBackground = shouldRestoreTransparency;
+      this.editor.render();
+      
+      // Mostrar notificación
+      if (totalPixelsModified > 0) {
+        const action = shouldRestoreTransparency ? 'restaurada' : 'eliminada';
+        console.log(`Transparencia ${action}: ${totalPixelsModified} píxeles modificados`);
+      }
+    }
+  }  
   
   // Generate timelapse by replaying history
   async generateTimelapse(fps, scale, progressCallback) {
@@ -10425,7 +10468,7 @@ class PixelArtEditor {
     // Reverse the scale on background size so it appears constant
     // Base size is 16px, but we need to divide by scale to counteract the transform
     const baseSize = 32;
-    const bgSize = Math.min(4, baseSize / this.scale);
+    const bgSize = Math.min(512, baseSize / this.scale);
     
     // Update canvas background style
     this.canvas.style.backgroundSize = `${bgSize}px ${bgSize}px`;
@@ -10434,6 +10477,8 @@ class PixelArtEditor {
   // Project management
   newProject(width = this.defaultWidth, height = this.defaultHeight, imageData = null) {
     this.project = this.getNewProjectData(width, height, imageData);
+
+    this.transparentBackground = true;
 
     this.saveLastProjectSize();
     
@@ -10458,6 +10503,10 @@ class PixelArtEditor {
   
   getNewProjectData(width, height, img) {
     const project =  {
+      version: this.version,
+      backgroundColor: 'transparent',
+      transparentBackground: false,
+      createdAt: new Date().toISOString(),
       width: width,
       height: height,
       frames: [
@@ -10860,7 +10909,6 @@ class PixelArtEditor {
 
     const frame = this.project.frames[this.project.currentFrame];
     if (!frame) return;
-
 
     // Draw background if not transparent
     if (!this.transparentBackground) {
@@ -12592,7 +12640,9 @@ class PixelArtEditor {
   toggleTransparency() {
     this.historyManager.startBatch("toggle_transparency", __("Alternar Transparencia||Toggle Transparency"));
     
-    if (!this.transparentBackground) {
+    this.updateTransparencyState();
+    
+    if (this.transparentBackground) {
       this.removeTransparentColor();
     } else {
       this.restoreTransparentColor();
@@ -12613,92 +12663,143 @@ class PixelArtEditor {
     this.historyManager.endBatch();
   }
   
-  checkTransparentColor(transparentColor = this.secondaryColor) {
-    let isTransparent = false;
-    
-    // Check transparent color in the bottom layer of each frames
-    this.project.frames.forEach(frame => {
-      const layer = frame.layers[0];
-      const ctx = layer.ctx;
-      
-      // Perform the operation
-      const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
-      const data = imageData.data;
-      
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
-        const hex = this.colorPicker.rgbToHex(r, g, b);
-        
-        // Check if it's transparent
-        if (a < 1 || hex == transparentColor) {
-          isTransparent = true;
-        }
-      }
-    });
-    
-    return isTransparent;
-  }
-  
   removeTransparentColor() {
-    // Remove transparent color in the bottom layer of each frames
-    this.project.frames.forEach(frame => {
-      const layer = frame.layers[0];
-      const ctx = layer.ctx;
+    // Elimina la transparencia: Convierte los píxeles transparentes al color secundario opaco
+    if (!this.project) return;
+    
+    const secondaryColor = this.secondaryColor;
+    const secondaryRgb = this.hexToRgb(secondaryColor);
+    let totalPixelsModified = 0;
+    
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
       
-      // Store old image data
-      const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
-      
-      // Perform the operation
-      const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
-      const data = imageData.data;
-      
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const hex = this.colorPicker.rgbToHex(r, g, b);
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+        const data = imageData.data;
         
-        // Make secondary color transparent
-        if (hex == this.secondaryColor) {
-          data[i + 3] = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          // Si el píxel es transparente (alpha = 0)
+          if (data[i + 3] === 0) {
+            // Rellenar con el color secundario y hacerlo opaco
+            data[i] = secondaryRgb.r;
+            data[i + 1] = secondaryRgb.g;
+            data[i + 2] = secondaryRgb.b;
+            data[i + 3] = 255;
+            totalPixelsModified++;
+          }
         }
+        
+        layer.ctx.putImageData(imageData, 0, 0);
       }
-    });
+    }
+    
+    if (totalPixelsModified > 0) {
+      this.render();
+      this.showToast(__(`Transparencia eliminada: ${totalPixelsModified} píxeles rellenados||Transparency removed: ${totalPixelsModified} pixels filled`), 2000);
+    } else {
+      this.showToast(__('No había píxeles transparentes para rellenar||No transparent pixels to fill'), 2000);
+    }
   }
   
   restoreTransparentColor() {
-    // Restore transparent color in the bottom layer of each frames
-    this.project.frames.forEach(frame => {
-      const layer = frame.layers[0];
-      const ctx = layer.ctx;
+    // Restaura la transparencia: Convierte los píxeles del color secundario a transparentes
+    if (!this.project) return;
+    
+    const secondaryColor = this.secondaryColor;
+    const secondaryRgb = this.hexToRgb(secondaryColor);
+    let totalPixelsModified = 0;
+    
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
       
-      // Store old image data
-      const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
-      
-      // Perform the operation
-      const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
-      const data = imageData.data;
-      
-      for (let i = 0; i < data.length; i += 4) {
-        const alpha = data[i + 3];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+        const data = imageData.data;
         
-        // Copy secondary color to alpha
-        if (alpha < 1) {
-          const rgb = this.colorPicker.hexToRgb(this.secondaryColor);
-          const { r, g, b } = rgb;
-          
-          data[i] = r;
-          data[i + 1] = g;
-          data[i + 2] = b;
-          data[i + 3] = 1;
+        for (let i = 0; i < data.length; i += 4) {
+          // Si el píxel coincide EXACTAMENTE con el color secundario Y es opaco
+          if (data[i] === secondaryRgb.r && 
+              data[i + 1] === secondaryRgb.g && 
+              data[i + 2] === secondaryRgb.b && 
+              data[i + 3] === 255) {
+            // Hacerlo transparente
+            data[i + 3] = 0;
+            totalPixelsModified++;
+          }
+        }
+        
+        layer.ctx.putImageData(imageData, 0, 0);
+      }
+    }
+    
+    if (totalPixelsModified > 0) {
+      this.render();
+      this.showToast(__(`Transparencia restaurada: ${totalPixelsModified} píxeles convertidos||Transparency restored: ${totalPixelsModified} pixels converted`), 2000);
+    } else {
+      this.showToast(__('No se encontraron píxeles del color secundario||No secondary color pixels found'), 2000);
+    }
+  }
+  
+  hasTransparency() {
+    if (!this.project) return false;
+    
+    // Revisar muestras de píxeles para rendimiento
+    for (let f = 0; f < Math.min(this.project.frames.length, 3); f++) {
+      const frame = this.project.frames[f];
+      
+      for (let l = 0; l < Math.min(frame.layers.length, 2); l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+        const data = imageData.data;
+        
+        // Muestrear aproximadamente el 1% de los píxeles para rendimiento
+        const step = Math.max(1, Math.floor(data.length / 10000));
+        for (let i = 3; i < data.length; i += 4 * step) {
+          if (data[i] < 255) {
+            return true; // Encontrado un píxel transparente
+          }
         }
       }
-    });
+    }
+    
+    return false;
   }
-
+  
+  updateTransparencyState() {
+    if (!this.project) return;
+    
+    // Detectar rápidamente si hay algún píxel transparente
+    const hasTransparency = this.checkForTransparency(); // implementación eficiente
+    
+    if (this.transparentBackground !== hasTransparency) {
+      this.transparentBackground = hasTransparency;
+      console.log(`Transparency state updated: ${hasTransparency}`);
+    }
+  }
+  
+  checkForTransparency() {
+    // Solo revisar la capa de fondo (índice 0) de cada frame
+    // Detenerse en el primer píxel transparente encontrado
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const bgLayer = this.project.frames[f].layers[0];
+      if (!bgLayer) continue;
+      
+      const imageData = bgLayer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+      const data = imageData.data;
+      
+      // Muestrear para rendimiento (cada 10 píxeles)
+      for (let i = 3; i < data.length; i += 40) { // alpha channel
+        if (data[i] < 255) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
   invertColors() {
     if (!this.project) return;
   
@@ -14034,7 +14135,7 @@ class PixelArtEditor {
     }
   }
 
-  hasTransparency(canvas) {
+  canvasHasTransparency(canvas) {
     const ctx = this.getCanvasContext(canvas);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
@@ -14618,13 +14719,14 @@ class PixelArtEditor {
       this.project.frames.push(frame);
     }
 
-    // Reset transparent background state
-    if (this.project.backgroundColor) {
-      this.secondaryColor = this.project.backgroundColor;
+    // Load transparency state
+    if (parsed.transparentBackground !== undefined) {
+      this.transparentBackground = parsed.transparentBackground;
+    } else {
+      this.transparentBackground = this.hasTransparency();
     }
+    this.checkForTransparency();
     
-    this.transparentBackground = this.checkTransparentColor(this.transparentBackground);
-
     // Load history if available
     if (projectData.history) {
       this.historyManager.deserialize(projectData.history);
@@ -14860,6 +14962,7 @@ class PixelArtEditor {
       frames: [],
       floatingColors: this.colorPicker.getFloatingColorsData(),
       backgroundColor: this.transparentBackground ? this.secondaryColor : 'transparent',
+      transparentBackground: this.transparentBackground, // quitar esto
       currentFrameTime: this.project.currentFrameTime,
       frameTimes: this.project.frameTimes,
       createdAt: new Date().toISOString(),
@@ -15151,10 +15254,25 @@ class PixelArtEditor {
 
     return this.getPixelColorFromCtx(ctx, x, y);
   }
-  
+
   getPixelColorFromCtx(ctx, x, y) {
     const imageData = ctx.getImageData(x, y, 1, 1);
     return imageData.data[3] === 0 ? 'transparent' : `#${this.componentToHex(imageData.data[0])}${this.componentToHex(imageData.data[1])}${this.componentToHex(imageData.data[2])}`;
+  }
+  
+  getPixelAlpha(x, y, frameIndex = this.project.currentFrame, layerIndex = this.project.currentLayer) {
+    const frame = this.project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    return this.getPixelAlphaFromCtx(layer.ctx, x, y);
+  }
+  
+  getPixelAlphaFromCtx(ctx, x, y) {
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    return imageData.data[3];
+  }
+
+  hexToRgb(hex) {
+    return this.colorPicker.hexToRgb(hex);
   }
 
   componentToHex(c) {

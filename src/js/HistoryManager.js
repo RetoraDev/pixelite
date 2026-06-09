@@ -569,22 +569,65 @@ class HistoryManager {
     this.editor.render();
   }
   
-  applyToggleTransparencyOperation(_, operation, isUndo) {
-    // TODO: Make transparente background work per project
-    let transparent = operation.transparent;
+  applyToggleTransparencyOperation(project, operation, isUndo) {
+    // Determinar si estamos restaurando o eliminando transparencia
+    let shouldRestoreTransparency = operation.transparent;
     
-    if (isUndo) transparent = !transparent;
+    if (isUndo) shouldRestoreTransparency = !shouldRestoreTransparency;
     
-    if (transparent) {
-      this.editor.removeTransparentColor();
-    } else {
-      this.editor.restoreTransparentColor();
+    const targetProject = project || this.editor.project;
+    const secondaryColor = this.editor.secondaryColor;
+    const rgb = this.editor.hexToRgb(secondaryColor);
+    let totalPixelsModified = 0;
+    
+    for (let f = 0; f < targetProject.frames.length; f++) {
+      const frame = targetProject.frames[f];
+      
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, targetProject.width, targetProject.height);
+        const data = imageData.data;
+        
+        if (shouldRestoreTransparency) {
+          // Modo RESTORE: Píxeles del color secundario → transparentes
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i] === rgb.r && 
+                data[i + 1] === rgb.g && 
+                data[i + 2] === rgb.b && 
+                data[i + 3] === 255) {
+              data[i + 3] = 0;
+              totalPixelsModified++;
+            }
+          }
+        } else {
+          // Modo REMOVE: Píxeles transparentes → color secundario opaco
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] === 0) {
+              data[i] = rgb.r;
+              data[i + 1] = rgb.g;
+              data[i + 2] = rgb.b;
+              data[i + 3] = 255;
+              totalPixelsModified++;
+            }
+          }
+        }
+        
+        layer.ctx.putImageData(imageData, 0, 0);
+      }
     }
     
-    // Toggle transparency and render
-    this.editor.transparentBackground = transparent;
-    this.editor.render();
-  }
+    // Actualizar el estado en el editor principal
+    if (project === this.editor.project) {
+      this.editor.transparentBackground = shouldRestoreTransparency;
+      this.editor.render();
+      
+      // Mostrar notificación
+      if (totalPixelsModified > 0) {
+        const action = shouldRestoreTransparency ? 'restaurada' : 'eliminada';
+        console.log(`Transparencia ${action}: ${totalPixelsModified} píxeles modificados`);
+      }
+    }
+  }  
   
   // Generate timelapse by replaying history
   async generateTimelapse(fps, scale, progressCallback) {
