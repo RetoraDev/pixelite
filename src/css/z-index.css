@@ -17,6 +17,21 @@
   z-index: 5;
 }
 
+/* Selection toolbar */
+.selection-toolbar {
+  z-index: 15;
+}
+
+/* Selection rectangle */
+.selection-rect {
+  z-index: 15;
+}
+
+/* Clipboard panel */
+.clipboard-panel {
+  z-index: 15;
+}
+
 /* ========== UI Elements (10-19) ========== */
 /* Floating references container */
 .floating-references-container {
