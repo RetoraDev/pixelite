@@ -122,6 +122,11 @@ class SelectionManager {
   onDown(x, y) {
     if (!this.editor.project || this.isTransforming) return;
     
+    if (this.editor.collabManager.isConnected && !this.editor.collabManager.isHost) {
+      this.editor.showToast(__('Solo el host puede usar la herramienta de transformación||Only the host can use the transformation tool'));
+      return;
+    }
+    
     // Clamp to project bounds
     const maxX = this.editor.project.width - 1;
     const maxY = this.editor.project.height - 1;
@@ -310,6 +315,11 @@ class SelectionManager {
   startTransform() {
     if (!this.hasSelection || !this.rect) return;
     
+    if (this.editor.collabManager.isConnected && !this.editor.collabManager.isHost) {
+      this.editor.showToast(__('Solo el host puede usar la herramienta de transformación||Only the host can use the transformation tool'));
+      return;
+    }
+    
     this.isTransforming = true;
     this.transformRect = { ...this.rect };
     this.transformStartRect = { ...this.rect };
@@ -384,6 +394,11 @@ class SelectionManager {
     handles.forEach(handle => {
       handle.style.display = show ? 'block' : 'none';
     });
+    if (show) {
+      this.selectionDiv.classList.add('transform-active');
+    } else {
+      this.selectionDiv.classList.remove('transform-active');
+    }
   }
   
   updateRectDisplay() {
@@ -409,11 +424,7 @@ class SelectionManager {
     const height = this.editor.project.height;
     
     // Get temporary canvas
-    const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas();
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    tempCtx.imageSmoothingEnabled = false;
-    tempCtx.clearRect(0, 0, width, height);
+    const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas(width, height);
     
     // Step 1: Start with the original complete image from ImageData
     if (this.transformOriginalFullImageData) {
@@ -465,6 +476,42 @@ class SelectionManager {
     this.editor.renderQuick();
   }  
   
+  getSelectedAreaCanvas() {
+    if (!this.hasSelection || !this.rect) {
+      return null;
+    }
+    
+    const width = this.rect.width;
+    const height = this.rect.height;
+    
+    if (width < 1 || height < 1) {
+      return null;
+    }
+    
+    const { canvas, ctx } = this.editor.getTempCanvas();
+    canvas.width = width;
+    canvas.height = height;
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    // If we have a transformed image (during move/resize), use it
+    if (this.transformCurrentImageData) {
+      ctx.drawImage(this.transformCurrentImageData, 0, 0);
+    } else {
+      // Otherwise, crop the selected area from the current layer
+      const frame = this.editor.project.frames[this.editor.project.currentFrame];
+      const layer = frame.layers[this.editor.project.currentLayer];
+      
+      ctx.drawImage(
+        layer.canvas,
+        this.rect.x, this.rect.y, width, height,
+        0, 0, width, height
+      );
+    }
+    
+    return canvas;
+  }  
+  
   onRectDown(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -473,7 +520,7 @@ class SelectionManager {
     this.isDragging = true;
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     this.dragStartPoint = { x: pos.x, y: pos.y };
@@ -491,7 +538,7 @@ class SelectionManager {
     
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     const deltaX = pos.x - this.dragStartPoint.x;
@@ -526,7 +573,7 @@ class SelectionManager {
     
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     this.dragStartPoint = { x: pos.x, y: pos.y };
@@ -544,7 +591,7 @@ class SelectionManager {
     
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     const deltaX = pos.x - this.dragStartPoint.x;
@@ -680,6 +727,11 @@ class SelectionManager {
     this.hasSelection = true;
     this.finishTransform();
     this.editor.render();
+    
+    // Transmitir cambios
+    if (this.editor.collabManager.isConnected && this.editor.collabManager.isHost) {
+      this.editor.collabManager.sendFullState();
+    }
   }  
   
   cancelTransform() {
@@ -709,11 +761,15 @@ class SelectionManager {
     this.editor.hideBottomConfirmation();
     this.updateToolbarVisibility();
   }  
-
+  
   updateHandleScales() {}
 
   showClipboard() {
     this.renderClipboardList();
+    this.editor.menuPanelOverlay.classList.remove('visible');
+    this.editor.animationPanel.classList.remove('visible');
+    this.editor.layersPanel.classList.remove('visible');
+    this.editor.gridManager.hide();
     this.clipboardPanel.classList.add('visible');
   }
   
@@ -791,6 +847,17 @@ class SelectionManager {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+  
+  shouldDrawOnSelection(x, y) {
+    if (!this.hasSelection) {
+      return true;
+    }
+    
+    return x >= this.rect.x
+        && y >= this.rect.y
+        && x <= this.rect.x + this.rect.width - 1
+        && y <= this.rect.y + this.rect.height - 1;
   }
   
   destroy() {

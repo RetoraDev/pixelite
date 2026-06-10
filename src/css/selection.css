@@ -28,8 +28,13 @@
   --ants-spacing: 5px;
   position: absolute;
   box-sizing: border-box;
-  pointer-events: auto;
+  pointer-events: none;
   display: none;
+}
+
+.selection-rect.transform-active {
+  pointer-events: auto;
+  cursor: hand;
 }
 
 .selection-rect-bg {
@@ -40,7 +45,6 @@
   height: 100%;
   opacity: 0.1;
   background-color: var(--primary-color);
-  pointer-events: none;
 }
 
 /* Top border */
@@ -139,7 +143,7 @@
 
 /* Handles invisibles que cubren todo el borde */
 .selection-handle {
-   position: absolute;
+  position: absolute;
   pointer-events: auto;
   z-index: 1;
   display: none;

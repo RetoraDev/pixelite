@@ -4,8 +4,8 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.6 dev
- * Built: 6/9/2026, 5:28:58 AM
+ * Version: v1.0.8 dev
+ * Built: 6/10/2026, 1:19:37 AM
  * Platform: Development
  * Debug: true
  * Minified: false
@@ -921,6 +921,9 @@ button:active {
 }
 .tool-pipette {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M20.71 5.63l-2.34-2.34a.996.996 0 0 0-1.41 0l-3.12 3.12-1.93-1.91-1.41 1.41 1.42 1.42L3 16.25V21h4.75l8.92-8.92 1.42 1.42 1.41-1.41-1.92-1.92 3.12-3.12c.4-.4.4-1.03.01-1.42zM6.92 19L5 17.08l8.06-8.06 1.92 1.92L6.92 19z"/></svg>');
+}
+.tool-ruler {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white"><g fill="none" fill-rule="evenodd"><path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z" fill="white"/><path fill="white" d="M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2v-7h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm2 2v1a1 1 0 0 0 2 0V5h2v1a1 1 0 1 0 2 0V5h2v1a1 1 0 0 0 2 0V5h2v5h-7.5a1.5 1.5 0 0 0-1.5 1.5V19H5v-2h1a1 1 0 1 0 0-2H5v-2h1a1 1 0 1 0 0-2H5V9h1a1 1 0 0 0 0-2H5V5z"/></g></svg>');
 }
 .tool-selection {
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 256 256" fill="white" stroke="white" stroke-width="16"><path d="M150 40a6 6 0 0 1-6 6h-32a6 6 0 0 1 0-12h32a6 6 0 0 1 6 6m-6 170h-32a6 6 0 0 0 0 12h32a6 6 0 0 0 0-12m64-176h-24a6 6 0 0 0 0 12h24a2 2 0 0 1 2 2v24a6 6 0 0 0 12 0V48a14 14 0 0 0-14-14m8 72a6 6 0 0 0-6 6v32a6 6 0 0 0 12 0v-32a6 6 0 0 0-6-6m0 72a6 6 0 0 0-6 6v24a2 2 0 0 1-2 2h-24a6 6 0 0 0 0 12h24a14 14 0 0 0 14-14v-24a6 6 0 0 0-6-6M40 150a6 6 0 0 0 6-6v-32a6 6 0 0 0-12 0v32a6 6 0 0 0 6 6m32 60H48a2 2 0 0 1-2-2v-24a6 6 0 0 0-12 0v24a14 14 0 0 0 14 14h24a6 6 0 0 0 0-12m0-176H48a14 14 0 0 0-14 14v24a6 6 0 0 0 12 0V48a2 2 0 0 1 2-2h24a6 6 0 0 0 0-12"/></svg>');
@@ -3079,8 +3082,13 @@ button:active {
   --ants-spacing: 5px;
   position: absolute;
   box-sizing: border-box;
-  pointer-events: auto;
+  pointer-events: none;
   display: none;
+}
+
+.selection-rect.transform-active {
+  pointer-events: auto;
+  cursor: hand;
 }
 
 .selection-rect-bg {
@@ -3091,7 +3099,6 @@ button:active {
   height: 100%;
   opacity: 0.1;
   background-color: var(--primary-color);
-  pointer-events: none;
 }
 
 /* Top border */
@@ -3190,7 +3197,7 @@ button:active {
 
 /* Handles invisibles que cubren todo el borde */
 .selection-handle {
-   position: absolute;
+  position: absolute;
   pointer-events: auto;
   z-index: 1;
   display: none;
@@ -3827,9 +3834,97 @@ input:checked + .slider:before {
   }
 }
 
+/* Ruler Tool Styles */
+.ruler-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  image-rendering: pixelated;
+  transform-origin: 0 0;
+}
+
+.ruler-label {
+  position: absolute;
+  background-color: var(--ui-backdrop);
+  backdrop-filter: blur(4px);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-color);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 21;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 5px var(--shadow-color);
+}
+
 /*
   Collab Styles
 */
+
+.collab-status {
+  display: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+  padding: 5px;
+  background-color: lime;
+  animation: blink 1s infinite;
+}
+
+.collab-status.connected {
+  display: inline-block;
+}
+
+.collab-connect-dialog {
+  min-width: 300px;
+}
+
+.collab-connect-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.collab-connect-tab {
+  color: var(--text-color);
+  padding: 8px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.collab-connect-tab.selected {
+  color: var(--primary-color);
+  border-bottom: 2px solid var(--primary-color);
+}
+
+.collab-connect-form {}
+
+.collab-connect-form-section {
+  margin-bottom: 16px;
+}
+
+.collab-connect-form label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.collab-connect-form input,
+.collab-connect-form select {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--bg-color);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-color);
+}
+
 .collab-session-overlay {
   position: fixed;
   top: 0;
@@ -4653,6 +4748,11 @@ input:checked + .slider:before {
     transform: translate(-50%, 0);
     opacity: 1;
   }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 @keyframes colorPickPulse {

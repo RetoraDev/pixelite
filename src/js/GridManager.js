@@ -379,7 +379,8 @@ class GridManager {
     this.editor.layersPanel.classList.remove('visible');
     this.editor.animationButton.classList.remove('active');
     this.editor.layersButton.classList.remove('active');
-    
+    this.editor.selectionManager.clipboardPanel.classList.remove('visible');
+
     // Show our panel
     this.panel.classList.add('visible');
     this.editor.gridsButton.classList.add("active");

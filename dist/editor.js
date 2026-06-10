@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.6 dev
- * Built: 6/9/2026, 5:28:58 AM
+ * Version: v1.0.8 dev
+ * Built: 6/10/2026, 1:19:37 AM
  * Platform: Development
  * Debug: true
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.6 dev";
+const VERSION = "v1.0.8 dev";
 const HOST = "ws://localhost:8080";
 const DEBUG = true;
 
@@ -1643,7 +1643,8 @@ class GridManager {
     this.editor.layersPanel.classList.remove('visible');
     this.editor.animationButton.classList.remove('active');
     this.editor.layersButton.classList.remove('active');
-    
+    this.editor.selectionManager.clipboardPanel.classList.remove('visible');
+
     // Show our panel
     this.panel.classList.add('visible');
     this.editor.gridsButton.classList.add("active");
@@ -1795,6 +1796,11 @@ class SelectionManager {
   
   onDown(x, y) {
     if (!this.editor.project || this.isTransforming) return;
+    
+    if (this.editor.collabManager.isConnected && !this.editor.collabManager.isHost) {
+      this.editor.showToast(__('Solo el host puede usar la herramienta de transformación||Only the host can use the transformation tool'));
+      return;
+    }
     
     // Clamp to project bounds
     const maxX = this.editor.project.width - 1;
@@ -1984,6 +1990,11 @@ class SelectionManager {
   startTransform() {
     if (!this.hasSelection || !this.rect) return;
     
+    if (this.editor.collabManager.isConnected && !this.editor.collabManager.isHost) {
+      this.editor.showToast(__('Solo el host puede usar la herramienta de transformación||Only the host can use the transformation tool'));
+      return;
+    }
+    
     this.isTransforming = true;
     this.transformRect = { ...this.rect };
     this.transformStartRect = { ...this.rect };
@@ -2058,6 +2069,11 @@ class SelectionManager {
     handles.forEach(handle => {
       handle.style.display = show ? 'block' : 'none';
     });
+    if (show) {
+      this.selectionDiv.classList.add('transform-active');
+    } else {
+      this.selectionDiv.classList.remove('transform-active');
+    }
   }
   
   updateRectDisplay() {
@@ -2083,11 +2099,7 @@ class SelectionManager {
     const height = this.editor.project.height;
     
     // Get temporary canvas
-    const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas();
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    tempCtx.imageSmoothingEnabled = false;
-    tempCtx.clearRect(0, 0, width, height);
+    const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas(width, height);
     
     // Step 1: Start with the original complete image from ImageData
     if (this.transformOriginalFullImageData) {
@@ -2139,6 +2151,42 @@ class SelectionManager {
     this.editor.renderQuick();
   }  
   
+  getSelectedAreaCanvas() {
+    if (!this.hasSelection || !this.rect) {
+      return null;
+    }
+    
+    const width = this.rect.width;
+    const height = this.rect.height;
+    
+    if (width < 1 || height < 1) {
+      return null;
+    }
+    
+    const { canvas, ctx } = this.editor.getTempCanvas();
+    canvas.width = width;
+    canvas.height = height;
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    // If we have a transformed image (during move/resize), use it
+    if (this.transformCurrentImageData) {
+      ctx.drawImage(this.transformCurrentImageData, 0, 0);
+    } else {
+      // Otherwise, crop the selected area from the current layer
+      const frame = this.editor.project.frames[this.editor.project.currentFrame];
+      const layer = frame.layers[this.editor.project.currentLayer];
+      
+      ctx.drawImage(
+        layer.canvas,
+        this.rect.x, this.rect.y, width, height,
+        0, 0, width, height
+      );
+    }
+    
+    return canvas;
+  }  
+  
   onRectDown(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -2147,7 +2195,7 @@ class SelectionManager {
     this.isDragging = true;
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     this.dragStartPoint = { x: pos.x, y: pos.y };
@@ -2165,7 +2213,7 @@ class SelectionManager {
     
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     const deltaX = pos.x - this.dragStartPoint.x;
@@ -2200,7 +2248,7 @@ class SelectionManager {
     
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     this.dragStartPoint = { x: pos.x, y: pos.y };
@@ -2218,7 +2266,7 @@ class SelectionManager {
     
     const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
     const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
-    const pos = this.editor.getCanvasPosition(clientX, clientY);
+    const pos = this.editor.getCanvasPosition(clientX, clientY, false);
     if (!pos) return;
     
     const deltaX = pos.x - this.dragStartPoint.x;
@@ -2354,6 +2402,11 @@ class SelectionManager {
     this.hasSelection = true;
     this.finishTransform();
     this.editor.render();
+    
+    // Transmitir cambios
+    if (this.editor.collabManager.isConnected && this.editor.collabManager.isHost) {
+      this.editor.collabManager.sendFullState();
+    }
   }  
   
   cancelTransform() {
@@ -2383,11 +2436,15 @@ class SelectionManager {
     this.editor.hideBottomConfirmation();
     this.updateToolbarVisibility();
   }  
-
+  
   updateHandleScales() {}
 
   showClipboard() {
     this.renderClipboardList();
+    this.editor.menuPanelOverlay.classList.remove('visible');
+    this.editor.animationPanel.classList.remove('visible');
+    this.editor.layersPanel.classList.remove('visible');
+    this.editor.gridManager.hide();
     this.clipboardPanel.classList.add('visible');
   }
   
@@ -2465,6 +2522,17 @@ class SelectionManager {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+  
+  shouldDrawOnSelection(x, y) {
+    if (!this.hasSelection) {
+      return true;
+    }
+    
+    return x >= this.rect.x
+        && y >= this.rect.y
+        && x <= this.rect.x + this.rect.width - 1
+        && y <= this.rect.y + this.rect.height - 1;
   }
   
   destroy() {
@@ -4144,6 +4212,9 @@ class HistoryManager {
         case 'color_adjustment':
           this.applyColorAdjustmentOperation(project, operation, isUndo);
           break;
+        case 'crop_canvas':
+          this.applyCropCanvasOperation(project, operation, isUndo);
+          break;
         case 'resize_canvas':
           this.applyResizeCanvasOperation(project, operation, isUndo);
           break;
@@ -4471,7 +4542,7 @@ class HistoryManager {
     ctx.putImageData(imageData, 0, 0);
   }
   
-  applyResizeCanvasOperation(project, operation, isUndo) {
+  applyCropCanvasOperation(project, operation, isUndo) {
     const { oldWidth, oldHeight, newWidth, newHeight, cropX, cropY, framesData } = operation;
     
     // Store current frame/layer indices
@@ -4550,6 +4621,79 @@ class HistoryManager {
           // Draw cropped area
           layer.ctx.clearRect(0, 0, newWidth, newHeight);
           layer.ctx.drawImage(tempCanvas, -cropX, -cropY);
+        }
+      });
+    });
+    
+    // Restore frame/layer indices
+    project.currentFrame = Math.min(currentFrame, project.frames.length - 1);
+    project.currentLayer = Math.min(currentLayer, 
+      project.frames[project.currentFrame].layers.length - 1);
+    
+    // Update transform and render
+    this.editor.updateCanvasTransform();
+    this.editor.render();
+  }
+
+  applyResizeCanvasOperation(project, operation, isUndo) {
+    const { oldWidth, oldHeight, newWidth, newHeight, framesData, newFramesData } = operation;
+    
+    // Store current frame/layer indices
+    const currentFrame = project.currentFrame;
+    const currentLayer = project.currentLayer;
+    
+    // Determine which dimensions to use
+    const targetWidth = isUndo ? oldWidth : newWidth;
+    const targetHeight = isUndo ? oldHeight : newHeight;
+    
+    // Resize project dimensions first
+    project.width = targetWidth;
+    project.height = targetHeight;
+    this.editor.resetCanvasSize();
+    
+    // Restore/transform each layer
+    project.frames.forEach((frame, fIndex) => {
+      // Make sure we have data for this frame
+      const frameData = framesData[fIndex];
+      if (!frameData) return;
+      
+      frame.layers.forEach((layer, lIndex) => {
+        const layerData = frameData.layers && frameData.layers[lIndex];
+        if (!layerData) return;
+        
+        // Ensure we have valid image data array
+        const expectedLength = 4 * oldWidth * oldHeight;
+        let imageDataArray = layerData.imageData;
+        
+        // If the array length doesn't match, create a blank array of correct size
+        if (!imageDataArray || imageDataArray.length !== expectedLength) {
+          imageDataArray = new Array(expectedLength).fill(0);
+        }
+        
+        if (isUndo) {
+          // Undo: restore original size and content
+          const imageData = new ImageData(
+            new Uint8ClampedArray(imageDataArray),
+            oldWidth,
+            oldHeight
+          );
+          
+          // Create temp canvas with original size
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = oldWidth;
+          tempCanvas.height = oldHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.putImageData(imageData, 0, 0);
+          
+          // Resize layer canvas to original size
+          layer.canvas.width = oldWidth;
+          layer.canvas.height = oldHeight;
+          
+          // Draw back to resized canvas
+          layer.ctx.clearRect(0, 0, oldWidth, oldHeight);
+          layer.ctx.drawImage(tempCanvas, 0, 0);
+        } else {
+          this.editor.resizeCanvas(newHeight, newWidth);
         }
       });
     });
@@ -5100,6 +5244,7 @@ class CollabManager {
     this.isConnected = false;
     this.manualDisconnect = false;
     this.chatVisible = false;
+    this.traceDataFormat = 'prerendered';
     
     // Members tracking
     this.members = new Map();
@@ -5379,8 +5524,9 @@ class CollabManager {
     const tools = this.editor.tools;
     
     Object.keys(tools).forEach(toolName => {
-      // Store original tool methods
       const tool = tools[toolName];
+      
+      // Store original tool methods
       const originalOnDown = tool.onDown;
       const originalOnMove = tool.onMove;
       const originalOnUp = tool.onUp;
@@ -5389,55 +5535,89 @@ class CollabManager {
       tool.originalOnMove = originalOnMove;
       tool.originalOnUp = originalOnUp;
       
+      if (tool.offlineOnly) {
+        tool.onDown = () => {};
+        tool.onMove = () => {};
+        tool.onUp = () => {};
+      }
+      
+      if (tool.dontBroadcast) return;
+      
       tool.onDown = function(x, y) {
         // Start new trace
         if (self.isConnected && self.canPerformAction('draw')) {
-          self.currentTrace = {
-            tool: toolName,
-            brushSize: self.editor.brushSize,
-            color: self.editor.getColor(),
-            points: [{ x, y }],
-            frame: self.editor.project.currentFrame,
-            layer: self.editor.project.currentLayer
-          };
-          self.tracePoints = [{ x, y }];
+          if (self.traceDataFormat == 'precise') {
+            self.currentTrace = {
+              type: 'precise',
+              tool: toolName,
+              brushSize: self.editor.brushSize,
+              color: self.editor.getColor(),
+              points: [{ x, y }],
+              frame: self.editor.project.currentFrame,
+              layer: self.editor.project.currentLayer
+            };
+            self.tracePoints = [{ x, y }];
+          } else if (self.traceDataFormat == 'prerendered') {
+            self.currentTrace = {
+              type: 'prerendered',
+              pixels: [],
+              frame: self.editor.project.currentFrame,
+              layer: self.editor.project.currentLayer
+            };
+            self.tracePoints = [];
+          }
         }
         
         if (originalOnDown) {
-          originalOnDown.call(self.editor, x, y);
+          const pixels = originalOnDown.call(self.editor, x, y);
+          
+          if (self.currentTrace.type == 'prerendered' && pixels && pixels.length) {
+            self.currentTrace.pixels = [...self.currentTrace.pixels, ...pixels];
+            self.sendCursorUpdate(x, y, true);
+          }
         }
       };
       
       tool.onMove = function(x, y) {
         // Add to current trace
-        if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
-          self.currentTrace.points.push({ x, y });
+        if (originalOnMove) {
+          const pixels = originalOnMove.call(self.editor, x, y);
           
-          // Send cursor update (throttled)
-          self.sendCursorUpdate(x, y, true);
+          if (self.currentTrace.type == 'prerendered' && pixels && pixels.length) {
+            self.currentTrace.pixels = [...self.currentTrace.pixels, ...pixels];
+          } else if (self.currentTrace.type == 'precise') {
+            self.currentTrace.points.push({ x, y });
+          }
         }
         
-        if (originalOnMove) {
-          originalOnMove.call(self.editor, x, y);
+        // Send cursor update (throttled)
+        if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
+          self.sendCursorUpdate(x, y, true);
         }
       };
       
       tool.onUp = function(x, y, startX, startY) {
         // Complete the trace and send it
+        if (originalOnUp) {
+          const pixels = originalOnUp.call(self.editor, x, y, startX, startY);
+          
+          if (self.currentTrace.type == 'prerendered' && pixels && pixels.length) {
+            self.currentTrace.pixels = [...self.currentTrace.pixels, ...pixels];
+          }
+        }
+        
         if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
-          // Add final point if different
-          const lastPoint = self.currentTrace.points[self.currentTrace.points.length - 1];
-          if (lastPoint.x !== x || lastPoint.y !== y) {
-            self.currentTrace.points.push({ x, y });
+          if (self.currentTrace.type == 'precise') {
+            // Add final point if different
+            const lastPoint = self.currentTrace.points[self.currentTrace.points.length - 1];
+            if (lastPoint.x !== x || lastPoint.y !== y) {
+              self.currentTrace.points.push({ x, y });
+            }
           }
           
           self.sendTraceComplete(self.currentTrace);
           self.currentTrace = null;
           self.sendCursorUpdate(0, 0, false);
-        }
-        
-        if (originalOnUp) {
-          originalOnUp.call(self.editor, x, y, startX, startY);
         }
       };
     });
@@ -5561,6 +5741,12 @@ class CollabManager {
       case 'chat_message':
         this.handleChatMessage(message);
         break;
+      case 'canvas_crop':
+        this.handleCanvasCrop(message);
+        break;
+      case 'canvas_resize':
+        this.handleCanvasResize(message);
+        break;
       case 'full_state':
         this.handleFullState(message);
         break;
@@ -5596,6 +5782,8 @@ class CollabManager {
     this.renderSessionMenu();
     this.sessionOverlay.style.display = 'flex';
     
+    document.querySelector('.collab-status').classList.add('connected');
+    
     this.hookEditorMethods();
     
     this.editor.showToast(__('Sesión creada||Session created'), 2000);
@@ -5625,6 +5813,8 @@ class CollabManager {
     this.renderSessionMenu();
     this.sessionOverlay.style.display = 'flex';
     
+    document.querySelector('.collab-status').classList.add('connected');
+    
     this.hookEditorMethods();
     
     this.editor.showToast(__('Conectado a la sesión||Connected to the session'), 2000);
@@ -5635,7 +5825,7 @@ class CollabManager {
     this.members.set(member.id, member);
     this.editor.showToast(`${this.wrapMemberName(member)} ${__('se unió||joined')}`, 2000);
     if (this.isHost) {
-      this.sendFullState(member.id);
+      setTimeout( () => this.sendFullState(member.id) );
     }
     this.renderSessionMenu();
   }
@@ -5672,12 +5862,18 @@ class CollabManager {
     
     if (!member || memberId === this.memberId) return;
     
-    // Show name tag at the last point
-    const lastPoint = data.points[data.points.length - 1];
-    this.showCursor(memberId, member.name, member.color, lastPoint.x, lastPoint.y);
+    if (data.type == 'precise') {
+      // Show name tag at the last point
+      const lastPoint = data.points[data.points.length - 1];
+      this.showCursor(memberId, member.name, member.color, lastPoint.x, lastPoint.y);
+    }
     
     // Apply the trace using the editor's drawing methods
-    this.applyTrace(data);
+    if (data.pixels) {
+      this.applyPreRenderedTrace(data);
+    } else {
+      this.applyTrace(data);
+    }
   }
 
   applyTrace(trace) {
@@ -5746,8 +5942,21 @@ class CollabManager {
     this.editor.render();
   }
   
+  applyPreRenderedTrace(trace) {
+    const { pixels, frame, layer } = trace;
+    
+    const frameObj = this.editor.project?.frames[frame];
+    if (!frameObj) return;
+    
+    const layerObj = frameObj.layers[layer];
+    if (!layerObj) return;
+    
+    this.editor.drawPixels(layerObj.ctx, pixels);
+    this.editor.recordDrawOperation(pixels);
+  }
+  
   handleRemoteCursor(message) {
-    const { memberId, x, y, active } = message;
+    const { memberId, x, y, active, pixels, frameIndex, layerIndex } = message;
     const member = this.members.get(memberId);
     
     if (!member || memberId === this.memberId) return;
@@ -5757,6 +5966,28 @@ class CollabManager {
     } else {
       this.hideCursor(memberId);
     }
+    
+    if (pixels && pixels.length) {
+      this.drawTracePreview(pixels, frameIndex, layerIndex || 0);
+    }
+  }
+  
+  drawTracePreview(pixels, frameIndex, layerIndex) {
+    if (frameIndex != this.editor.currentFrame) return;
+    
+    // Get temporary canvas
+    const { canvas, ctx } = this.editor.getTempCanvas(this.editor.project.width, this.editor.project.height);
+    
+    // Draw trace preview
+    this.editor.drawPixels(ctx, pixels);
+
+    // Combine with main canvas
+    this.editor.renderQuick(true, {
+      layerIndex: layerIndex,
+      pixels: pixels.filter(p => p.newColor == 'transparent')
+    });
+    
+    this.editor.ctx.drawImage(canvas, 0, 0)
   }
   
   handleNameUpdate(message) {
@@ -5789,11 +6020,31 @@ class CollabManager {
     }
     this.scrollMessagesToBottom();
   }
+  
+  handleCanvasResize(message) {
+    this.editor.resizeCanvas(message.width, message.height);
+  }
+  
+  handleCanvasCrop(message) {
+    this.editor.cropCanvas(message.x, message.y, message.width, message.height);
+  }
 
   handleFullState(message) {
     if (message.memberId === this.memberId) return;
     this.applyFullState(message.state);
     this.editor.showOperationMessage(__('Proyecto sincronizado||Project synchronized'), 1000);
+    if (message.reason) {
+      const member = this.members.get(message.memberId);
+          
+      switch(message.reason) {
+        case 'new_project':
+          this.editor.showToast(`${this.wrapMemberName(member)} ${__('comenzó un proyecto nuevo||started a new project')}`, 2000);
+          break;    
+        case 'load_project':
+          this.editor.showToast(`${this.wrapMemberName(member)} ${__('cargó un archivo||loaded a file')}`, 2000);
+          break;    
+      }
+    }
   }
 
   handleSessionEnded(reason) {
@@ -5824,6 +6075,8 @@ class CollabManager {
     this.chatContainer.style.display = 'none';
     this.pingIndicator.style.display = 'none';
     this.sessionOverlay.style.display = 'none';
+        
+    document.querySelector('.collab-status').classList.remove('connected');
     
     this.restoreEditorMethods();
     
@@ -5848,6 +6101,9 @@ class CollabManager {
       type: 'cursor_update',
       x: Math.round(x),
       y: Math.round(y),
+      pixels: this.currentTrace && this.currentTrace.pixels ? this.currentTrace.pixels : [],
+      frameIndex: this.editor.currentFrame,
+      layerIndex: this.editor.currentLayer,
       active: active
     });
   }
@@ -5859,14 +6115,29 @@ class CollabManager {
     });
   }
 
-  sendFullState(toMemberId) {
+  sendFullState(toMemberId, reason) {
     if (!this.isHost || !this.isConnected) return;
     
     const state = this.getFullState();
     this.sendMessage({
       type: 'full_state',
+      reason: reason || null,
       state: state,
       toMemberId: toMemberId || null
+    });
+  }
+  
+  sendCropMessage(x, y, width, height) {
+    this.sendMessage({
+      type: 'canvas_crop',
+      x, y, width, height
+    });
+  }
+  
+  sendResizeMessage(width, height) {
+    this.sendMessage({
+      type: 'canvas_resize',
+      width, height
     });
   }
 
@@ -5875,8 +6146,12 @@ class CollabManager {
       width: this.editor.project.width,
       height: this.editor.project.height,
       frames: [],
+      frameTimes: this.editor.project.frameTimes,
       currentFrame: this.editor.project.currentFrame,
-      currentLayer: this.editor.project.currentLayer
+      currentLayer: this.editor.project.currentLayer,
+      createdAt: this.editor.project.createdAt,
+      backgroundColor: this.editor.project.backgroundColor,
+      transparentBackground: this.editor.transparentBackground
     };
     
     for (let f = 0; f < this.editor.project.frames.length; f++) {
@@ -5905,8 +6180,12 @@ class CollabManager {
       width: state.width,
       height: state.height,
       frames: [],
+      frameTimes: state.frameTimes,
       currentFrame: state.currentFrame,
-      currentLayer: state.currentLayer
+      currentLayer: state.currentLayer,
+      createdAt: state.createdAt,
+      backgroundColor: state.backgroundColor,
+      transparentBackground: state.transparentBackground
     };
     
     for (let f = 0; f < state.frames.length; f++) {
@@ -5942,6 +6221,7 @@ class CollabManager {
     
     this.editor.project = project;
     this.editor.resetCanvasSize();
+    this.editor.resetZoom();
     this.editor.render();
   }
 
@@ -6461,6 +6741,13 @@ class CollabManager {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
+  }
+  
+  requestOperation(operation) {
+    // TODO: Clients request operations in the project to host
+    
+    // By now just notify it's not possible
+    this.editor.showToast(__('Solo el host puede hacer eso||Only host can do that'));
   }
 
   canPerformAction(action) {
@@ -7215,6 +7502,277 @@ class PaletteManager {
         }
       ]
     );
+  }
+}
+
+// RulerTool.js
+class RulerTool {
+  constructor(editor) {
+    this.editor = editor;
+    
+    this.isActive = false;
+    this.startPoint = null;
+    this.currentPoint = null;
+    
+    this.canvas = null;
+    this.ctx = null;
+    this.label = null;
+    
+    this.HD_SCALE = 16;
+    
+    this.init();
+  }
+  
+  init() {
+    this.createCanvas();
+  }
+  
+  createCanvas() {
+    this.canvas = document.createElement('canvas');
+    this.canvas.style.position = 'absolute';
+    this.canvas.style.top = '0';
+    this.canvas.style.left = '0';
+    this.canvas.style.pointerEvents = 'none';
+    this.canvas.style.imageRendering = 'pixelated';
+    
+    this.editor.canvasWrapper.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext('2d');
+    
+    this.label = document.createElement('div');
+    this.label.className = 'ruler-label';
+    this.label.style.display = 'none';
+    this.editor.uiLayer.appendChild(this.label);
+  }
+  
+  updateCanvasSize() {
+    if (!this.editor.project) return;
+    
+    const width = this.editor.project.width;
+    const height = this.editor.project.height;
+    
+    this.canvas.width = width * this.HD_SCALE;
+    this.canvas.height = height * this.HD_SCALE;
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
+  }
+  
+  onDown(x, y) {
+    if (!this.editor.project) return;
+    
+    this.isActive = true;
+    this.startPoint = { x: x * this.HD_SCALE, y: y * this.HD_SCALE };
+    this.currentPoint = { x: x * this.HD_SCALE, y: y * this.HD_SCALE };
+    
+    this.updateCanvasSize();
+    this.updateRuler();
+    this.updateLabel(x, y);
+  }
+  
+  onMove(x, y) {
+    if (!this.isActive) return;
+    
+    this.currentPoint = { x: x * this.HD_SCALE, y: y * this.HD_SCALE };
+    this.updateRuler();
+    this.updateLabel(x, y);
+  }
+  
+  onUp(x, y) {
+    if (!this.isActive) return;
+    
+    this.isActive = false;
+    this.startPoint = null;
+    this.currentPoint = null;
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.label.style.display = 'none';
+  }
+  
+  updateRuler() {
+    if (!this.startPoint || !this.currentPoint) return;
+    
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.save();
+    
+    const primaryColor = this.editor.primaryColor;
+    this.ctx.strokeStyle = primaryColor;
+    this.ctx.fillStyle = primaryColor;
+    
+    const zoom = this.editor.scale;
+    
+    // Base visual sizes at zoom=1
+    const BASE_VISUAL_THICKNESS = 2;
+    const BASE_VISUAL_ARROW = 12;
+    const BASE_VISUAL_TIP = 6;
+    
+    // Apply zoom compensation
+    let visualThickness = BASE_VISUAL_THICKNESS / zoom;
+    let visualArrowSize = BASE_VISUAL_ARROW / zoom;
+    let visualTipSize = BASE_VISUAL_TIP / zoom;
+    
+    // Apply minimum limits (never get too small)
+    const MIN_VISUAL_THICKNESS = 1;
+    const MIN_VISUAL_ARROW = 4;
+    const MIN_VISUAL_TIP = 2;
+    
+    visualThickness = Math.max(MIN_VISUAL_THICKNESS, visualThickness);
+    visualArrowSize = Math.max(MIN_VISUAL_ARROW, visualArrowSize);
+    visualTipSize = Math.max(MIN_VISUAL_TIP, visualTipSize);
+    
+    // Convert to HD canvas pixels
+    const lineThickness = visualThickness * this.HD_SCALE;
+    const arrowSize = visualArrowSize * this.HD_SCALE;
+    const arrowTipSize = visualTipSize * this.HD_SCALE;
+    
+    this.ctx.lineWidth = Math.max(1, lineThickness);
+    
+    const dx = this.currentPoint.x - this.startPoint.x;
+    const dy = this.currentPoint.y - this.startPoint.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    
+    const startX = this.startPoint.x;
+    const startY = this.startPoint.y;
+    const currentX = this.currentPoint.x;
+    const currentY = this.currentPoint.y;
+    
+    // Horizontal line
+    if (absDx > 0) {
+      const isRight = dx > 0;
+      
+      let lineEndX = currentX;
+      if (isRight) {
+        lineEndX = currentX - arrowSize;
+      } else {
+        lineEndX = currentX + arrowSize;
+      }
+      
+      const lineX = Math.min(startX, lineEndX);
+      const lineWidth = Math.abs(lineEndX - startX);
+      
+      if (lineWidth > 0) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(lineX, startY);
+        this.ctx.lineTo(lineX + lineWidth, startY);
+        this.ctx.stroke();
+      }
+      
+      const arrowX = currentX;
+      
+      this.ctx.beginPath();
+      if (isRight) {
+        this.ctx.moveTo(arrowX, startY);
+        this.ctx.lineTo(arrowX - arrowSize, startY - arrowTipSize);
+        this.ctx.lineTo(arrowX - arrowSize, startY + arrowTipSize);
+      } else {
+        this.ctx.moveTo(arrowX, startY);
+        this.ctx.lineTo(arrowX + arrowSize, startY - arrowTipSize);
+        this.ctx.lineTo(arrowX + arrowSize, startY + arrowTipSize);
+      }
+      this.ctx.fill();
+    }
+    
+    // Vertical line
+    if (absDy > 0) {
+      const isDown = dy > 0;
+      
+      let lineEndY = currentY;
+      if (isDown) {
+        lineEndY = currentY - arrowSize;
+      } else {
+        lineEndY = currentY + arrowSize;
+      }
+      
+      const lineY = Math.min(startY, lineEndY);
+      const lineHeight = Math.abs(lineEndY - startY);
+      
+      if (lineHeight > 0) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, lineY);
+        this.ctx.lineTo(startX, lineY + lineHeight);
+        this.ctx.stroke();
+      }
+      
+      const arrowY = currentY;
+      
+      this.ctx.beginPath();
+      if (isDown) {
+        this.ctx.moveTo(startX, arrowY);
+        this.ctx.lineTo(startX - arrowTipSize, arrowY - arrowSize);
+        this.ctx.lineTo(startX + arrowTipSize, arrowY - arrowSize);
+      } else {
+        this.ctx.moveTo(startX, arrowY);
+        this.ctx.lineTo(startX - arrowTipSize, arrowY + arrowSize);
+        this.ctx.lineTo(startX + arrowTipSize, arrowY + arrowSize);
+      }
+      this.ctx.fill();
+    }
+    
+    this.ctx.restore();
+  }
+  
+  updateLabel(x, y) {
+    if (!this.startPoint) {
+      this.label.style.display = 'none';
+      return;
+    }
+    
+    const startX = this.startPoint.x / this.HD_SCALE;
+    const startY = this.startPoint.y / this.HD_SCALE;
+    const dx = Math.abs(x - startX);
+    const dy = Math.abs(y - startY);
+    
+    const screenPos = this.editor.canvasToScreen(x, y);
+    if (!screenPos) return;
+    
+    const labelWidth = 80;
+    const labelHeight = 28;
+    const offset = 10;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const topBarHeight = 40;
+    const bottomBarHeight = 50;
+    
+    const screenX = Math.round(screenPos.x);
+    const screenY = Math.round(screenPos.y);
+    
+    const positions = [
+      { x: screenX - labelWidth - offset, y: screenY - labelHeight - offset },
+      { x: screenX + offset, y: screenY - labelHeight - offset },
+      { x: screenX - labelWidth - offset, y: screenY + offset },
+      { x: screenX + offset, y: screenY + offset }
+    ];
+    
+    let labelX, labelY;
+    for (const pos of positions) {
+      const fitsHorizontally = pos.x >= offset && pos.x + labelWidth <= viewportWidth - offset;
+      const fitsVertically = pos.y >= topBarHeight && pos.y + labelHeight <= viewportHeight - bottomBarHeight;
+      if (fitsHorizontally && fitsVertically) {
+        labelX = pos.x;
+        labelY = pos.y;
+        break;
+      }
+    }
+    
+    if (labelX === undefined) {
+      labelX = offset;
+      labelY = topBarHeight + offset;
+    }
+    
+    this.label.style.left = `${labelX}px`;
+    this.label.style.top = `${labelY}px`;
+    this.label.textContent = `${Math.round(dx)} × ${Math.round(dy)} px`;
+    this.label.style.display = 'block';
+  }
+  
+  updateCanvasTransform() {
+    // Canvas inherits transform from canvasWrapper automatically
+  }
+  
+  cancel() {
+    this.isActive = false;
+    this.startPoint = null;
+    this.currentPoint = null;
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.label.style.display = 'none';
   }
 }
 
@@ -8940,6 +9498,7 @@ class PixelArtEditor {
       this.referenceManager = new ReferenceManager(this);
       this.selectionManager = new SelectionManager(this);
       this.paletteManager = new PaletteManager(this);
+      this.rulerTool = new RulerTool(this);
       this.colorPicker = new ColorPicker(this);
       this.lockScreen = new LockScreen(this);
 
@@ -9528,6 +10087,13 @@ class PixelArtEditor {
       this.togglePanel("layers");
     } else if (this.gridManager.panelVisible) {
       this.gridManager.hide();
+    } else if (this.selectionManager.clipboardPanel.classList.contains('visible')) {
+      this.selectionManager.clipboardPanel.hideClipboard();
+    } else if (this.selectionManager.hasSelection) {
+      this.selectionManager.clear();
+    } else if (this.selectionManager.isTransforming) {
+      this.selectionManager.cancelTransform();
+      this.exitImmersive();
     } else if (this.settingsUI.visible) {
       this.settingsUI.hide();
     } else {
@@ -9573,34 +10139,17 @@ class PixelArtEditor {
   showCollabConnectDialog() {
     const content = document.createElement('div');
     content.className = 'collab-connect-dialog';
-    content.style.cssText = `
-      min-width: 300px;
-    `;
     
     // Tabs
     const tabs = document.createElement('div');
-    tabs.style.cssText = `
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-      border-bottom: 1px solid var(--border-color);
-    `;
+    tabs.className = 'collab-connect-tabs'
     
     const createTab = document.createElement('div');
-    createTab.style.cssText = `
-      padding: 8px 16px;
-      cursor: pointer;
-      border-bottom: 2px solid var(--primary-color);
-      color: var(--primary-color);
-    `;
+    createTab.className = 'collab-connect-tab selected';
     createTab.textContent = __('Crear Sala||Create Room');
     
     const joinTab = document.createElement('div');
-    joinTab.style.cssText = `
-      padding: 8px 16px;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-    `;
+    joinTab.className = 'collab-connect-tab';
     joinTab.textContent = __('Unirse||Join');
     
     tabs.appendChild(createTab);
@@ -9609,21 +10158,20 @@ class PixelArtEditor {
     
     // Create form
     const createForm = document.createElement('div');
+    createForm.className = 'collab-connect-form';
     createForm.style.display = 'block';
     createForm.innerHTML = `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Nombre de sala||Room name')}</label>
-        <input type="text" id="collab-room-name" value="${localStorage.getItem('collab_default_room') || 'Mi Sala'}" 
-               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      <div class="collab-connect-form-section">
+        <label>${__('Nombre de sala||Room name')}</label>
+        <input type="text" id="collab-room-name" value="${localStorage.getItem('collab_default_room') || 'Mi Sala'}">
       </div>
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Contraseña||Password')}</label>
-        <input type="password" id="collab-room-password" value="${localStorage.getItem('collab_default_password') || ''}" 
-               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      <div class="collab-connect-form-section">
+        <label>${__('Contraseña||Password')}</label>
+        <input type="password" id="collab-room-password" value="${localStorage.getItem('collab_default_password') || ''}">
       </div>
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Permisos||Permissions')}</label>
-        <select id="collab-permissions" style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      <div class="collab-connect-form-section">
+        <label>${__('Permisos||Permissions')}</label>
+        <select id="collab-permissions">
           <option value="strict">${__('Estricto||Strict')}</option>
           <option value="balanced" selected>${__('Equilibrado||Balanced')}</option>
           <option value="open">${__('Abierto||Open')}</option>
@@ -9634,36 +10182,31 @@ class PixelArtEditor {
     
     // Join form
     const joinForm = document.createElement('div');
+    joinForm.className = 'collab-connect-form';
     joinForm.style.display = 'none';
     joinForm.innerHTML = `
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('ID de sala||Room ID')}</label>
-        <input type="text" id="collab-join-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
-               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      <div class="collab-connect-form-section">
+        <label>${__('ID de sala||Room ID')}</label>
+        <input type="text" id="collab-join-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
       </div>
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12px;">${__('Contraseña||Password')}</label>
-        <input type="password" id="collab-join-password" 
-               style="width: 100%; padding: 10px; background-color: var(--bg-color); border: 2px solid var(--border-color); border-radius: 4px; color: var(--text-color);">
+      <div class="collab-connect-form-section">
+        <label>${__('Contraseña||Password')}</label>
+        <input type="password" id="collab-join-password">
       </div>
     `;
     content.appendChild(joinForm);
     
     // Tab switching
     createTab.addEventListener('click', () => {
-      createTab.style.borderBottomColor = 'var(--primary-color)';
-      createTab.style.color = 'var(--primary-color)';
-      joinTab.style.borderBottomColor = 'transparent';
-      joinTab.style.color = 'var(--text-color)';
+      createTab.classList.add('selected');
+      joinTab.classList.remove('selected');
       createForm.style.display = 'block';
       joinForm.style.display = 'none';
     });
     
     joinTab.addEventListener('click', () => {
-      joinTab.style.borderBottomColor = 'var(--primary-color)';
-      joinTab.style.color = 'var(--primary-color)';
-      createTab.style.borderBottomColor = 'transparent';
-      createTab.style.color = 'var(--text-color)';
+      createTab.classList.remove('selected');
+      joinTab.classList.add('selected');
       joinForm.style.display = 'block';
       createForm.style.display = 'none';
     });
@@ -9834,7 +10377,7 @@ class PixelArtEditor {
     this.toolSelectionContainer.className = "tool-selection-container";
     this.bottomBar.appendChild(this.toolSelectionContainer);
 
-    // Tool button with dropdown
+    // Tool button withdropdown
     this.toolButtonContainer = document.createElement("div");
     this.toolButtonContainer.className = "tool-button-container";
     this.toolSelectionContainer.appendChild(this.toolButtonContainer);
@@ -10159,6 +10702,7 @@ class PixelArtEditor {
     this.tempCanvas.width = width || this.project.width;
     this.tempCanvas.height = height || this.project.height;
     this.tempCtx = this.tempCtx || this.getCanvasContext(this.tempCanvas);
+    this.tempCtx.imageSmoothingEnabled = false;
     this.tempCtx.clearRect(0, 0, this.tempCanvas.width, this.tempCanvas.height);
     return { canvas: this.tempCanvas, ctx: this.tempCtx };
   }
@@ -10195,25 +10739,27 @@ class PixelArtEditor {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
         this.historyManager.startBatch("draw", __('Dibujar||Draw'));
-        this.drawPixel(x, y);
+        return this.drawPixel(x, y);
       },
       onMove: (x, y) => {
+        let pixels = [];
         if (this.isDrawing) {
           if (this._previousPencilPosition && this.distance(x, y, this._previousPencilPosition.x, this._previousPencilPosition.y) >= 2) {
             this.startLine(this._previousPencilPosition.x, this._previousPencilPosition.y);
-            this.finishLine(x, y);
+            pixels = this.finishLine(x, y);
           } else {
-            this.drawPixel(x, y);
+            pixels = this.drawPixel(x, y);
           }
           this._previousPencilPosition = { x, y };
         }
+        return pixels;
       },
       onUp: (x, y) => {
         if (this.isDrawing) {
           this.isDrawing = false;
           this.historyManager.endBatch();
         }
-        this._previousPencilPositi = null;
+        this._previousPencilPosition = null;
       }
     });
     
@@ -10228,18 +10774,20 @@ class PixelArtEditor {
         this.isDrawing = true;
         this._previousPencilPosition = { x, y };
         this.historyManager.startBatch("draw", __('Borrar||Erase'));
-        this.drawPixel(x, y, { color: "transparent" });
+        return this.drawPixel(x, y, { color: "transparent" });
       },
       onMove: (x, y) => {
+        let pixels = [];
         if (this.isDrawing) {
           if (this._previousPencilPosition && this.distance(x, y, this._previousPencilPosition.x, this._previousPencilPosition.y) >= 2) {
             this.startLine(this._previousPencilPosition.x, this._previousPencilPosition.y, "transparent");
-            this.finishLine(x, y);
+            pixels = this.finishLine(x, y);
           } else {
-            this.drawPixel(x, y, { color: "transparent" });
+            pixels = this.drawPixel(x, y, { color: "transparent" });
           }
           this._previousPencilPosition = { x, y };
         }
+        return pixels;
       },
       onUp: (x, y) => {
         if (this.isDrawing) {
@@ -10268,8 +10816,9 @@ class PixelArtEditor {
       },
       onUp: (x, y) => {
         if (this.tempLine) {
-          this.finishLine(x, y);
+          const pixels = this.finishLine(x, y);
           this.saveToHistory();
+          return pixels;
         }
       }
     });
@@ -10296,8 +10845,9 @@ class PixelArtEditor {
       },
       onUp: (x, y) => {
         if (this.tempRect) {
-          this.finishRect(x, y);
+          const pixels = this.finishRect(x, y);
           this.saveToHistory();
+          return pixels;
         }
       }
     });
@@ -10324,8 +10874,9 @@ class PixelArtEditor {
       },
       onUp: (x, y) => {
         if (this.tempEllipse) {
-          this.finishEllipse(x, y);
+          const pixels = this.finishEllipse(x, y);
           this.saveToHistory();
+          return pixels;
         }
       }
     });
@@ -10339,8 +10890,9 @@ class PixelArtEditor {
       shortcut: "b",
       onDown: (x, y) => {
         this.historyManager.startBatch("draw", __('Rellenar||Bucket fill'));
-        this.fillArea(x, y);
+        const pixels = this.fillArea(x, y);
         this.saveToHistory();
+        return pixels;
       }
     });
     
@@ -10351,9 +10903,22 @@ class PixelArtEditor {
       icon: "tool-pipette",
       cursor: "crosshair",
       shortcut: "a",
+      dontBroadcast: true,
       onDown: (x, y) => {
         this.pickColor(x, y);
       }
+    });
+    
+    // Ruler Tool
+    this.addTool({
+      name: "Ruler",
+      displayName: __("Regla||Ruler"),
+      icon: "tool-ruler",
+      cursor: "crosshair",
+      shortcut: "r",
+      onDown: (x, y) => this.rulerTool.onDown(x, y),
+      onMove: (x, y) => this.rulerTool.onMove(x, y),
+      onUp: (x, y, startX, startY) => this.rulerTool.onUp(x, y, startX, startY)
     });
     
     // Selection Tool
@@ -10363,6 +10928,7 @@ class PixelArtEditor {
       icon: "tool-selection",
       cursor: "crosshair",
       shortcut: "s",
+      dontBroadcast: true,
       onDown: (x, y) => this.selectionManager.onDown(x, y),
       onMove: (x, y) => this.selectionManager.onMove(x, y),
       onUp: (x, y, startX, startY) => this.selectionManager.onUp(x, y, startX, startY)
@@ -10492,16 +11058,22 @@ class PixelArtEditor {
     collabItem.className = 'menu-item';
     collabItem.innerHTML = `
       <span>${__('Modo Colaborativo||Collab Mode')}</span>
-      <span class="collab-status" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 8px;"></span>
+      <span class="collab-status"></span>
     `;
     collabItem.addEventListener('click', () => this.showCollabDialog());
     section.appendChild(collabItem);
 
     const exportCurrentFrameItem = document.createElement("div");
     exportCurrentFrameItem.className = "menu-item";
-    exportCurrentFrameItem.textContent = __("Exportar Frame Actual...||Export Current Frame");
+    exportCurrentFrameItem.textContent = __("Exportar Frame Actual||Export Current Frame");
     exportCurrentFrameItem.addEventListener("click", () => this.exportCurrentFrame());
     section.appendChild(exportCurrentFrameItem);
+    
+    const exportSelectionItem = document.createElement("div");
+    exportSelectionItem.className = "menu-item";
+    exportSelectionItem.textContent = __("Exportar Selección||Export Selection");
+    exportSelectionItem.addEventListener("click", () => this.exportSelection());
+    section.appendChild(exportSelectionItem);
 
     const exportAnimationItem = document.createElement("div");
     exportAnimationItem.className = "menu-item";
@@ -10512,7 +11084,7 @@ class PixelArtEditor {
     const exportMenu = this.menuContent.querySelector(".menu-content-file");
     const timelapseItem = document.createElement("div");
     timelapseItem.className = "menu-item";
-    timelapseItem.textContent = __("Exportar Timelapse...||Export Timelapse...");
+    timelapseItem.textContent = __("Exportar Timelapse||Export Timelapse");
     timelapseItem.addEventListener("click", () => this.exportTimelapse());
     section.appendChild(timelapseItem);
 
@@ -10535,10 +11107,16 @@ class PixelArtEditor {
     h3.textContent = __("Transformar||Transform");
     transformSection.appendChild(h3);
 
+    const cropCanvasItem = document.createElement("div");
+    cropCanvasItem.className = "menu-item";
+    cropCanvasItem.textContent = __("Recortar Canvas||Crop Canvas");
+    cropCanvasItem.addEventListener("click", () => this.startResizeCanvas('crop'));
+    transformSection.appendChild(cropCanvasItem);
+    
     const resizeCanvasItem = document.createElement("div");
     resizeCanvasItem.className = "menu-item";
     resizeCanvasItem.textContent = __("Redimensionar Canvas||Resize Canvas");
-    resizeCanvasItem.addEventListener("click", () => this.startResizeCanvas());
+    resizeCanvasItem.addEventListener("click", () => this.startResizeCanvas('resize'));
     transformSection.appendChild(resizeCanvasItem);
     
     const flipHItem = document.createElement("div");
@@ -10737,6 +11315,7 @@ class PixelArtEditor {
       this.layersButton.classList.remove("active");
       this.adjustTimelinePosition();
       this.gridManager.hide();
+      this.selectionManager.clipboardPanel.classList.remove('visible');
       this.menuPanelOverlay.classList.remove("visible");
     } else if (panel === "layers") {
       this.layersPanel.classList.toggle("visible");
@@ -10744,6 +11323,7 @@ class PixelArtEditor {
       this.animationPanel.classList.remove("visible");
       this.animationButton.classList.remove("active");
       this.menuPanelOverlay.classList.remove("visible");
+      this.selectionManager.clipboardPanel.classList.remove('visible');
       this.gridManager.hide();
     }
   }
@@ -10770,7 +11350,7 @@ class PixelArtEditor {
   handleMouseDown(e) {
     if (this.shouldBlockInput()) return; // Hide menus if visible
 
-    const pos = this.getCanvasPosition(e.clientX, e.clientY);
+    const pos = this.getCanvasPosition(e.clientX, e.clientY, this.ensureBoundsDrawing);
     if (!pos) return;
 
     switch(e.button) {
@@ -10798,7 +11378,7 @@ class PixelArtEditor {
   }
 
   handleMouseMove(e) {
-    const pos = this.getCanvasPosition(e.clientX, e.clientY);
+    const pos = this.getCanvasPosition(e.clientX, e.clientY, this.ensureBoundsDrawing);
     if (!pos) return;
     
     if (this.isDrawing && this.currentTool && this.currentTool.onMove) {
@@ -10819,7 +11399,7 @@ class PixelArtEditor {
     
     if (!this.isDrawing) return;
 
-    const pos = this.getCanvasPosition(e.clientX, e.clientY);
+    const pos = this.getCanvasPosition(e.clientX, e.clientY, this.ensureBoundsDrawing);
     if (pos && this.currentTool && this.currentTool.onUp) {
       this.currentTool.onUp(pos.x, pos.y, this.startX, this.startY);
     }
@@ -11215,6 +11795,22 @@ class PixelArtEditor {
     return { x: canvasX, y: canvasY };
   }
   
+  canvasToScreen(canvasX, canvasY) {
+    if (!this.project) return null;
+    
+    const rect = this.canvasContainer.getBoundingClientRect();
+    
+    // Calculate screen position
+    const screenX = rect.left + rect.width / 2 + 
+                    (canvasX - this.project.width / 2) * this.scale + 
+                    this.posX;
+    const screenY = rect.top + rect.height / 2 + 
+                    (canvasY - this.project.height / 2) * this.scale + 
+                    this.posY;
+    
+    return { x: screenX, y: screenY };
+  }
+  
   checkBounds(x, y) {
     return x >= 0 && x < this.project.width && y >= 0 && y < this.project.height;
   }
@@ -11340,6 +11936,11 @@ class PixelArtEditor {
   
   // Project management
   newProject(width = this.defaultWidth, height = this.defaultHeight, imageData = null) {
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast(__('Desconectate de la sesión colaborativa primero||Disconnect from collaborative session first'));
+      return;
+    }
+
     this.project = this.getNewProjectData(width, height, imageData);
 
     this.transparentBackground = true;
@@ -11352,7 +11953,12 @@ class PixelArtEditor {
       this.colorPicker.removeAllFloatingPaletteColors();
     }
 
+    if (this.collabManager.isConnected && this.collabManager.isHost) {
+      this.collabManager.sendFullState(null, imageData ? 'load_project' : 'new_project');
+    }
+
     this.animationPanel.classList.remove("visible");
+    this.menuPanelOverlay.classList.remove("visible");
     this.layersPanel.classList.remove("visible");
 
     this.resetCanvasSize();
@@ -11400,10 +12006,16 @@ class PixelArtEditor {
     this.canvas.height = this.project.height;
   }
   
-  startResizeCanvas() {
+  startResizeCanvas(mode = 'crop') {
     if (!this.project) return;
     
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast(__('Solo el anfitrión puede redimensionar el canvas||Only host can resize canvas'));
+      return;
+    }
+    
     this.isCanvasResizing = true;
+    this.canvasResizeMode = mode;
     
     // Initialize resize state
     this.canvasResizeState = {
@@ -11633,24 +12245,53 @@ class PixelArtEditor {
       framesData.push(frameData);
     });
     
-    // Perform resize
-    this.resizeCanvas(cropX, cropY, cropWidth, cropHeight);
-    
-    // Record operation with full layer data
-    const operation = {
-      type: 'resize_canvas',
-      description: __('Redimensionar Canvas||Resize Canvas'),
-      oldWidth: oldWidth,
-      oldHeight: oldHeight,
-      newWidth: cropWidth,
-      newHeight: cropHeight,
-      cropX: cropX,
-      cropY: cropY,
-      framesData: framesData // Store all layer data for undo
-    };
-    
-    this.historyManager.addChange(operation);
-    this.historyManager.endBatch();
+    if (this.canvasResizeMode === "crop") {
+      // Perform resize
+      this.cropCanvas(cropX, cropY, cropWidth, cropHeight);
+      
+      // Record operation with full layer data
+      const operation = {
+        type: 'crop_canvas',
+        description: __('Recortar Canvas||Crop Canvas'),
+        oldWidth: oldWidth,
+        oldHeight: oldHeight,
+        newWidth: cropWidth,
+        newHeight: cropHeight,
+        cropX: cropX,
+        cropY: cropY,
+        framesData: framesData // Store all layer data for undo
+      };
+      
+      this.historyManager.addChange(operation);
+      this.historyManager.endBatch();
+      
+      // Send crop event if needed
+      if (this.collabManager.isConnected && this.collabManager.isHost) {
+        this.collabManager.sendCropMessage(cropX, cropY, cropWidth, cropHeight);
+      }
+    } else if (this.canvasResizeMode === "resize") {
+      // Perform resize
+      this.resizeCanvas(cropWidth, cropHeight);
+      
+      // Record operation with full layer data
+      const operation = {
+        type: 'resize_canvas',
+        description: __('Redimensionar Canvas||Resize Canvas'),
+        oldWidth: oldWidth,
+        oldHeight: oldHeight,
+        newWidth: cropWidth,
+        newHeight: cropHeight,
+        framesData: framesData // Store all layer data for undo
+      };
+      
+      this.historyManager.addChange(operation);
+      this.historyManager.endBatch();
+      
+      // Send resize event if needed
+      if (this.collabManager.isConnected && this.collabManager.isHost) {
+        this.collabManager.sendResizeMessage(cropWidth, cropHeight);
+      }
+    }
     
     this.stopResizeCanvas();
   }  
@@ -11670,7 +12311,7 @@ class PixelArtEditor {
     this.exitImmersive();
   }
   
-  resizeCanvas(x = 0, y = 0, width = 32, height = 32, silent) {
+  cropCanvas(x = 0, y = 0, width = 32, height = 32, silent) {
     if (!this.project) return;
     
     width = Math.max(1, Math.floor(width));
@@ -11690,6 +12331,40 @@ class PixelArtEditor {
         const tempCtx = tempCanvas.getContext('2d');
         
         tempCtx.drawImage(layer.canvas, -x, -y);
+        
+        layer.canvas.width = width;
+        layer.canvas.height = height;
+        layer.ctx.clearRect(0, 0, width, height);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+      });
+    });
+    
+    this.updateCanvasTransform();
+    this.render();
+    
+    if (!silent) {
+      this.showOperationMessage(__('Canvas recortado||Canvas cropped'));
+    }
+  }
+  
+  resizeCanvas(width = 32, height = 32, silent) {
+    if (!this.project) return;
+    
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
+    
+    this.project.width = width;
+    this.project.height = height;
+    this.resetCanvasSize();
+    
+    this.project.frames.forEach(frame => {
+      frame.layers.forEach(layer => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.drawImage(layer.canvas, 0, 0, width, height);
         
         layer.canvas.width = width;
         layer.canvas.height = height;
@@ -11806,12 +12481,12 @@ class PixelArtEditor {
     this.updateAnimationPreview();
   }
   
-  renderQuick(drawReference) {
+  renderQuick(drawReference, excludeParams) {
     if (!this.project) return;
-
+  
     const frame = this.project.frames[this.project.currentFrame];
     if (!frame) return;
-
+  
     // Draw background if not transparent
     if (!this.transparentBackground) {
       this.ctx.fillStyle = this.secondaryColor;
@@ -11832,16 +12507,38 @@ class PixelArtEditor {
         this.ctx.drawImage(layer.canvas, 0, 0);
       }
     }
-
+    
+    // Apply exclusion mask if provided
+    if (excludeParams && excludeParams.pixels && excludeParams.pixels.length > 0) {
+      const { layerIndex, pixels } = excludeParams;
+      
+      // Only apply exclusion to the specified layer
+      if (layerIndex !== undefined && frame.layers[layerIndex]) {
+        const targetLayer = frame.layers[layerIndex];
+        const ctx = targetLayer.ctx;
+        
+        // Clear each excluded pixel from the layer
+        for (const pixel of pixels) {
+          const { x, y } = pixel;
+          if (x >= 0 && x < this.project.width && y >= 0 && y < this.project.height) {
+            ctx.clearRect(x, y, 1, 1);
+          }
+        }
+        
+        // Redraw the layer after clearing excluded pixels
+        this.ctx.drawImage(targetLayer.canvas, 0, 0);
+      }
+    }
+  
     // Draw trace reference (top layer)
     if (this.referenceManager && drawReference) {
       this.referenceManager.renderTop(this.ctx, this.project.width, this.project.height);
     }
     
-    //  UI
+    // UI
     this.updateAnimationPreview();
     this.updateFramesUIQuick();
-  }
+  }  
   
   getProjectSnapshot() {
     if (!this.project) return null;
@@ -11972,6 +12669,8 @@ class PixelArtEditor {
     });
     this.recordDrawOperation(pixels);
     this.render();
+    
+    return pixels;
   }
   
   startLine(x, y, color) {
@@ -12021,6 +12720,8 @@ class PixelArtEditor {
     this.tempCtx = null;
 
     this.render();
+    
+    return pixels;
   }
   
   startRect(x, y) {
@@ -12104,6 +12805,8 @@ class PixelArtEditor {
     this.tempCtx = null;
 
     this.render();
+    
+    return pixels;
   }
 
   startEllipse(x, y) {
@@ -12211,6 +12914,8 @@ class PixelArtEditor {
     this.tempCtx = null;
 
     this.render();
+    
+    return pixels;
   }
 
   pickColor(x, y, includeReferenceImage = true, silent = false) {
@@ -12280,6 +12985,8 @@ class PixelArtEditor {
     }
     
     this.render();
+    
+    return pixels;
   }
 
   // Drawing algorithms
@@ -12300,6 +13007,7 @@ class PixelArtEditor {
       pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color);
       pixels = pixels.filter(p => p.newColor != p.oldColor);
     } else {
+      
       // Save old pixel color
       const oldColor = this.getPixelColorFromCtx(ctx, x, y);
       
@@ -12322,6 +13030,20 @@ class PixelArtEditor {
         ];
       }
     }
+    
+    return pixels;
+  }
+  
+  drawPixels(ctx, pixels = []) {
+    pixels.forEach(pixel => {
+      const { x, y, newColor } = pixel;
+      if (newColor === "transparent") {
+        ctx.clearRect(x, y, 1, 1);
+      } else {
+        ctx.fillStyle = newColor;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    });
     
     return pixels;
   }
@@ -12754,12 +13476,12 @@ class PixelArtEditor {
   }  
   
   floodFill(ctx, x, y, targetColor, fillRgb) {
-    const width = this.project.width;
+    const width = this.project.width + 1;
     const height = this.project.height;
     
     const fillColor = this.colorPicker.rgbToHex(fillRgb.r, fillRgb.g, fillRgb.b);
     
-    if (x < 0 || x >= width || y < 0 || y >= height) return [];
+    if (x < 0 || x > width || y < 0 || y > height) return [];
     
     const targetR = targetColor[0];
     const targetG = targetColor[1];
@@ -12801,14 +13523,8 @@ class PixelArtEditor {
         const idx = (yPos * width + (xPos - 1)) * 4;
         if (data[idx] === targetR && data[idx + 1] === targetG && 
             data[idx + 2] === targetB && data[idx + 3] === targetA) {
-          // Verificar selección antes de incluir
-          if (!this.selectionManager.hasSelection || 
-              this.selectionManager.shouldDrawOnSelection(xPos - 1, yPos)) {
-            xPos--;
-            left = xPos;
-          } else {
-            break;
-          }
+          xPos--;
+          left = xPos;
         } else {
           break;
         }
@@ -12816,25 +13532,19 @@ class PixelArtEditor {
       
       // Scan right
       xPos = segment.x;
-      while (xPos < width - 1) {
+      while (xPos < width) {
         const idx = (yPos * width + (xPos + 1)) * 4;
         if (data[idx] === targetR && data[idx + 1] === targetG && 
             data[idx + 2] === targetB && data[idx + 3] === targetA) {
-          // Verificar selección antes de incluir
-          if (!this.selectionManager.hasSelection || 
-              this.selectionManager.shouldDrawOnSelection(xPos + 1, yPos)) {
-            xPos++;
-            right = xPos;
-          } else {
-            break;
-          }
+          xPos++;
+          right = xPos;
         } else {
           break;
         }
       }
       
-      // Fill the segment (solo píxeles dentro de selección)
-      for (let i = left; i <= right; i++) {
+      // Fill the segment
+      for (let i = left; i < right; i++) {
         // Verificar selección
         if (this.selectionManager.hasSelection && !this.selectionManager.shouldDrawOnSelection(i, yPos)) {
           continue;
@@ -12842,6 +13552,8 @@ class PixelArtEditor {
         
         const idx = (yPos * width + i) * 4;
         const oldColor = this.getPixelColorFromCtx(ctx, i, yPos);
+        
+        if (oldColor == fillColor) return;
         
         if (fillRgb) {
           data[idx] = fillRgb.r;
@@ -12866,7 +13578,37 @@ class PixelArtEditor {
         }
       }
       
-      // ... resto del código (escaneo arriba/abajo)
+      // Scan above and below for new segments
+      for (let dy = -1; dy <= 1; dy += 2) {
+        const newY = yPos + dy;
+        if (newY < 0 || newY >= height) continue;
+        
+        let inSegment = false;
+        let startX = left;
+        
+        for (let i = left; i <= right; i++) {
+          const idx = (newY * width + i) * 4;
+          const matches = data[idx] === targetR && data[idx + 1] === targetG && 
+                         data[idx + 2] === targetB && data[idx + 3] === targetA;
+          
+          if (matches && !inSegment && !visited[newY * width + i]) {
+            inSegment = true;
+            startX = i;
+          }
+          
+          if ((!matches || i === right) && inSegment) {
+            const endX = (!matches && i > startX) ? i - 1 : i;
+            if (startX <= endX) {
+              stack.push({ x: startX, y: newY, left: startX, right: endX, dir: dy });
+              // Mark as visited to prevent reprocessing
+              for (let j = startX; j <= endX; j++) {
+                visited[newY * width + j] = 1;
+              }
+            }
+            inSegment = false;
+          }
+        }
+      }
     }
     
     // Write back to canvas
@@ -13556,20 +14298,18 @@ class PixelArtEditor {
       const frame = this.project.frames[f];
       
       for (let l = 0; l < frame.layers.length; l++) {
-        const layer = frame.layers[l];
+        const layer = frame.layers[0];
         const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
         const data = imageData.data;
         
-        for (let i = 0; i < data.length; i += 4) {
-          // Si el píxel es transparente (alpha = 0)
-          if (data[i + 3] === 0) {
-            // Rellenar con el color secundario y hacerlo opaco
-            data[i] = secondaryRgb.r;
-            data[i + 1] = secondaryRgb.g;
-            data[i + 2] = secondaryRgb.b;
-            data[i + 3] = 255;
-            totalPixelsModified++;
-          }
+        // Si el píxel es transparente (alpha = 0)
+        if (data[i + 3] === 0) {
+          // Rellenar con el color secundario y hacerlo opaco
+          data[i] = secondaryRgb.r;
+          data[i + 1] = secondaryRgb.g;
+          data[i + 2] = secondaryRgb.b;
+          data[i + 3] = 255;
+          totalPixelsModified++;
         }
         
         layer.ctx.putImageData(imageData, 0, 0);
@@ -13808,6 +14548,14 @@ class PixelArtEditor {
   // Animation Frame Management
   addFrame(frameIndex = this.project.currentFrame, time) {
     if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'add_frame',
+        frameIndex, time
+      });
+      return;
+    }
   
     const newIndex = frameIndex + 1;
   
@@ -13857,7 +14605,15 @@ class PixelArtEditor {
   removeFrame(index = this.project.currentFrame, silent) {
     if (!this.project || this.project.frames.length <= 1) return;
     
-    this.historyManager.startBatch("remove_layer", __("(Quitar|Add) Frame"));
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'remove_frame',
+        frameIndex
+      });
+      return;
+    }
+    
+    this.historyManager.startBatch("remove_frame", __("(Quitar|Remove) Frame"));
   
     const removedFrame = this.project.frames[index];
     const removedFrameTime = this.project.frameTimes[index];
@@ -13889,7 +14645,15 @@ class PixelArtEditor {
   
   duplicateFrame(currentIndex = this.project.currentFrame) {
     if (!this.project) return;
-  
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'duplicate_frame',
+        frameIndex: currentIndex
+      });
+      return;
+    }
+    
     const currentFrame = this.project.frames[currentIndex];
     const newIndex = currentIndex + 1;
   
@@ -13953,6 +14717,14 @@ class PixelArtEditor {
   moveFrame(fromIndex, toIndex, silent) {
     if (fromIndex === toIndex) return;
   
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'move_frame',
+        fromIndex, toIndex
+      });
+      return;
+    }
+  
     this.historyManager.startBatch("move_frame", __("(Move|Mover) Frame"));
   
     const frame = this.project.frames.splice(fromIndex, 1)[0];
@@ -13980,6 +14752,14 @@ class PixelArtEditor {
   setFrameTime(frameIndex, time) {
     if (!this.project || frameIndex < 0 || frameIndex >= this.project.frameTimes.length) return;
   
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'set_frame_time',
+        frameIndex, time
+      });
+      return;
+    }
+  
     const oldTime = this.project.frameTimes[frameIndex];
     this.project.frameTimes[frameIndex] = time;
   
@@ -14002,7 +14782,7 @@ class PixelArtEditor {
     const frameCount = this.project.frames.length;
     
     // Initialize frame times if needed
-    if (this.project.frameTimes.length !== frameCount) {
+    if (!this.project.frameTimes || this.project.frameTimes.length !== frameCount) {
       this.project.frameTimes = new Array(frameCount).fill(this.project.currentFrameTime);
     }
   
@@ -14215,6 +14995,11 @@ class PixelArtEditor {
   // Layer Management
   addLayer() {
     if (!this.project) return;
+        
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede añadir nuevas capas||Only host can add new layers');
+      return;
+    }
   
     this.historyManager.startBatch("add_layer", __("Añadir Capa||Add Layer"));
   
@@ -14248,6 +15033,11 @@ class PixelArtEditor {
   
   removeLayer() {
     if (!this.project) return;
+  
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede quitar capas||Only host can remove layers');
+      return;
+    }
   
     const frame = this.project.frames[this.project.currentFrame];
     if (frame.layers.length <= 1) return;
@@ -14309,6 +15099,11 @@ class PixelArtEditor {
   moveLayer(frameIndex, fromIndex, toIndex) {
     if (fromIndex === toIndex) return;
   
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede mover las capas||Only host can move layers');
+      return;
+    }
+  
     this.historyManager.startBatch("move_layer", "Move Layer");
   
     const frame = this.project.frames[frameIndex];
@@ -14348,6 +15143,11 @@ class PixelArtEditor {
   
   duplicateLayer() {
     if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede añadir nuevas capas||Only host can add new layers');
+      return;
+    }
     
     const frame = this.project.frames[this.project.currentFrame];
     const sourceIndex = this.project.currentLayer;
@@ -14426,6 +15226,11 @@ class PixelArtEditor {
   mergeLayerUp(layerIndex = this.project.currentLayer) {
     if (!this.project) return;
     
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede mezclar capas||Only host can merge layers');
+      return;
+    }
+    
     const frame = this.project.frames[this.project.currentFrame];
     if (layerIndex >= frame.layers.length - 1) return; // Already top layer
   
@@ -14476,6 +15281,11 @@ class PixelArtEditor {
   
   mergeLayerDown(layerIndex = this.project.currentLayer) {
     if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede mezclar capas||Only host can merge layers');
+      return;
+    }
     
     const frame = this.project.frames[this.project.currentFrame];
     if (layerIndex <= 0) return; // Already bottom layer
@@ -15069,6 +15879,11 @@ class PixelArtEditor {
 
   // Main file operations
   openFile() {
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast(__('Desconectate de la sesión colaborativa primero||Disconnect from collaborative session first'));
+      return;
+    }
+    
     const fileBrowser = this.getFileBrowser({
       mode: "open",
       fileTypes: ["pxl", "psd", "png", "jpg", "jpeg", "pal"],
@@ -15087,7 +15902,7 @@ class PixelArtEditor {
           } else {
             this.importImage(fileData, fileInfo.name);
           }
-
+          
           this.showToast(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
           this.menuPanelOverlay.classList.remove("visible");
         } catch (error) {
@@ -15162,6 +15977,37 @@ class PixelArtEditor {
 
           await this.saveFile(fileInfo.name, "png", dataURL);
           this.showToast(__(`Frame (exportado como|exported as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error exportando el frame|Error exporting frame): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  exportSelection() {
+    if (!this.project) return;
+
+    const fileBrowser = this.getFileBrowser({
+      title: "Export frame",
+      mode: "saveAs",
+      fileTypes: ["png"],
+      defaultType: "png",
+      defaultName: `selection_${Date.now()}`,
+      onConfirm: async fileInfo => {
+        try {
+          const canvas = this.selectionManager.getSelectedAreaCanvas();
+          
+          if (canvas) {
+            const dataURL = canvas.toDataURL("image/png");
+
+            await this.saveFile(fileInfo.name, "png", dataURL);
+            this.showToast(__(`(Selección exportada como|Selection exported as) ${fileInfo.name}`));
+          } else {
+            this.showToast(__(`No hay nada seleccionado||Nothing selected`));
+          }
         } catch (error) {
           this.showToast(__(`(Error exportando el frame|Error exporting frame): ${error.message}`), 5000);
           console.error(error);
@@ -15601,11 +16447,6 @@ class PixelArtEditor {
     }
 
     // Load transparency state
-    if (parsed.transparentBackground !== undefined) {
-      this.transparentBackground = parsed.transparentBackground;
-    } else {
-      this.transparentBackground = this.hasTransparency();
-    }
     this.checkForTransparency();
     
     // Load history if available

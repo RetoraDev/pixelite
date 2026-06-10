@@ -121,6 +121,12 @@ function handleMessage(ws, message) {
     case 'chat_message':
       handleChatMessage(ws, message);
       break;
+    case 'canvas_crop':
+      handleCanvasCrop(ws, message);
+      break;
+    case 'canvas_resize':
+      handleCanvasResize(ws, message);
+      break;
     case 'full_state':
       handleFullState(ws, message);
       break;
@@ -297,8 +303,7 @@ function handleTraceComplete(ws, message) {
   }
 
   const member = session.getMember(ws.memberId);
-  const points = message.data?.points?.length || 0;
-  console.log(`Trace completed by ${member?.name || 'Unknown'} with ${points} points`);
+  console.log(`Trace completed by ${member?.name || 'Unknown'}, broadcasting`);
 
   // Broadcast the completed trace to all other members
   const recipients = broadcastToSession(ws.sessionId, {
@@ -322,6 +327,9 @@ function handleCursorUpdate(ws, message) {
     memberId: ws.memberId,
     x: message.x,
     y: message.y,
+    pixels: message.pixels || [],
+    frameIndex: message.currentFrame,
+    layerIndex: message.currentLayer,
     active: message.active
   }, [ws.memberId]);
 }
@@ -373,6 +381,56 @@ function handleChatMessage(ws, message) {
   });
 }
 
+function handleCanvasResize(ws, message) {
+  if (!ws.sessionId || !ws.memberId) return;
+
+  const session = sessions.get(ws.sessionId);
+  if (!session) return;
+
+  // Only host can send canvas resize events
+  if (!session.isHost(ws.memberId)) return;
+
+  console.log(`Canvas resize from  ${ws.memberId}`);
+
+  const toMemberId = message.toMemberId || null;
+
+  // Broadcast full state to all other members
+  const recipients = broadcastToSession(ws.sessionId, {
+    type: 'canvas_resize',
+    memberId: ws.memberId,
+    width: message.width,
+    height: message.height
+  }, toMemberId ? [ws.memberId, ...wss.clients.filter(client => client.memberId !== toMemberId)] : [ws.memberId]);
+  
+  console.log(`Canvas resize broadcast to ${recipients} clients`);
+}
+
+function handleCanvasCrop(ws, message) {
+  if (!ws.sessionId || !ws.memberId) return;
+
+  const session = sessions.get(ws.sessionId);
+  if (!session) return;
+
+  // Only host can send canvas crop events
+  if (!session.isHost(ws.memberId)) return;
+
+  console.log(`Canvas crop from  ${ws.memberId}`);
+
+  const toMemberId = message.toMemberId || null;
+
+  // Broadcast full state to all other members
+  const recipients = broadcastToSession(ws.sessionId, {
+    type: 'canvas_crop',
+    memberId: ws.memberId,
+    x: message.x,
+    y: message.y,
+    width: message.width,
+    height: message.height
+  }, toMemberId ? [ws.memberId, ...wss.clients.filter(client => client.memberId !== toMemberId)] : [ws.memberId]);
+  
+  console.log(`Canvas crop broadcast to ${recipients} clients`);
+}
+
 function handleFullState(ws, message) {
   if (!ws.sessionId || !ws.memberId) return;
 
@@ -393,6 +451,7 @@ function handleFullState(ws, message) {
   const recipients = broadcastToSession(ws.sessionId, {
     type: 'full_state',
     memberId: ws.memberId,
+    reason: message.reason || null,
     state: message.state
   }, toMemberId ? [ws.memberId, ...wss.clients.filter(client => client.memberId !== toMemberId)] : [ws.memberId]);
   

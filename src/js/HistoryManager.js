@@ -149,6 +149,9 @@ class HistoryManager {
         case 'color_adjustment':
           this.applyColorAdjustmentOperation(project, operation, isUndo);
           break;
+        case 'crop_canvas':
+          this.applyCropCanvasOperation(project, operation, isUndo);
+          break;
         case 'resize_canvas':
           this.applyResizeCanvasOperation(project, operation, isUndo);
           break;
@@ -476,7 +479,7 @@ class HistoryManager {
     ctx.putImageData(imageData, 0, 0);
   }
   
-  applyResizeCanvasOperation(project, operation, isUndo) {
+  applyCropCanvasOperation(project, operation, isUndo) {
     const { oldWidth, oldHeight, newWidth, newHeight, cropX, cropY, framesData } = operation;
     
     // Store current frame/layer indices
@@ -555,6 +558,79 @@ class HistoryManager {
           // Draw cropped area
           layer.ctx.clearRect(0, 0, newWidth, newHeight);
           layer.ctx.drawImage(tempCanvas, -cropX, -cropY);
+        }
+      });
+    });
+    
+    // Restore frame/layer indices
+    project.currentFrame = Math.min(currentFrame, project.frames.length - 1);
+    project.currentLayer = Math.min(currentLayer, 
+      project.frames[project.currentFrame].layers.length - 1);
+    
+    // Update transform and render
+    this.editor.updateCanvasTransform();
+    this.editor.render();
+  }
+
+  applyResizeCanvasOperation(project, operation, isUndo) {
+    const { oldWidth, oldHeight, newWidth, newHeight, framesData, newFramesData } = operation;
+    
+    // Store current frame/layer indices
+    const currentFrame = project.currentFrame;
+    const currentLayer = project.currentLayer;
+    
+    // Determine which dimensions to use
+    const targetWidth = isUndo ? oldWidth : newWidth;
+    const targetHeight = isUndo ? oldHeight : newHeight;
+    
+    // Resize project dimensions first
+    project.width = targetWidth;
+    project.height = targetHeight;
+    this.editor.resetCanvasSize();
+    
+    // Restore/transform each layer
+    project.frames.forEach((frame, fIndex) => {
+      // Make sure we have data for this frame
+      const frameData = framesData[fIndex];
+      if (!frameData) return;
+      
+      frame.layers.forEach((layer, lIndex) => {
+        const layerData = frameData.layers && frameData.layers[lIndex];
+        if (!layerData) return;
+        
+        // Ensure we have valid image data array
+        const expectedLength = 4 * oldWidth * oldHeight;
+        let imageDataArray = layerData.imageData;
+        
+        // If the array length doesn't match, create a blank array of correct size
+        if (!imageDataArray || imageDataArray.length !== expectedLength) {
+          imageDataArray = new Array(expectedLength).fill(0);
+        }
+        
+        if (isUndo) {
+          // Undo: restore original size and content
+          const imageData = new ImageData(
+            new Uint8ClampedArray(imageDataArray),
+            oldWidth,
+            oldHeight
+          );
+          
+          // Create temp canvas with original size
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = oldWidth;
+          tempCanvas.height = oldHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.putImageData(imageData, 0, 0);
+          
+          // Resize layer canvas to original size
+          layer.canvas.width = oldWidth;
+          layer.canvas.height = oldHeight;
+          
+          // Draw back to resized canvas
+          layer.ctx.clearRect(0, 0, oldWidth, oldHeight);
+          layer.ctx.drawImage(tempCanvas, 0, 0);
+        } else {
+          this.editor.resizeCanvas(newHeight, newWidth);
         }
       });
     });

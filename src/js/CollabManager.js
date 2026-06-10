@@ -13,6 +13,7 @@ class CollabManager {
     this.isConnected = false;
     this.manualDisconnect = false;
     this.chatVisible = false;
+    this.traceDataFormat = 'prerendered';
     
     // Members tracking
     this.members = new Map();
@@ -292,8 +293,9 @@ class CollabManager {
     const tools = this.editor.tools;
     
     Object.keys(tools).forEach(toolName => {
-      // Store original tool methods
       const tool = tools[toolName];
+      
+      // Store original tool methods
       const originalOnDown = tool.onDown;
       const originalOnMove = tool.onMove;
       const originalOnUp = tool.onUp;
@@ -302,55 +304,89 @@ class CollabManager {
       tool.originalOnMove = originalOnMove;
       tool.originalOnUp = originalOnUp;
       
+      if (tool.offlineOnly) {
+        tool.onDown = () => {};
+        tool.onMove = () => {};
+        tool.onUp = () => {};
+      }
+      
+      if (tool.dontBroadcast) return;
+      
       tool.onDown = function(x, y) {
         // Start new trace
         if (self.isConnected && self.canPerformAction('draw')) {
-          self.currentTrace = {
-            tool: toolName,
-            brushSize: self.editor.brushSize,
-            color: self.editor.getColor(),
-            points: [{ x, y }],
-            frame: self.editor.project.currentFrame,
-            layer: self.editor.project.currentLayer
-          };
-          self.tracePoints = [{ x, y }];
+          if (self.traceDataFormat == 'precise') {
+            self.currentTrace = {
+              type: 'precise',
+              tool: toolName,
+              brushSize: self.editor.brushSize,
+              color: self.editor.getColor(),
+              points: [{ x, y }],
+              frame: self.editor.project.currentFrame,
+              layer: self.editor.project.currentLayer
+            };
+            self.tracePoints = [{ x, y }];
+          } else if (self.traceDataFormat == 'prerendered') {
+            self.currentTrace = {
+              type: 'prerendered',
+              pixels: [],
+              frame: self.editor.project.currentFrame,
+              layer: self.editor.project.currentLayer
+            };
+            self.tracePoints = [];
+          }
         }
         
         if (originalOnDown) {
-          originalOnDown.call(self.editor, x, y);
+          const pixels = originalOnDown.call(self.editor, x, y);
+          
+          if (self.currentTrace.type == 'prerendered' && pixels && pixels.length) {
+            self.currentTrace.pixels = [...self.currentTrace.pixels, ...pixels];
+            self.sendCursorUpdate(x, y, true);
+          }
         }
       };
       
       tool.onMove = function(x, y) {
         // Add to current trace
-        if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
-          self.currentTrace.points.push({ x, y });
+        if (originalOnMove) {
+          const pixels = originalOnMove.call(self.editor, x, y);
           
-          // Send cursor update (throttled)
-          self.sendCursorUpdate(x, y, true);
+          if (self.currentTrace.type == 'prerendered' && pixels && pixels.length) {
+            self.currentTrace.pixels = [...self.currentTrace.pixels, ...pixels];
+          } else if (self.currentTrace.type == 'precise') {
+            self.currentTrace.points.push({ x, y });
+          }
         }
         
-        if (originalOnMove) {
-          originalOnMove.call(self.editor, x, y);
+        // Send cursor update (throttled)
+        if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
+          self.sendCursorUpdate(x, y, true);
         }
       };
       
       tool.onUp = function(x, y, startX, startY) {
         // Complete the trace and send it
+        if (originalOnUp) {
+          const pixels = originalOnUp.call(self.editor, x, y, startX, startY);
+          
+          if (self.currentTrace.type == 'prerendered' && pixels && pixels.length) {
+            self.currentTrace.pixels = [...self.currentTrace.pixels, ...pixels];
+          }
+        }
+        
         if (self.isConnected && self.canPerformAction('draw') && self.currentTrace) {
-          // Add final point if different
-          const lastPoint = self.currentTrace.points[self.currentTrace.points.length - 1];
-          if (lastPoint.x !== x || lastPoint.y !== y) {
-            self.currentTrace.points.push({ x, y });
+          if (self.currentTrace.type == 'precise') {
+            // Add final point if different
+            const lastPoint = self.currentTrace.points[self.currentTrace.points.length - 1];
+            if (lastPoint.x !== x || lastPoint.y !== y) {
+              self.currentTrace.points.push({ x, y });
+            }
           }
           
           self.sendTraceComplete(self.currentTrace);
           self.currentTrace = null;
           self.sendCursorUpdate(0, 0, false);
-        }
-        
-        if (originalOnUp) {
-          originalOnUp.call(self.editor, x, y, startX, startY);
         }
       };
     });
@@ -474,6 +510,12 @@ class CollabManager {
       case 'chat_message':
         this.handleChatMessage(message);
         break;
+      case 'canvas_crop':
+        this.handleCanvasCrop(message);
+        break;
+      case 'canvas_resize':
+        this.handleCanvasResize(message);
+        break;
       case 'full_state':
         this.handleFullState(message);
         break;
@@ -509,6 +551,8 @@ class CollabManager {
     this.renderSessionMenu();
     this.sessionOverlay.style.display = 'flex';
     
+    document.querySelector('.collab-status').classList.add('connected');
+    
     this.hookEditorMethods();
     
     this.editor.showToast(__('Sesión creada||Session created'), 2000);
@@ -538,6 +582,8 @@ class CollabManager {
     this.renderSessionMenu();
     this.sessionOverlay.style.display = 'flex';
     
+    document.querySelector('.collab-status').classList.add('connected');
+    
     this.hookEditorMethods();
     
     this.editor.showToast(__('Conectado a la sesión||Connected to the session'), 2000);
@@ -548,7 +594,7 @@ class CollabManager {
     this.members.set(member.id, member);
     this.editor.showToast(`${this.wrapMemberName(member)} ${__('se unió||joined')}`, 2000);
     if (this.isHost) {
-      this.sendFullState(member.id);
+      setTimeout( () => this.sendFullState(member.id) );
     }
     this.renderSessionMenu();
   }
@@ -585,12 +631,18 @@ class CollabManager {
     
     if (!member || memberId === this.memberId) return;
     
-    // Show name tag at the last point
-    const lastPoint = data.points[data.points.length - 1];
-    this.showCursor(memberId, member.name, member.color, lastPoint.x, lastPoint.y);
+    if (data.type == 'precise') {
+      // Show name tag at the last point
+      const lastPoint = data.points[data.points.length - 1];
+      this.showCursor(memberId, member.name, member.color, lastPoint.x, lastPoint.y);
+    }
     
     // Apply the trace using the editor's drawing methods
-    this.applyTrace(data);
+    if (data.pixels) {
+      this.applyPreRenderedTrace(data);
+    } else {
+      this.applyTrace(data);
+    }
   }
 
   applyTrace(trace) {
@@ -659,8 +711,21 @@ class CollabManager {
     this.editor.render();
   }
   
+  applyPreRenderedTrace(trace) {
+    const { pixels, frame, layer } = trace;
+    
+    const frameObj = this.editor.project?.frames[frame];
+    if (!frameObj) return;
+    
+    const layerObj = frameObj.layers[layer];
+    if (!layerObj) return;
+    
+    this.editor.drawPixels(layerObj.ctx, pixels);
+    this.editor.recordDrawOperation(pixels);
+  }
+  
   handleRemoteCursor(message) {
-    const { memberId, x, y, active } = message;
+    const { memberId, x, y, active, pixels, frameIndex, layerIndex } = message;
     const member = this.members.get(memberId);
     
     if (!member || memberId === this.memberId) return;
@@ -670,6 +735,28 @@ class CollabManager {
     } else {
       this.hideCursor(memberId);
     }
+    
+    if (pixels && pixels.length) {
+      this.drawTracePreview(pixels, frameIndex, layerIndex || 0);
+    }
+  }
+  
+  drawTracePreview(pixels, frameIndex, layerIndex) {
+    if (frameIndex != this.editor.currentFrame) return;
+    
+    // Get temporary canvas
+    const { canvas, ctx } = this.editor.getTempCanvas(this.editor.project.width, this.editor.project.height);
+    
+    // Draw trace preview
+    this.editor.drawPixels(ctx, pixels);
+
+    // Combine with main canvas
+    this.editor.renderQuick(true, {
+      layerIndex: layerIndex,
+      pixels: pixels.filter(p => p.newColor == 'transparent')
+    });
+    
+    this.editor.ctx.drawImage(canvas, 0, 0)
   }
   
   handleNameUpdate(message) {
@@ -702,11 +789,31 @@ class CollabManager {
     }
     this.scrollMessagesToBottom();
   }
+  
+  handleCanvasResize(message) {
+    this.editor.resizeCanvas(message.width, message.height);
+  }
+  
+  handleCanvasCrop(message) {
+    this.editor.cropCanvas(message.x, message.y, message.width, message.height);
+  }
 
   handleFullState(message) {
     if (message.memberId === this.memberId) return;
     this.applyFullState(message.state);
     this.editor.showOperationMessage(__('Proyecto sincronizado||Project synchronized'), 1000);
+    if (message.reason) {
+      const member = this.members.get(message.memberId);
+          
+      switch(message.reason) {
+        case 'new_project':
+          this.editor.showToast(`${this.wrapMemberName(member)} ${__('comenzó un proyecto nuevo||started a new project')}`, 2000);
+          break;    
+        case 'load_project':
+          this.editor.showToast(`${this.wrapMemberName(member)} ${__('cargó un archivo||loaded a file')}`, 2000);
+          break;    
+      }
+    }
   }
 
   handleSessionEnded(reason) {
@@ -737,6 +844,8 @@ class CollabManager {
     this.chatContainer.style.display = 'none';
     this.pingIndicator.style.display = 'none';
     this.sessionOverlay.style.display = 'none';
+        
+    document.querySelector('.collab-status').classList.remove('connected');
     
     this.restoreEditorMethods();
     
@@ -761,6 +870,9 @@ class CollabManager {
       type: 'cursor_update',
       x: Math.round(x),
       y: Math.round(y),
+      pixels: this.currentTrace && this.currentTrace.pixels ? this.currentTrace.pixels : [],
+      frameIndex: this.editor.currentFrame,
+      layerIndex: this.editor.currentLayer,
       active: active
     });
   }
@@ -772,14 +884,29 @@ class CollabManager {
     });
   }
 
-  sendFullState(toMemberId) {
+  sendFullState(toMemberId, reason) {
     if (!this.isHost || !this.isConnected) return;
     
     const state = this.getFullState();
     this.sendMessage({
       type: 'full_state',
+      reason: reason || null,
       state: state,
       toMemberId: toMemberId || null
+    });
+  }
+  
+  sendCropMessage(x, y, width, height) {
+    this.sendMessage({
+      type: 'canvas_crop',
+      x, y, width, height
+    });
+  }
+  
+  sendResizeMessage(width, height) {
+    this.sendMessage({
+      type: 'canvas_resize',
+      width, height
     });
   }
 
@@ -788,8 +915,12 @@ class CollabManager {
       width: this.editor.project.width,
       height: this.editor.project.height,
       frames: [],
+      frameTimes: this.editor.project.frameTimes,
       currentFrame: this.editor.project.currentFrame,
-      currentLayer: this.editor.project.currentLayer
+      currentLayer: this.editor.project.currentLayer,
+      createdAt: this.editor.project.createdAt,
+      backgroundColor: this.editor.project.backgroundColor,
+      transparentBackground: this.editor.transparentBackground
     };
     
     for (let f = 0; f < this.editor.project.frames.length; f++) {
@@ -818,8 +949,12 @@ class CollabManager {
       width: state.width,
       height: state.height,
       frames: [],
+      frameTimes: state.frameTimes,
       currentFrame: state.currentFrame,
-      currentLayer: state.currentLayer
+      currentLayer: state.currentLayer,
+      createdAt: state.createdAt,
+      backgroundColor: state.backgroundColor,
+      transparentBackground: state.transparentBackground
     };
     
     for (let f = 0; f < state.frames.length; f++) {
@@ -855,6 +990,7 @@ class CollabManager {
     
     this.editor.project = project;
     this.editor.resetCanvasSize();
+    this.editor.resetZoom();
     this.editor.render();
   }
 
@@ -1374,6 +1510,13 @@ class CollabManager {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
+  }
+  
+  requestOperation(operation) {
+    // TODO: Clients request operations in the project to host
+    
+    // By now just notify it's not possible
+    this.editor.showToast(__('Solo el host puede hacer eso||Only host can do that'));
   }
 
   canPerformAction(action) {

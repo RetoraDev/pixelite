@@ -34,6 +34,7 @@ const jsFileOrder = [
   'js/HistoryManager.js',
   'js/CollabManager.js',
   'js/PaletteManager.js',
+  'js/RulerTool.js',
   'js/ColorPicker.js',
   'js/FileBrowser.js',
   'js/PixelArtEditor.js'
@@ -54,6 +55,7 @@ const cssFileOrder = [
   "css/color-picker.css",
   "css/selection.css",
   "css/settings.css",
+  "css/ruler.css",
   "css/collab.css",
   "css/lock-screen.css",
   "css/z-index.css",
@@ -61,7 +63,7 @@ const cssFileOrder = [
 ];
 
 let packageInfo = {};
-let versionName = "1.0.1";
+let versionName = "1.0.0";
 let copyright = "(C) RETORA";
 
 function log(text, type, error = null) {
