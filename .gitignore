@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+*.zip
+*.apk
+dist/*.zip
+dist/*.apk
+dist/*.idsig
+.env
+*.keystore
+*.log
+untracked/
+ai.js
+AI.md
+desktop.ini
+.DS_Store
+Thumbs.db
+.nomedia
+.nosearch

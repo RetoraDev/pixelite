@@ -1,0 +1,7765 @@
+class PixelArtEditor {
+  constructor(container) {
+    this.container = container || document.createElement("div");
+    this.container.classList.add("app-container");
+    document.body.appendChild(this.container);
+    
+    this.version = VERSION;
+
+    this.tools = {};
+    this.currentTool = null;
+    this.lastTool = null;
+    this.isDrawing = false;
+    this.isPanning = false;
+    this.brushSize = localStorage.getItem("brushSize") ? parseInt(localStorage.getItem("brushSize")) : 1;
+    this.maxBrushSize = 8;
+    this.minBrushSize = 1;
+    this.defaultWidth = 32;
+    this.defaultHeight = 32;
+    this.startX = 0;
+    this.startY = 0;
+    this.scale = 1;
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.primaryColor = localStorage.getItem("primaryColor") || "#000000";
+    this.secondaryColor = localStorage.getItem("secondaryColor") || "#ff00ff";
+    this.selectedColor = "primary";
+    this.transparentBackground = true;
+    this.project = null;
+    this.historyManager = new HistoryManager(this);
+    this.touchDistance = 0;
+    this.touchCenterX = 0;
+    this.touchCenterY = 0;
+    this.minScale = 1;
+    this.maxScale = 35;
+    this.popupOpen = false;
+    this.toolDropdownOpen = false;
+    this.toolSettingsOpen = false;
+    this.isPlaying = false;
+    this.animationInterval = null;
+    this.defaultFrameTime = 1000 / 12; // Default frame time
+    this.showMiniView = false;
+    this.useCordova = window.location.href.startsWith("file");
+    this.deviceReady = false;
+    this.isFilePluginAvailable = false;
+    this.fileBrowser = null;
+    this.defaultFileBrowserPathUrl = null;
+    this.timelapseFPS = 30;
+    this.isCanvasResizing = false;
+    this.canvasResizeState = {
+      x: 0, y : 0,
+      width: 0, height: 0
+    };
+    
+    // Flood fill async
+    this.floodFillTimeout = null;
+    this.isFloodFilling = false;
+    this.floodFillPixels = [];
+    this.floodFillStep = 0;
+    this.floodFillSteps = [];
+    
+    // Some settings
+    this.registerLayerVisibilityChanges = false;
+    this.autoLoadRecentFloatingColors = false;
+    this.usePerProjectFloatingColors = false;
+    this.ensureBoundsDrawing = false;
+    
+    // Collab Session
+    this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
+    this.collabMemberColor = localStorage.getItem('collab_user_color') || ['red', 'blue', 'green', 'yellow', 'orange', 'purple'][Math.floor(Math.random() * 6)];
+    
+    // Temporary variables
+    this.tempLine = null;
+    this.tempRect = null;
+    this.tempEllipse = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+    this.tempColor = null;
+    
+    try {
+      this.initSettings();
+      this.initUI();
+      this.initCollab();
+      this.initBrushUI();
+      this.initCanvas();
+      this.initTools();
+      this.initEventListeners();
+
+      this.gridManager = new GridManager(this);
+      this.spritesheetLoader = new SpritesheetLoader(this);
+      this.referenceManager = new ReferenceManager(this);
+      this.selectionManager = new SelectionManager(this);
+      this.paletteManager = new PaletteManager(this);
+      this.colorPicker = new ColorPicker(this);
+      this.lockScreen = new LockScreen(this);
+
+      if (this.useCordova) {
+        this.initCordova();
+      }
+
+      this.newProject();
+
+      if (this.showMiniView) {
+        this.animationPreview.classList.add("visible");
+      }
+    } catch (error) {
+      console.error("Editor initialization error:", error);
+      this.showError(error);
+      throw error;
+    }
+  }
+  
+  initSettings() {
+    // Create settings manager
+    this.settings = new SettingsManager(this);
+    
+    window.settings = this.settings;
+    
+    // Define categories and settings
+    
+    // General category
+    const generalCat = this.settings.addCategory({
+      id: 'general',
+      title: 'General||General',
+      icon: 'icon-general'
+    });
+    
+    // Language setting
+    generalCat.addSetting({
+      id: 'language',
+      label: 'Idioma||Language',
+      description: 'Selecciona el idioma de la interfaz||Select interface language',
+      type: 'select',
+      defaultValue: "0",
+      options: [
+        { value: "0", label: 'Español' },
+        { value: "1", label: 'English' }
+      ],
+      needsReload: true,
+      onInit: (value, editor) => {
+        editor.settings.language = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.settings.language = value;
+        editor.settings.save();
+      }
+    });
+
+    // Theme setting
+    generalCat.addSetting({
+      id: 'theme',
+      label: 'Tema||Theme',
+      description: 'Oscuro / Claro||Dark / Light',
+      type: 'select',
+      defaultValue: 'dark',
+      options: [
+        { value: 'dark', label: 'Oscuro||Dark' },
+        { value: 'light', label: 'Claro||Light' }
+      ],
+      needsReload: false,
+      onInit: (value, editor) => {
+        document.body.classList.add(`theme-${value}`);
+      },
+      onUpdate: (value, oldValue, editor) => {
+        document.body.classList.remove(`theme-${oldValue}`);
+        document.body.classList.add(`theme-${value}`);
+      }
+    });
+
+    // Editor category
+    const editorCat = this.settings.addCategory({
+      id: 'editor',
+      title: 'Editor||Editor',
+      icon: 'icon-editor'
+    });
+
+    editorCat.addSetting({
+      id: 'autoSave',
+      label: 'Auto-guardado||Auto-save',
+      description: 'Guardar automáticamente cada 5 minutos||Auto-save every 5 minutes',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        if (value) {
+          editor.startAutoSave();
+        } else {
+          editor.stopAutoSave();
+        }
+      },
+      onUpdate: (value, oldValue, editor) => {
+        if (value) {
+          editor.startAutoSave();
+        } else {
+          editor.stopAutoSave();
+        }
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'showPreview',
+      label: 'Mostrar Vista Previa por defecto||Show Preview by default',
+      description: 'Mostrar recuadro de vista previa al iniciar la app||Show preview window at startup',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.showMiniView = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'registerLayerVisibilityChanges',
+      label: 'Registrar cambios de visibilidad||Register visibility changes',
+      description: 'Registrar cambios de visibilidad de capas en la historia de deshacer||Register layer visibility changes in undo history',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.registerLayerVisibilityChanges = value;
+      },
+      onUpdate: (value, oldScale, editor) => {
+        editor.registerLayerVisibilityChanges = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'autoLoadRecentFloatingColors',
+      label: 'Cargar colores flotantes recientes||Load recent floating colors',
+      description: 'Cargar colores flotantes recientes automáticamente al iniciar la app||Auto-load recent floating colors on startup',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.autoLoadRecentFloatingColors = value;
+      }
+    });
+    
+    editorCat.addSetting({
+      id: 'usePerProjectFloatingColors',
+      label: 'Usar colores flotantes por proyecto||Use per project floating colors',
+      description: 'Los colores flotantes se guardan de forma independiente para cada proyecto||Floating colors are saved independently for each project',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.usePerProjectFloatingColors = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.usePerProjectFloatingColors = value;
+      }
+    });
+    
+    // Canvas category
+    const canvasCat = this.settings.addCategory({
+      id: 'canvas',
+      title: 'Lienzo||Canvas',
+      icon: 'icon-canvas'
+    });
+
+    canvasCat.addSetting({
+      id: 'defaultWidth',
+      label: 'Ancho predeterminado||Default width',
+      description: 'Ancho por defecto para nuevos proyectos||Default width for new projects',
+      type: 'number',
+      defaultValue: 32,
+      min: 8,
+      max: 512,
+      step: 8,
+      onInit: (value, editor) => {
+        editor.defaultWidth = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.defaultWidth = value;
+      }
+    });
+
+    canvasCat.addSetting({
+      id: 'defaultHeight',
+      label: 'Alto predeterminado||Default height',
+      description: 'Alto por defecto para nuevos proyectos||Default height for new projects',
+      type: 'number',
+      defaultValue: 32,
+      min: 8,
+      max: 512,
+      step: 8,
+      onInit: (value, editor) => {
+        editor.defaultHeight = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.defaultHeight = value;
+      }
+    });
+
+    canvasCat.addSetting({
+      id: 'smoothPanning',
+      label: 'Paneo Suave||Smooth Panning',
+      description: 'Movimiento suave del lienzo||Smooth movement of the canvas',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        if (value) {
+          editor.setSmoothPanning(true);
+        } else {
+          editor.setSmoothPanning(false);
+        }
+      },
+      onUpdate: (value, oldValue, editor) => {
+        if (value) {
+          editor.setSmoothPanning(true);
+        } else {
+          editor.setSmoothPanning(false);
+        }
+      }
+    });
+    
+    canvasCat.addSetting({
+      id: 'ensureBoundsDrawing',
+      label: 'Asegurar límites de dibujo||Ensure drawing bounds',
+      description: 'Si se activa, se dejará de emular el dibujo fuera del lienzo||If enabled, it will ensure drawing is inside the canvas bounds',
+      type: 'boolean',
+      defaultValue: false,
+      onInit: (value, editor) => {
+        editor.ensureBoundsDrawing = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.ensureBoundsDrawing = value;
+      }
+    });
+
+    // Animation category
+    const animCat = this.settings.addCategory({
+      id: 'animation',
+      title: 'Animación||Animation',
+      icon: 'icon-animation'
+    });
+
+    animCat.addSetting({
+      id: 'defaultFPS',
+      label: 'FPS predeterminado||Default FPS',
+      description: 'Fotogramas por segundo para nuevas animaciones||Frames per second for new animations',
+      type: 'number',
+      defaultValue: 12,
+      min: 1,
+      max: 60,
+      step: 1,
+      onInit: (value, editor) => {
+        editor.defaultFrameTime = 1000 / value;
+      }
+    });
+
+    // Performance category
+    const perfCat = this.settings.addCategory({
+      id: 'performance',
+      title: 'Rendimiento||Performance',
+      icon: 'icon-performance'
+    });
+
+    perfCat.addSetting({
+      id: 'zoomLimit',
+      label: 'Limité de Zoom||Zoom Limit',
+      description: 'Límitar el zoom hasta cierto punto||Limit zoom to certain point',
+      type: 'boolean',
+      defaultValue: true,
+      step: 10,
+      onInit: (value, editor) => {
+        editor.minScale = value ? 1 : 0;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.minScale = value ? 1 : 0;
+      }
+    });
+    
+    perfCat.addSetting({
+      id: 'maxUndoSteps',
+      label: 'Pasos de deshacer máximos||Max undo steps',
+      description: 'Límite de historial de deshacer (0 = Ilimitado)||Undo history limit (0 = Unlimited)',
+      type: 'number',
+      defaultValue: 50,
+      min: 0,
+      max: 2000,
+      step: 10,
+      onInit: (value, editor) => {
+        editor.historyManager.maxHistoryLength = value ? value : Infinity;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.historyManager.maxHistoryLength = value ? value : Infinity;
+      }
+    });
+    
+    perfCat.addSetting({
+      id: 'maxBrushSize',
+      label: 'Tamaño máximo del pincel||Max brush size',
+      description: 'Límite del tamaño del pincel, Pinceles muy anchos pueden ralentizar la app||Brush size limit, wide brushes can slow down the app',
+      type: 'number',
+      defaultValue: 8,
+      min: 3,
+      max: 32,
+      step: 1,
+      onInit: (value, editor) => {
+        editor.maxBrushSize = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.maxBrushSize = value;
+      }
+    });
+    
+    // Collaboration category
+    const collabCat = this.settings.addCategory({
+      id: 'collab',
+      title: 'Colaboración||Collaboration',
+      icon: 'icon-collab'
+    });
+    
+    collabCat.addSetting({
+      id: 'memberName',
+      label: 'Nombre en pantalla||Display name',
+      description: 'Nombre a mostrar en sesiones colaborativas||Name to show in collaborative sessions',
+      type: 'text',
+      defaultValue: this.collabMemberName,
+      needsReload: false,
+      onInit: (value, editor) => {
+        editor.collabMemberName = value.length > 3 ? value : `user_${Math.floor(Math.random() * 10000)}`;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        editor.collabMemberName = value.length > 3 ? value : `user_${Math.floor(Math.random() * 10000)}`;
+        this.collabManager.updateMemberName(editor.collabMemberName);
+        localStorage.setItem('collab_username', value);
+      }
+    });
+    
+    collabCat.addSetting({
+      id: 'memberColor',
+      label: 'Color||Color',
+      description: 'Color con el que se muestra tu nombre||Color with which your name is shown',
+      type: 'select',
+      defaultValue: this.collabMemberColor,
+      options: [
+        { value: 'red', label: 'Rojo||Red' },
+        { value: 'blue', label: 'Azul||Blue' },
+        { value: 'green', label: 'Verde||Green' },
+        { value: 'yellow', label: 'Amarillo||Yellow' },
+        { value: 'orange', label: 'Naranja||Orange' },
+        { value: 'purple', label: 'Púrpura||Purple' },
+        { value: 'pink', label: 'Rosa||Pink' },
+        { value: 'cyan', label: 'Cian||Cyan' },
+        { value: 'brown', label: 'Marrón||Brown' },
+        { value: 'gray', label: 'Gris||Gray' },
+        { value: 'lime', label: 'Lima||Lime' },
+        { value: 'indigo', label: 'Indigo||Indigo' }
+      ],
+      needsReload: false,
+      onInit: (value, editor) => {
+        this.collabMemberColor = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        this.collabMemberColor = value;
+        this.collabManager.memberColor = value;
+        this.collabManager.updateMemberColor(value);
+        localStorage.setItem('collab_user_color', value);
+      }
+    });
+    
+    // Lock Screen Category
+    const lockScreenCategory = this.settings.addCategory({
+      id: 'lock_screen',
+      title: __('Bloqueo||Lock Screen'),
+      icon: 'icon-lock'
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_mode',
+      label: __('Modo de bloqueo||Lock mode'),
+      description: __('Tipo de pantalla de bloqueo||Lock screen type'),
+      type: 'select',
+      defaultValue: this.lockScreen?.lockScreenMode || 'tap',
+      options: [
+        { value: 'tap', label: __('Toque||Tap') },
+        { value: 'pin', label: __('PIN||PIN') },
+        { value: 'password', label: __('Contraseña||Password') }
+      ],
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ mode: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_pin',
+      label: __('PIN de bloqueo||Lock PIN'),
+      description: __('Código numérico de 4 dígitos||4-digit numeric code'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenKey || '1234',
+      placeholder: '',
+      onUpdate: (value) => {
+        if (this.lockScreen && /^\d{0,4}$/.test(value)) {
+          this.lockScreen.updateSettings({ pin: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_password',
+      label: __('Contraseña||Password'),
+      description: __('Contraseña para desbloquear||Password to unlock'),
+      placeholder: __('Dejar vacío para usar el PIN||Leave empty to use PIN'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenPassword || '',
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ password: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_message',
+      label: __('Mensaje||Message'),
+      description: __('Mensaje mostrado en la pantalla de bloqueo||Message shown on lock screen'),
+      type: 'text',
+      defaultValue: this.lockScreen?.lockScreenMessage || __('Pantalla bloqueada||Pixelite is locked'),
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ message: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_show_startup',
+      label: __('Mostrar al inicio||Show at startup'),
+      description: __('Bloquear al iniciar la aplicación||Lock when app starts'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.showAtStartup || false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ showAtStartup: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_page_hide',
+      label: __('Bloquear al cambiar de app||Lock on app switch'),
+      description: __('Bloquear al cambiar de aplicación o pestaña||Lock when switching apps or tabs'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.lockOnPageHide !== false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ lockOnPageHide: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_inactivity',
+      label: __('Bloquear por inactividad||Lock after inactivity'),
+      description: __('Bloquear automáticamente después de inactividad||Auto-lock after inactivity'),
+      type: 'select',
+      defaultValue: this.lockScreen?.lockAfterInactivity || 'never',
+      options: [
+        { value: 'never', label: __('Nunca||Never') },
+        { value: '10s', label: __('10 segundos||10 seconds') },
+        { value: '30s', label: __('30 segundos||30 seconds') },
+        { value: '1m', label: __('1 minuto||1 minute') },
+        { value: '5m', label: __('5 minutos||5 minutes') },
+        { value: '10m', label: __('10 minutos||10 minutes') },
+        { value: '15m', label: __('15 minutos||15 minutes') },
+        { value: '30m', label: __('30 minutos||30 minutes') },
+        { value: '1h', label: __('1 hora||1 hour') }
+      ],
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ lockAfterInactivity: value });
+        }
+      }
+    });
+    
+    lockScreenCategory.addSetting({
+      id: 'lock_blur',
+      label: __('Desenfoque de fondo||Blur background'),
+      description: __('Usar efecto de desenfoque en el fondo||Use blur effect on background'),
+      type: 'boolean',
+      defaultValue: this.lockScreen?.useBlurBackdrop !== false,
+      onUpdate: (value) => {
+        if (this.lockScreen) {
+          this.lockScreen.updateSettings({ useBlurBackdrop: value });
+        }
+      }
+    });
+    
+    // Initialize settings
+    this.settings.init();
+    
+    // Create settings UI
+    this.settingsUI = new SettingsUI(this.settings, this);
+  }
+  
+  initCollab() {
+    this.collabManager = new CollabManager(this);
+  }
+
+  // Auto-save functionality
+  startAutoSave() {
+    if (this.autoSaveInterval) return;
+    
+    this.autoSaveInterval = setInterval(() => {
+      if (this.project) {
+        this.saveProject(true);
+        this.showToast(__('Proyecto auto-guardado||Project auto-saved'));
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+  }
+
+  stopAutoSave() {
+    if (this.autoSaveInterval) {
+      clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
+    }
+  }
+  
+  setSmoothPanning(enabled) {
+    document.body.style.setProperty("--transform-transition", enabled ? "0.2s" : "none");
+  }
+
+  initCordova() {
+    const script = document.createElement("script");
+    script.src = "cordova/cordova.js";
+    document.head.appendChild(script);
+    document.addEventListener("deviceready", () => this.onDeviceReady(), false);
+  }
+
+  onDeviceReady() {
+    this.deviceReady = true;
+
+    // Request file system permissions if needed
+    if (window.requestFileSystem) {
+      // Test file system access
+      window.requestFileSystem(
+        window.PERSISTENT || 1,
+        0,
+        fs => {
+          this.isCordova = true;
+          this.isFilePluginAvailable = true;
+          window.resolveLocalFileSystemURL(
+            cordova.file.externalRootDirectory,
+            entry => {
+              this.defaultFileBrowserPathUrl = entry.toURL();
+            },
+            error => {
+              console.warn("File system access denied:", error.code);
+              this.isFilePluginAvailable = false;
+            }
+          );
+        },
+        error => {
+          console.warn("File system access denied:", error.code);
+          this.isFilePluginAvailable = false;
+        }
+      );
+    }
+
+    // Register back key
+    document.addEventListener("backbutton", () => this.onBackButtonDown());
+  }
+
+  onBackButtonDown() {
+    if (this.popupOpen) {
+      this.hidePopup();
+    } else if (this.fileBrowser && this.fileBrowser.visible) {
+      if (this.isFilePluginAvailable) {
+        this.fileBrowser.goUp();
+      } else {
+        this.fileBrowser.hide();
+      }
+    } else if (this.colorPickerOpen) {
+      this.hideColorPicker();
+    } else if (this.menuPanelOverlay.classList.contains("visible")) {
+      this.toggleMenu();
+    } else if (this.animationPanel.classList.contains("visible")) {
+      this.togglePanel("animation");
+    } else if (this.layersPanel.classList.contains("visible")) {
+      this.togglePanel("layers");
+    } else if (this.gridManager.panelVisible) {
+      this.gridManager.hide();
+    } else if (this.selectionManager.clipboardPanel.classList.contains('visible')) {
+      this.selectionManager.clipboardPanel.hideClipboard();
+    } else if (this.selectionManager.hasSelection) {
+      this.selectionManager.clear();
+    } else if (this.selectionManager.isTransforming) {
+      this.selectionManager.cancelTransform();
+      this.exitImmersive();
+    } else if (this.settingsUI.visible) {
+      this.settingsUI.hide();
+    } else {
+      this.exitApp();
+    }
+  }
+
+  showError(error) {
+    this.errorElement.innerHTML = "";
+    this.errorElement.style.display = "flex";
+
+    const title = document.createElement("h2");
+    title.textContent = "App crash";
+    this.errorElement.appendChild(title);
+
+    const messageElement = document.createElement("p");
+    messageElement.className = "error-message";
+    this.errorElement.appendChild(messageElement);
+
+    messageElement.textContent = error.message || "An unknown error occurred";
+
+    this.loadingElement.style.display = "none";
+
+    const reloadButton = document.createElement("button");
+    reloadButton.className = "error-reload";
+    reloadButton.textContent = "Reload";
+    this.errorElement.appendChild(reloadButton);
+
+    reloadButton.addEventListener("click", () => {
+      window.location.reload();
+    });
+  }
+  
+  showCollabDialog() {
+    if (this.collabManager.isConnected) {
+      this.collabManager.sessionOverlay.style.display = 'flex';
+      this.collabManager.renderSessionMenu();
+    } else {
+      this.showCollabConnectDialog();
+    }
+  }
+  
+  showCollabConnectDialog() {
+    const content = document.createElement('div');
+    content.className = 'collab-connect-dialog';
+    
+    // Tabs
+    const tabs = document.createElement('div');
+    tabs.className = 'collab-connect-tabs'
+    
+    const createTab = document.createElement('div');
+    createTab.className = 'collab-connect-tab selected';
+    createTab.textContent = __('Crear Sala||Create Room');
+    
+    const joinTab = document.createElement('div');
+    joinTab.className = 'collab-connect-tab';
+    joinTab.textContent = __('Unirse||Join');
+    
+    tabs.appendChild(createTab);
+    tabs.appendChild(joinTab);
+    content.appendChild(tabs);
+    
+    // Create form
+    const createForm = document.createElement('div');
+    createForm.className = 'collab-connect-form';
+    createForm.style.display = 'block';
+    createForm.innerHTML = `
+      <div class="collab-connect-form-section">
+        <label>${__('Nombre de sala||Room name')}</label>
+        <input type="text" id="collab-room-name" value="${localStorage.getItem('collab_default_room') || 'Mi Sala'}">
+      </div>
+      <div class="collab-connect-form-section">
+        <label>${__('Contraseña||Password')}</label>
+        <input type="password" id="collab-room-password" value="${localStorage.getItem('collab_default_password') || ''}">
+      </div>
+      <div class="collab-connect-form-section" style="display: none">
+        <label>${__('Permisos||Permissions')}</label>
+        <select id="collab-permissions">
+          <option value="strict">${__('Estricto||Strict')}</option>
+          <option value="balanced" selected>${__('Equilibrado||Balanced')}</option>
+          <option value="open">${__('Abierto||Open')}</option>
+        </select>
+      </div>
+    `;
+    content.appendChild(createForm);
+    
+    // Join form
+    const joinForm = document.createElement('div');
+    joinForm.className = 'collab-connect-form';
+    joinForm.style.display = 'none';
+    joinForm.innerHTML = `
+      <div class="collab-connect-form-section">
+        <label>${__('ID de sala||Room ID')}</label>
+        <input type="text" id="collab-join-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+      </div>
+      <div class="collab-connect-form-section">
+        <label>${__('Contraseña||Password')}</label>
+        <input type="password" id="collab-join-password">
+      </div>
+    `;
+    content.appendChild(joinForm);
+    
+    // Tab switching
+    createTab.addEventListener('click', () => {
+      createTab.classList.add('selected');
+      joinTab.classList.remove('selected');
+      createForm.style.display = 'block';
+      joinForm.style.display = 'none';
+    });
+    
+    joinTab.addEventListener('click', () => {
+      createTab.classList.remove('selected');
+      joinTab.classList.add('selected');
+      joinForm.style.display = 'block';
+      createForm.style.display = 'none';
+    });
+    
+    this.showPopup(
+      __('Colaboración||Collaboration'),
+      content,
+      [
+        {
+          text: __('Cancelar||Cancel'),
+          class: 'cancel',
+          action: () => this.hidePopup()
+        },
+        {
+          text: __('Conectar||Connect'),
+          action: () => {
+            if (createForm.style.display !== 'none') {
+              // Create session
+              const roomName = document.getElementById('collab-room-name').value;
+              const password = document.getElementById('collab-room-password').value;
+              const permissionsPreset = document.getElementById('collab-permissions').value;
+              
+              let permissions;
+              switch (permissionsPreset) {
+                case 'strict':
+                  permissions = {
+                    undoRedo: 'host',
+                    addRemoveFrames: 'host',
+                    addRemoveLayers: 'host',
+                    draw: 'host',
+                    chat: 'everyone'
+                  };
+                  break;
+                case 'open':
+                  permissions = {
+                    undoRedo: 'everyone',
+                    addRemoveFrames: 'everyone',
+                    addRemoveLayers: 'everyone',
+                    draw: 'everyone',
+                    chat: 'everyone'
+                  };
+                  break;
+                default:
+                  permissions = {
+                    undoRedo: 'host',
+                    addRemoveFrames: 'everyone',
+                    addRemoveLayers: 'everyone',
+                    draw: 'everyone',
+                    chat: 'everyone'
+                  };
+              }
+              
+              this.collabManager.createSession(roomName, password, permissions);
+            } else {
+              // Join session
+              const sessionId = document.getElementById('collab-join-id').value;
+              const password = document.getElementById('collab-join-password').value;
+              
+              if (!sessionId) {
+                this.showToast(__('ID de sala requerido||Room ID required'), 2000);
+                return;
+              }
+              
+              // Warn about unsaved changes
+              this.showPopup(
+                __('Unirse a sala||Join Room'),
+                __('¿Unirse a la sala? Los cambios no guardados se perderán||Join room? Unsaved changes will be lost'),
+                [
+                  {
+                    text: __('Cancelar||Cancel'),
+                    class: 'cancel',
+                    action: () => this.hidePopup()
+                  },
+                  {
+                    text: __('Unirse||Join'),
+                    action: () => {
+                      this.collabManager.joinSession(sessionId, password);
+                      this.hidePopup();
+                    }
+                  }
+                ]
+              );
+              return;
+            }
+            this.hidePopup();
+          }
+        }
+      ]
+    );
+  }
+
+  initUI() {
+    this.loadingElement = document.createElement("div");
+    this.loadingElement.className = "loading-overlay";
+    this.container.appendChild(this.loadingElement);
+    
+    this.loadingSpinner = document.createElement("div");
+    this.loadingSpinner.className = "loading-spinner";
+    this.loadingElement.appendChild(this.loadingSpinner);
+    
+    this.loadingText = document.createElement("div");
+    this.loadingText.className = "loading-text";
+    this.loadingText.innerHTML = __("Cargando...||Loading...");
+    this.loadingElement.appendChild(this.loadingText);
+
+    this.errorElement = document.createElement("div");
+    this.errorElement.className = "editor-error";
+    this.errorElement.style.display = "none";
+    this.container.appendChild(this.errorElement);
+
+    this.editorElement = document.createElement("div");
+    this.editorElement.className = "pixel-art-editor";
+    this.container.appendChild(this.editorElement);
+
+    // Create canvas container
+    this.canvasContainer = document.createElement("div");
+    this.canvasContainer.className = "editor-canvas-container";
+    this.editorElement.appendChild(this.canvasContainer);
+    
+    // Create interactive overlay
+    this.overlayLayer = document.createElement("div");
+    this.overlayLayer.className = "editor-overlay-layer";
+    this.editorElement.appendChild(this.overlayLayer);
+    
+    // Create UI layer
+    this.uiLayer = document.createElement("div");
+    this.uiLayer.className = "editor-ui";
+    this.editorElement.appendChild(this.uiLayer);
+
+    // Top bar
+    this.topBar = document.createElement("div");
+    this.topBar.className = "ui-top-bar";
+    this.uiLayer.appendChild(this.topBar);
+
+    // Menu button
+    this.menuButton = this.createButton("menu", "icon-menu", () => this.toggleMenu());
+    this.topBar.appendChild(this.menuButton);
+
+    // Color indicator
+    this.colorIndicator = document.createElement("div");
+    this.colorIndicator.className = "color-indicator";
+    this.topBar.appendChild(this.colorIndicator);
+
+    this.colorPrimary = document.createElement("div");
+    this.colorPrimary.className = "color-primary";
+    this.colorIndicator.appendChild(this.colorPrimary);
+
+    this.colorSecondary = document.createElement("div");
+    this.colorSecondary.className = "color-secondary";
+    this.colorIndicator.appendChild(this.colorSecondary);
+
+    this.colorSelector = document.createElement("div");
+    this.colorSelector.className = "color-selector";
+    this.colorIndicator.appendChild(this.colorSelector);
+
+    this.colorIndicator.addEventListener("click", () => this.colorPicker.toggleSelectedColor());
+
+    this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.colorPicker.show());
+    this.topBar.appendChild(this.colorPickerButton);
+
+    // Bottom bar
+    this.bottomBar = document.createElement("div");
+    this.bottomBar.className = "ui-bottom-bar";
+    this.uiLayer.appendChild(this.bottomBar);
+
+    // Tool selection
+    this.toolSelectionContainer = document.createElement("div");
+    this.toolSelectionContainer.className = "tool-selection-container";
+    this.bottomBar.appendChild(this.toolSelectionContainer);
+
+    // Tool button withdropdown
+    this.toolButtonContainer = document.createElement("div");
+    this.toolButtonContainer.className = "tool-button-container";
+    this.toolSelectionContainer.appendChild(this.toolButtonContainer);
+
+    this.currentToolButton = this.createButton("current-tool", "tool-pencil", () => this.toggleToolDropdown());
+    this.toolButtonContainer.appendChild(this.currentToolButton);
+    this.currentToolButton.title = __("Herramienta Actual||Current Tool");
+
+    this.toolDropdown = document.createElement("div");
+    this.toolDropdown.className = "tool-dropdown";
+    this.toolButtonContainer.appendChild(this.toolDropdown);
+
+    // Tool settings button (visible only when tool has settings)
+    this.toolSettingsButton = this.createButton("tool-settings", "icon-settings", () => this.showToolSettings());
+    this.toolSettingsButton.title = __("Opciones de herramienta||Tool settings");
+    this.toolSettingsButton.style.display = "none";
+    this.toolSelectionContainer.appendChild(this.toolSettingsButton);
+
+    // Tool settings popup
+    this.toolSettingsPopup = document.createElement("div");
+    this.toolSettingsPopup.className = "tool-settings-popup";
+    this.toolSettingsPopup.style.display = "none";
+    this.uiLayer.appendChild(this.toolSettingsPopup);
+
+    // Add close handler
+    this.toolSettingsPopup.addEventListener("click", e => e.stopPropagation());
+
+    // Tool switcher
+    this.toolSwitcher = this.createButton("switch-tool", "icon-switch-tool", () => this.switchLastTool());
+    this.toolSwitcher.title = __("Rotar herramientas (Espacio)||Switch tools (Space)");
+    this.toolSelectionContainer.appendChild(this.toolSwitcher);
+    
+    // Animation panel toggle
+    this.animationButton = this.createButton("animation", "icon-animation", () => this.togglePanel("animation"));
+    this.animationButton.title = __("(Animación|Animation) (Ctrl + A)");
+    this.bottomBar.appendChild(this.animationButton);
+
+    // Layers panel toggle
+    this.layersButton = this.createButton("layers", "icon-layers", () => this.togglePanel("layers"));
+    this.layersButton.title = __("(Capas|Layers) (Ctrl + L)");
+    this.bottomBar.appendChild(this.layersButton);
+
+    // Grids panel toggle
+    this.gridsButton = this.createButton("grids", "icon-grids", () => this.gridManager.toggle());
+    this.gridsButton.title = __("(Cuadrículas|Grids)");
+    this.bottomBar.appendChild(this.gridsButton);
+
+    // Undo/Redo buttons
+    this.undoRedoButtons = document.createElement("div");
+    this.undoRedoButtons.className = "undo-redo-buttons";
+    this.bottomBar.appendChild(this.undoRedoButtons);
+
+    this.undoButton = this.createButton("undo", "icon-undo", () => this.undo());
+    this.undoButton.title = __("(Deshacer|Undo) (Ctrl + Z)");
+    this.undoRedoButtons.appendChild(this.undoButton);
+
+    this.redoButton = this.createButton("redo", "icon-redo", () => this.redo());
+    this.redoButton.title = __("(Rehacer|Redo) (Ctrl + Y)");
+    this.undoRedoButtons.appendChild(this.redoButton);
+
+    // Menu panel
+    this.menuPanelOverlay = document.createElement("div");
+    this.menuPanelOverlay.className = "menu-panel-overlay";
+    this.uiLayer.appendChild(this.menuPanelOverlay);
+    
+    this.menuPanelOverlay.addEventListener("click", () => this.toggleMenu());
+    
+    this.menuPanel = document.createElement("div");
+    this.menuPanel.className = "menu-panel";
+    this.menuPanelOverlay.appendChild(this.menuPanel);
+    
+    this.menuTabs = document.createElement("div");
+    this.menuTabs.className = "menu-tabs";
+    this.menuPanel.appendChild(this.menuTabs);
+
+    this.menuContent = document.createElement("div");
+    this.menuContent.className = "menu-content";
+    this.menuPanel.appendChild(this.menuContent);
+    
+    this.menuPanel.addEventListener("click", e => e.stopPropagation());
+
+    // Create menu tabs
+    this.createMenuTab("File");
+    this.createMenuTab("Edit");
+    this.createMenuTab("View");
+    this.createMenuTab("Color");
+    this.createMenuTab("Help");
+
+    // Animation panel
+    this.animationPanel = document.createElement("div");
+    this.animationPanel.className = "animation-panel";
+    this.uiLayer.appendChild(this.animationPanel);
+
+    // Timeline header with controls
+    const timelineHeader = document.createElement("div");
+    timelineHeader.className = "timeline-header";
+    this.animationPanel.appendChild(timelineHeader);
+
+    // Play/Pause button
+    this.playPauseButton = this.createButton("play-pause", "icon-play", () => this.togglePlayback());
+    timelineHeader.appendChild(this.playPauseButton);
+
+    // Prev/Next frame buttons
+    this.prevFrameButton = this.createButton("prev-frame", "icon-prev", () => this.prevFrame());
+    timelineHeader.appendChild(this.prevFrameButton);
+
+    this.nextFrameButton = this.createButton("next-frame", "icon-next", () => this.nextFrame());
+    timelineHeader.appendChild(this.nextFrameButton);
+
+    // Add Frame button
+    this.addFrameButton = this.createButton("add-frame", "icon-add", () => this.addFrame(this.project.currentFrame));
+    timelineHeader.appendChild(this.addFrameButton);
+  
+    // Duplicate Frame button
+    this.duplicateFrameButton = this.createButton("duplicate-frame", "icon-copy", () => this.duplicateFrame());
+    timelineHeader.appendChild(this.duplicateFrameButton);
+
+    // FPS control
+    const fpsControl = document.createElement("div");
+    fpsControl.className = "fps-control";
+    timelineHeader.appendChild(fpsControl);
+
+    const fpsLabel = document.createElement("span");
+    fpsLabel.textContent = "FPS:";
+    fpsControl.appendChild(fpsLabel);
+
+    this.fpsInput = document.createElement("input");
+    this.fpsInput.type = "number";
+    this.fpsInput.min = "1";
+    this.fpsInput.max = "60";
+    this.fpsInput.value = parseInt(1000 / this.defaultFrameTime);
+    this.fpsInput.addEventListener("keyup", () => {
+      const value = this.fpsInput.value;
+      if (value && value <= 60) {
+        this.fpsInput.style.backgroundColor = "var(--bg-color)";
+      } else {
+        this.fpsInput.style.backgroundColor =  "#9f0000";
+      }
+    });
+    this.fpsInput.addEventListener("change", () => {
+      const value = this.fpsInput.value;
+      if (value && value <= 60) {
+        this.updateFPS(value);
+        this.fpsInput.style.backgroundColor = "var(--bg-color)";
+      } else {
+        this.fpsInput.style.backgroundColor =  "#9f0000";
+      }
+    });
+    fpsControl.appendChild(this.fpsInput);
+
+    // Close button
+    const closeButton = document.createElement("div");
+    closeButton.className = "panel-close timeline-close";
+    closeButton.innerHTML = "&times;";
+    closeButton.addEventListener("click", () => this.togglePanel("animation"));
+    timelineHeader.appendChild(closeButton);
+
+    // Timeline content
+    this.timelineContent = document.createElement("div");
+    this.timelineContent.className = "timeline-content";
+    this.animationPanel.appendChild(this.timelineContent);
+
+    // Animation preview
+    this.animationPreview = document.createElement("canvas");
+    this.animationPreview.className = "animation-preview";
+    this.animationPreview.addEventListener("click", () => {
+      this.animationPanel.classList.add("visible");
+      this.animationButton.classList.add("active");
+    });
+    this.animationPanel.appendChild(this.animationPreview);
+
+    // Layers panel
+    this.layersPanel = document.createElement("div");
+    this.layersPanel.className = "layers-panel";
+    this.uiLayer.appendChild(this.layersPanel);
+
+    const layersHeader = document.createElement("div");
+    layersHeader.className = "panel-header";
+    this.layersPanel.appendChild(layersHeader);
+
+    const layersTitle = document.createElement("div");
+    layersTitle.className = "panel-title";
+    layersTitle.textContent = "Layers";
+    layersHeader.appendChild(layersTitle);
+
+    const layersClose = document.createElement("div");
+    layersClose.className = "panel-close";
+    layersClose.innerHTML = "&times;";
+    layersClose.addEventListener("click", () => this.togglePanel("layers"));
+    layersHeader.appendChild(layersClose);
+
+    this.layersContainer = document.createElement("div");
+    this.layersContainer.className = "layers-container";
+    this.layersPanel.appendChild(this.layersContainer);
+
+    const layerActions = document.createElement("div");
+    layerActions.className = "layer-actions";
+    this.layersPanel.appendChild(layerActions);
+
+    this.addLayerButton = this.createButton("add-layer", "+", () => this.addLayer());
+    layerActions.appendChild(this.addLayerButton);
+
+    this.removeLayerButton = this.createButton("remove-layer", "-", () => this.removeLayer());
+    layerActions.appendChild(this.removeLayerButton);
+
+    // Notification system
+    this.notificationElement = document.createElement("div");
+    this.notificationElement.className = "notification";
+    this.uiLayer.appendChild(this.notificationElement);
+    
+    this.operationMessageElement = document.createElement("div");
+    this.operationMessageElement.className = "operation-message";
+    this.uiLayer.appendChild(this.operationMessageElement);
+
+    // Popup system
+    this.popupOverlay = document.createElement("div");
+    this.popupOverlay.className = "popup-overlay";
+    this.uiLayer.appendChild(this.popupOverlay);
+
+    this.popupContent = document.createElement("div");
+    this.popupContent.className = "popup-content";
+    this.popupOverlay.appendChild(this.popupContent);
+
+    // Update colors
+    this.updateColorIndicator();
+  }
+
+  initBrushUI() {
+    // Brush size indicator
+    this.brushSizeIndicator = document.createElement("div");
+    this.brushSizeIndicator.className = "brush-size-indicator";
+    this.brushSizeIndicator.style.display = "none";
+    this.uiLayer.appendChild(this.brushSizeIndicator);
+
+    // Brush size text
+    this.brushSizeText = document.createElement("div");
+    this.brushSizeText.className = "brush-size-text";
+    this.brushSizeText.textContent = `${__("Brocha||Brush")}: ${this.brushSize}px`;
+    this.brushSizeIndicator.appendChild(this.brushSizeText);
+
+    this.brushSizeBar = document.createElement("progress");
+    this.brushSizeBar.className = "brush-size-bar";
+    this.brushSizeIndicator.appendChild(this.brushSizeBar);
+
+    this.updateBrushSizeIndicator();
+  }
+  
+  initCanvas() {
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "editor-canvas";
+    this.canvasContainer.appendChild(this.canvas);
+
+    // Add a wrapper div for proper centering
+    this.canvasWrapper = document.createElement("div");
+    this.canvasWrapper.className = "canvas-wrapper";
+    this.canvasWrapper.style.position = "absolute";
+    this.canvasWrapper.style.transformOrigin = "0 0";
+    this.canvasContainer.insertBefore(this.canvasWrapper, this.canvas);
+    this.canvasWrapper.appendChild(this.canvas);
+
+    // Create canvas resize controls
+    this.canvasResizeControls = document.createElement("div");
+    this.canvasResizeControls.className = "canvas-resize-controls";
+    this.canvasWrapper.appendChild(this.canvasResizeControls);
+
+    this.canvasResizeX = document.createElement("div");
+    this.canvasResizeX.className = "canvas-resize-edge vertical";
+    this.canvasResizeControls.appendChild(this.canvasResizeX);
+    
+    this.canvasResizeY = document.createElement("div");
+    this.canvasResizeY.className = "canvas-resize-edge";
+    this.canvasResizeControls.appendChild(this.canvasResizeY);
+    
+    this.canvasResizeWidth = document.createElement("div");
+    this.canvasResizeWidth.className = "canvas-resize-edge vertical";
+    this.canvasResizeControls.appendChild(this.canvasResizeWidth);
+    
+    this.canvasResizeHeight = document.createElement("div");
+    this.canvasResizeHeight.className = "canvas-resize-edge";
+    this.canvasResizeControls.appendChild(this.canvasResizeHeight);
+
+    this.ctx = this.getCanvasContext(this.canvas);
+
+    // Initialize transform values
+    this.scale = 4;
+    this.posX = 0;
+    this.posY = 0;
+    
+    // Initialize debug canvas
+    this.debugCanvas = document.getElementById("debug-canvas");
+    if (this.debugCanvas) {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      this.debugCanvas.width = width;
+      this.debugCanvas.height = height
+      
+      this.debugCtx = this.getCanvasContext(this.debugCanvas);
+      
+      this.debug = {
+        point: (x, y, radius, color) => {
+          this.debugCtx.clearRect(0, 0, width, height);
+          this.drawBrushCircle(this.debugCtx, x, y, radius || 1, color || "#ffffff");
+        },
+        text: (x, y, text, color) => {
+          this.debugCtx.clearRect(0, 0, width, height);
+          this.debugCtx.fillStyle = color;
+          this.debugCtx.fillText(text, x, y);
+        }
+      };
+    }
+  }
+  
+  getCanvasContext(canvas) {
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.imageSmoothingEnabled = false;
+    return context;
+  }
+  
+  getTempCanvas(width, height) {
+    this.tempCanvas = this.tempCanvas || document.createElement("canvas");
+    this.tempCanvas.width = width || this.project.width;
+    this.tempCanvas.height = height || this.project.height;
+    this.tempCtx = this.tempCtx || this.getCanvasContext(this.tempCanvas);
+    this.tempCtx.imageSmoothingEnabled = false;
+    this.tempCtx.clearRect(0, 0, this.tempCanvas.width, this.tempCanvas.height);
+    return { canvas: this.tempCanvas, ctx: this.tempCtx };
+  }
+
+  initEventListeners() {
+    // Mouse events
+    this.canvasContainer.addEventListener("mousedown", this.handleMouseDown.bind(this));
+    this.canvasContainer.addEventListener("mousemove", this.handleMouseMove.bind(this));
+    this.canvasContainer.addEventListener("mouseup", this.handleMouseUp.bind(this));
+    this.canvasContainer.addEventListener("mouseleave", this.handleMouseUp.bind(this));
+    this.canvasContainer.addEventListener("wheel", this.handleMouseWheel.bind(this));
+
+    // Touch events
+    this.canvasContainer.addEventListener("touchstart", this.handleTouchStart.bind(this), { passive: false });
+    this.canvasContainer.addEventListener("touchmove", this.handleTouchMove.bind(this), { passive: false });
+    this.canvasContainer.addEventListener("touchend", this.handleTouchEnd.bind(this));
+
+    // Keyboard events
+    document.addEventListener("keydown", this.handleKeyDown.bind(this));
+
+    // Window resize
+    window.addEventListener("resize", this.handleResize.bind(this));
+  }
+
+  initTools() {
+    // Pencil
+    this.addTool({
+      name: "Pencil",
+      displayName: __("Lápiz||Pencil"),
+      icon: "tool-pencil",
+      cursor: "crosshair",
+      shortcut: "d",
+      onDown: (x, y) => {
+        this.isDrawing = true;
+        this._previousPencilPosition = { x, y };
+        this.historyManager.startBatch("draw", __('Dibujar||Draw'));
+        return this.drawPixel(x, y);
+      },
+      onMove: (x, y) => {
+        let pixels = [];
+        if (this.isDrawing) {
+          if (this._previousPencilPosition && this.distance(x, y, this._previousPencilPosition.x, this._previousPencilPosition.y) >= 2) {
+            this.startLine(this._previousPencilPosition.x, this._previousPencilPosition.y);
+            pixels = this.finishLine(x, y);
+          } else {
+            pixels = this.drawPixel(x, y);
+          }
+          this._previousPencilPosition = { x, y };
+        }
+        return pixels;
+      },
+      onUp: (x, y) => {
+        if (this.isDrawing) {
+          this.isDrawing = false;
+          this.historyManager.endBatch();
+        }
+        this._previousPencilPosition = null;
+      }
+    });
+    
+    // Eraser
+    this.addTool({
+      name: "Eraser",
+      displayName: __("Borrador||Eraser"),
+      icon: "tool-eraser",
+      cursor: "crosshair",
+      shortcut: "s",
+      onDown: (x, y) => {
+        this.isDrawing = true;
+        this._previousPencilPosition = { x, y };
+        this.historyManager.startBatch("draw", __('Borrar||Erase'));
+        return this.drawPixel(x, y, { color: "transparent" });
+      },
+      onMove: (x, y) => {
+        let pixels = [];
+        if (this.isDrawing) {
+          if (this._previousPencilPosition && this.distance(x, y, this._previousPencilPosition.x, this._previousPencilPosition.y) >= 2) {
+            this.startLine(this._previousPencilPosition.x, this._previousPencilPosition.y, "transparent");
+            pixels = this.finishLine(x, y);
+          } else {
+            pixels = this.drawPixel(x, y, { color: "transparent" });
+          }
+          this._previousPencilPosition = { x, y };
+        }
+        return pixels;
+      },
+      onUp: (x, y) => {
+        if (this.isDrawing) {
+          this.isDrawing = false;
+          this.historyManager.endBatch();
+        }
+        this._previousPencilPosition = null;
+      }
+    });
+    
+    // Line
+    this.addTool({
+      name: "Line",
+      displayName: __("Línea||Line"),
+      icon: "tool-line",
+      cursor: "crosshair",
+      shortcut: "l",
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Línea||Line'));
+        this.startLine(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.tempLine) {
+          this.previewLine(x, y);
+        }
+      },
+      onUp: (x, y) => {
+        if (this.tempLine) {
+          const pixels = this.finishLine(x, y);
+          this.saveToHistory();
+          return pixels;
+        }
+      }
+    });
+    
+    // Rectangle
+    this.addTool({
+      name: "Rectangle",
+      displayName: __("Rectángulo||Rectangle"),
+      icon: "tool-rect",
+      cursor: "crosshair",
+      shortcut: "r",
+      settings: {
+        filled: { type: "boolean", default: false },
+        perfect: { type: "boolean", default: false }
+      },
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Rectángulo||Rectangle'));
+        this.startRect(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.tempRect) {
+          this.previewRect(x, y);
+        }
+      },
+      onUp: (x, y) => {
+        if (this.tempRect) {
+          const pixels = this.finishRect(x, y);
+          this.saveToHistory();
+          return pixels;
+        }
+      }
+    });
+
+    // Ellipse 
+    this.addTool({
+      name: "Ellipse",
+      displayName: __("Elipse||Ellipse"),
+      icon: "tool-ellipse",
+      cursor: "crosshair",
+      shortcut: "e",
+      settings: {
+        filled: { type: "boolean", default: false },
+        perfect: { type: "boolean", default: false }
+      },
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Elipse||Ellipse'));
+        this.startEllipse(x, y);
+      },
+      onMove: (x, y) => {
+        if (this.tempEllipse) {
+          this.previewEllipse(x, y);
+        }
+      },
+      onUp: (x, y) => {
+        if (this.tempEllipse) {
+          const pixels = this.finishEllipse(x, y);
+          this.saveToHistory();
+          return pixels;
+        }
+      }
+    });
+
+    // Paint Bucket
+    this.addTool({
+      name: "Paint Bucket",
+      displayName: __("Cubeta||Paint Bucket"),
+      icon: "tool-bucket",
+      cursor: "crosshair",
+      shortcut: "b",
+      onDown: (x, y) => {
+        this.historyManager.startBatch("draw", __('Rellenar||Bucket fill'));
+        const pixels = this.fillArea(x, y);
+        this.saveToHistory();
+        return pixels;
+      }
+    });
+    
+    // Pipette
+    this.addTool({
+      name: "Pipette",
+      displayName: __("Pipeta||Pipette"),
+      icon: "tool-pipette",
+      cursor: "crosshair",
+      shortcut: "a",
+      dontBroadcast: true,
+      onDown: (x, y) => {
+        this.pickColor(x, y);
+      }
+    });
+    
+    // Selection Tool
+    this.addTool({
+      name: "Selection",
+      displayName: __("Selección||Selection"),
+      icon: "tool-selection",
+      cursor: "crosshair",
+      shortcut: "s",
+      dontBroadcast: true,
+      onDown: (x, y) => this.selectionManager.onDown(x, y),
+      onMove: (x, y) => this.selectionManager.onMove(x, y),
+      onUp: (x, y, startX, startY) => this.selectionManager.onUp(x, y, startX, startY)
+    });
+    
+    // Set default tool
+    this.setTool("Pencil", true);
+    this.lastTool = "Eraser";
+  }
+
+  updateBrushSizeIndicator() {
+    this.brushSizeText.textContent = __(`(Pincel|Brush): ${this.brushSize}px`);
+    this.brushSizeBar.min = 0;
+    this.brushSizeBar.max = this.maxBrushSize;
+    this.brushSizeBar.value = this.brushSize;
+  }
+  
+  showLoadingScreen(text = "Loading") {
+    this.loadingElement.style.display = "flex";
+    this.loadingText.innerHTML = text;
+  }
+  
+  hideLoadingScreen() {
+    this.loadingElement.style.display = "none";
+  }
+  
+  createButton(id, iconClass, onClick) {
+    const button = document.createElement("button");
+    button.className = "ui-button";
+    button.id = id;
+
+    if (iconClass) {
+      const icon = document.createElement("div");
+      icon.className = `icon ${iconClass}`;
+      button.appendChild(icon);
+    }
+
+    if (onClick) {
+      button.addEventListener("click", onClick);
+    }
+
+    return button;
+  }
+  
+  createMenuTab(name) {
+    const displayNames = {
+      "File": __("Archivo||File"),
+      "Edit": __("Editar||Edit"),
+      "View": __("Ver||View"),
+      "Color": "Color",
+      "Help": __("Ayuda||Help"),
+    };
+    
+    const tab = document.createElement("div");
+    tab.className = "menu-tab";
+    tab.textContent = displayNames[name] || name;
+    tab.name = name;
+    tab.addEventListener("click", () => this.showMenuContent(name));
+    this.menuTabs.appendChild(tab);
+
+    const content = document.createElement("div");
+    content.className = `menu-content-${name.toLowerCase()}`;
+    content.style.display = "none";
+    this.menuContent.appendChild(content);
+
+    if (name === "File") {
+      this.createFileMenu(content);
+    } else if (name === "Edit") {
+      this.createEditMenu(content);
+    } else if (name === "View") {
+      this.createViewMenu(content);
+    } else if (name === "Color") {
+      this.createColorMenu(content);
+    } else if (name === "Help") {
+      this.createHelpMenu(content);
+    }
+
+    // Show first tab by default
+    if (this.menuTabs.children.length === 1) {
+      tab.classList.add("active");
+      content.style.display = "block";
+    }
+  }
+
+  createFileMenu(container) {
+    const section = document.createElement("div");
+    section.className = "menu-section";
+    container.appendChild(section);
+
+    const newItem = document.createElement("div");
+    newItem.className = "menu-item";
+    newItem.textContent = __("Nuevo Proyecto||New Project");
+    newItem.addEventListener("click", () => this.showNewProjectDialog());
+    section.appendChild(newItem);
+
+    const openItem = document.createElement("div");
+    openItem.className = "menu-item";
+    openItem.textContent = __("Abrir Proyecto...||Open Project...");
+    openItem.addEventListener("click", () => this.openFile());
+    section.appendChild(openItem);
+    
+    const openSpritesheetItem = document.createElement("div");
+    openSpritesheetItem.className = "menu-item";
+    openSpritesheetItem.textContent = __("Abrir Hoja...||Open Spritesheet...");
+    openSpritesheetItem.addEventListener("click", () => this.showSpritesheetLoader());
+    section.appendChild(openSpritesheetItem);
+
+    const saveItem = document.createElement("div");
+    saveItem.className = "menu-item";
+    saveItem.textContent = __("Guardar||Save");
+    saveItem.addEventListener("click", () => this.saveProject());
+    section.appendChild(saveItem);
+
+    const saveAsItem = document.createElement("div");
+    saveAsItem.className = "menu-item";
+    saveAsItem.textContent = __("Guardar Como...||Save As...");
+    saveAsItem.addEventListener("click", () => this.saveAs());
+    section.appendChild(saveAsItem);
+
+    const referenceItem = document.createElement("div");
+    referenceItem.className = "menu-item";
+    referenceItem.textContent = __("Cargar Referencia...||Load Reference...");
+    referenceItem.addEventListener("click", () => this.loadReferenceImage());
+    section.appendChild(referenceItem);
+    
+    const collabItem = document.createElement('div');
+    collabItem.className = 'menu-item';
+    collabItem.innerHTML = `
+      <span>${__('Modo Colaborativo||Collab Mode')}</span>
+      <span class="collab-status"></span>
+    `;
+    collabItem.addEventListener('click', () => this.showCollabDialog());
+    section.appendChild(collabItem);
+
+    const exportCurrentFrameItem = document.createElement("div");
+    exportCurrentFrameItem.className = "menu-item";
+    exportCurrentFrameItem.textContent = __("Exportar Frame Actual||Export Current Frame");
+    exportCurrentFrameItem.addEventListener("click", () => this.exportCurrentFrame());
+    section.appendChild(exportCurrentFrameItem);
+    
+    const exportSelectionItem = document.createElement("div");
+    exportSelectionItem.className = "menu-item";
+    exportSelectionItem.textContent = __("Exportar Selección||Export Selection");
+    exportSelectionItem.addEventListener("click", () => this.exportSelection());
+    section.appendChild(exportSelectionItem);
+
+    const exportAnimationItem = document.createElement("div");
+    exportAnimationItem.className = "menu-item";
+    exportAnimationItem.textContent = __("Exportar Animación||Export Animation");
+    exportAnimationItem.addEventListener("click", () => this.exportAnimation());
+    section.appendChild(exportAnimationItem);
+
+    const exportMenu = this.menuContent.querySelector(".menu-content-file");
+    const timelapseItem = document.createElement("div");
+    timelapseItem.className = "menu-item";
+    timelapseItem.textContent = __("Exportar Timelapse||Export Timelapse");
+    timelapseItem.addEventListener("click", () => this.exportTimelapse());
+    section.appendChild(timelapseItem);
+
+    const exitItem = document.createElement("div");
+    exitItem.className = "menu-item";
+    exitItem.textContent = __("Salir de la app||Exit App");
+    exitItem.addEventListener("click", () => this.exitApp());
+    exitItem.style.display = "none";
+    section.appendChild(exitItem);
+
+    document.addEventListener("deviceready", () => (exitItem.style.display = ""));
+  }
+
+  createEditMenu(container) {
+    const transformSection = document.createElement("div");
+    transformSection.className = "menu-section";
+    container.appendChild(transformSection);
+
+    const h3 = document.createElement("h3");
+    h3.textContent = __("Transformar||Transform");
+    transformSection.appendChild(h3);
+
+    const cropCanvasItem = document.createElement("div");
+    cropCanvasItem.className = "menu-item";
+    cropCanvasItem.textContent = __("Recortar Canvas||Crop Canvas");
+    cropCanvasItem.addEventListener("click", () => this.startResizeCanvas('crop'));
+    transformSection.appendChild(cropCanvasItem);
+    
+    const resizeCanvasItem = document.createElement("div");
+    resizeCanvasItem.className = "menu-item";
+    resizeCanvasItem.textContent = __("Redimensionar Canvas||Resize Canvas");
+    resizeCanvasItem.addEventListener("click", () => this.startResizeCanvas('resize'));
+    transformSection.appendChild(resizeCanvasItem);
+    
+    const flipHItem = document.createElement("div");
+    flipHItem.className = "menu-item";
+    flipHItem.textContent = __("Espejo Horizontal||Flip Horizontal");
+    flipHItem.addEventListener("click", () => this.flipHorizontal());
+    transformSection.appendChild(flipHItem);
+
+    const flipVItem = document.createElement("div");
+    flipVItem.className = "menu-item";
+    flipVItem.textContent = __("Espejo Vertical||Flip Vertical");
+    flipVItem.addEventListener("click", () => this.flipVertical());
+    transformSection.appendChild(flipVItem);
+
+    const rotate90Item = document.createElement("div");
+    rotate90Item.className = "menu-item";
+    rotate90Item.textContent = __("(Rotar|Rotate) 90° CW");
+    rotate90Item.addEventListener("click", () => this.rotate(90));
+    transformSection.appendChild(rotate90Item);
+
+    const rotate270Item = document.createElement("div");
+    rotate270Item.className = "menu-item";
+    rotate270Item.textContent = __("(Rotar|Rotate) 90° CCW");
+    rotate270Item.addEventListener("click", () => this.rotate(270));
+    transformSection.appendChild(rotate270Item);
+
+    const rotate180Item = document.createElement("div");
+    rotate180Item.className = "menu-item";
+    rotate180Item.textContent = __("(Rotar|Rotate) 180°");
+    rotate180Item.addEventListener("click", () => this.rotate(180));
+    transformSection.appendChild(rotate180Item);
+
+    // Animation section
+    const animationSection = document.createElement("div");
+    animationSection.className = "menu-section";
+    container.appendChild(animationSection);
+
+    const animationH3 = document.createElement("h3");
+    animationH3.textContent = __("Animación||Animation");
+    animationSection.appendChild(animationH3);
+
+    const fpsItem = document.createElement("div");
+    fpsItem.className = "menu-item";
+    fpsItem.textContent = __("Cambiar FPS...||Set FPS...");
+    fpsItem.addEventListener("click", () => this.showFPSDialog());
+    animationSection.appendChild(fpsItem);
+
+    const frameTimeItem = document.createElement("div");
+    frameTimeItem.className = "menu-item";
+    frameTimeItem.textContent = __("Cambiar Tiempo del Frame...||Set Frame Time...");
+    frameTimeItem.addEventListener("click", () => this.showCurrentFrameTimeDialog());
+    animationSection.appendChild(frameTimeItem);
+  
+    // Clipboard section
+    const clipboardSection = document.createElement("div");
+    clipboardSection.className = "menu-section";
+    container.appendChild(clipboardSection);
+  
+    const clipboardH3 = document.createElement("h3");
+    clipboardH3.textContent = __("Portapapeles||Clipboard");
+    clipboardSection.appendChild(clipboardH3);
+  
+    const clipboardItem = document.createElement("div");
+    clipboardItem.className = "menu-item";
+    clipboardItem.textContent = __("Abrir Portapapeles||Open Clipboard");
+    clipboardItem.addEventListener("click", () => this.selectionManager.showClipboard());
+    clipboardSection.appendChild(clipboardItem);
+
+    // Settings section
+    const settingsSection = document.createElement("div");
+    settingsSection.className = "menu-section";
+    container.appendChild(settingsSection);
+    
+    const settingsH3 = document.createElement("h3");
+    settingsH3.textContent = __("Ajustes||Settings");
+    settingsSection.appendChild(settingsH3);
+    
+    const settingsItem = document.createElement("div");
+    settingsItem.className = "menu-item";
+    settingsItem.textContent = __("Configurar||Configure");
+    settingsItem.addEventListener("click", () => this.settingsUI.toggle());
+    settingsSection.appendChild(settingsItem);
+  }
+
+  createViewMenu(container) {
+    const viewSection = document.createElement("div");
+    viewSection.className = "menu-section";
+    container.appendChild(viewSection);
+    
+    const zoomInItem = document.createElement("div");
+    zoomInItem.className = "menu-item";
+    zoomInItem.textContent = __("Acercar||Zoom In");
+    zoomInItem.addEventListener("click", () => this.zoom(1.2));
+    viewSection.appendChild(zoomInItem);
+
+    const zoomOutItem = document.createElement("div");
+    zoomOutItem.className = "menu-item";
+    zoomOutItem.textContent = __("Alejar||Zoom Out");
+    zoomOutItem.addEventListener("click", () => this.zoom(0.8));
+    viewSection.appendChild(zoomOutItem);
+
+    const resetZoomItem = document.createElement("div");
+    resetZoomItem.className = "menu-item";
+    resetZoomItem.textContent = __("Reiniciar zoom||Reset Zoom");
+    resetZoomItem.addEventListener("click", () => this.resetZoom());
+    viewSection.appendChild(resetZoomItem);
+
+    const togglePreviewItem = document.createElement("div");
+    togglePreviewItem.className = "menu-item";
+    togglePreviewItem.textContent = __("Alternar vista previa||Toggle Preview");
+    togglePreviewItem.addEventListener("click", () => this.togglePreview());
+    viewSection.appendChild(togglePreviewItem);
+  }
+
+  createColorMenu(container) {
+    const colorSection = document.createElement("div");
+    colorSection.className = "menu-section";
+    container.appendChild(colorSection);
+
+    const h3 = document.createElement("h3");
+    h3.textContent = __("Ajustes de Color||Color Adjustments");
+    colorSection.appendChild(h3);
+
+    const transparencyItem = document.createElement("div");
+    transparencyItem.className = "menu-item";
+    transparencyItem.textContent = __("Alternar Transparencia||Toggle Transparency");
+    transparencyItem.addEventListener("click", () => this.toggleTransparency());
+    colorSection.appendChild(transparencyItem);
+
+    const invertItem = document.createElement("div");
+    invertItem.className = "menu-item";
+    invertItem.textContent = __("Invertir Colores||Invert Colors");
+    invertItem.addEventListener("click", () => this.invertColors());
+    colorSection.appendChild(invertItem);
+
+    const grayscaleItem = document.createElement("div");
+    grayscaleItem.className = "menu-item";
+    grayscaleItem.textContent = __("Escala de Grises||Grayscale");
+    grayscaleItem.addEventListener("click", () => this.grayscale());
+    colorSection.appendChild(grayscaleItem);
+  }
+
+  createHelpMenu(container) {
+    const helpSection = document.createElement("div");
+    helpSection.className = "menu-section";
+    container.appendChild(helpSection);
+
+    const aboutItem = document.createElement("div");
+    aboutItem.className = "menu-item";
+    aboutItem.textContent = __("Acerca de...||About...");
+    aboutItem.addEventListener("click", () => this.showAboutDialog());
+    helpSection.appendChild(aboutItem);
+
+    const manualItem = document.createElement("div");
+    manualItem.className = "menu-item";
+    manualItem.textContent = "Manual";
+    manualItem.addEventListener("click", () => this.showManualDialog());
+    helpSection.appendChild(manualItem);
+  }
+
+  showMenuContent(name) {
+    // Hide all content
+    const contents = this.menuContent.querySelectorAll('div[class^="menu-content-"]');
+    contents.forEach(content => {
+      content.style.display = "none";
+    });
+
+    // Deactivate all tabs
+    const tabs = this.menuTabs.querySelectorAll(".menu-tab");
+    tabs.forEach(tab => {
+      tab.classList.remove("active");
+    });
+
+    // Show selected content
+    const content = this.menuContent.querySelector(`.menu-content-${name.toLowerCase()}`);
+    if (content) {
+      content.style.display = "block";
+    }
+
+    // Activate selected tab
+    const tab = Array.from(tabs).find(t => t.name === name);
+    if (tab) {
+      tab.classList.add("active");
+    }
+  }
+
+  toggleMenu() {
+    this.menuPanelOverlay.classList.toggle("visible");
+  }
+
+  togglePanel(panel) {
+    if (panel === "animation") {
+      this.animationPanel.classList.toggle("visible");
+      this.animationButton.classList.toggle("active");
+      this.layersPanel.classList.remove("visible");
+      this.layersButton.classList.remove("active");
+      this.adjustTimelinePosition();
+      this.gridManager.hide();
+      this.selectionManager.clipboardPanel.classList.remove('visible');
+      this.menuPanelOverlay.classList.remove("visible");
+    } else if (panel === "layers") {
+      this.layersPanel.classList.toggle("visible");
+      this.layersButton.classList.toggle("active");
+      this.animationPanel.classList.remove("visible");
+      this.animationButton.classList.remove("active");
+      this.menuPanelOverlay.classList.remove("visible");
+      this.selectionManager.clipboardPanel.classList.remove('visible');
+      this.gridManager.hide();
+    }
+  }
+
+  togglePreview() {
+    this.showMiniView = !this.showMiniView;
+    this.animationPreview.classList.toggle("visible");
+  }
+
+  shouldBlockInput() {
+    // Block touch if some panels are visible
+    if (this.menuPanelOverlay.classList.contains("visible")) {
+      this.toggleMenu();
+      return true;
+    } else if (this.layersPanel.classList.contains("visible")) {
+      this.togglePanel("layers");
+      return true;
+    }
+     
+    // Otherwise don't block
+    return false;
+  }
+
+  handleMouseDown(e) {
+    if (this.shouldBlockInput()) return; // Hide menus if visible
+
+    const pos = this.getCanvasPosition(e.clientX, e.clientY, this.ensureBoundsDrawing);
+    if (!pos) return;
+
+    switch(e.button) {
+      case 0: // Left click
+        this.isDrawing = true;
+        this.startX = pos.x;
+        this.startY = pos.y;
+    
+        if (this.currentTool && this.currentTool.onDown) {
+          this.currentTool.onDown(pos.x, pos.y);
+        }
+        break;
+      case 1: // Middle click
+        if (this.isDrawing) {
+          this.handleMouseUp(e);
+        }
+        this.startPan(e);
+        break;
+      case 2: // Right click
+        e.preventDefault();
+        this.handleMouseUp(e);
+        // TODO: Context menu
+        break;
+    }
+  }
+
+  handleMouseMove(e) {
+    const pos = this.getCanvasPosition(e.clientX, e.clientY, this.ensureBoundsDrawing);
+    if (!pos) return;
+    
+    if (this.isDrawing && this.currentTool && this.currentTool.onMove) {
+      this.currentTool.onMove(pos.x, pos.y);
+    }
+    
+    if (this.isPanning) {
+      this.pan(e.clientX, e.clientY);
+    }
+
+    e.preventDefault();
+  }
+
+  handleMouseUp(e) {
+    this.isPanning = false;
+    
+    this.canvas.style.cursor = this.canvas.style.cursor = this.currentTool.cursor;
+    
+    if (!this.isDrawing) return;
+
+    const pos = this.getCanvasPosition(e.clientX, e.clientY, this.ensureBoundsDrawing);
+    if (pos && this.currentTool && this.currentTool.onUp) {
+      this.currentTool.onUp(pos.x, pos.y, this.startX, this.startY);
+    }
+
+    this.isDrawing = false;
+  }
+  
+  handleMouseWheel(e) {
+    e.preventDefault();
+    if (e && e.deltaY != 0) {
+      if (e.deltaY < 0) {
+        this.zoom(1.2, e.clientX, e.clientY);
+      } else {
+        this.zoom(0.8, e.clientX, e.clientY);
+      }
+      this.cancelDrawing();
+    }
+  }
+  
+  handleTouchStart(e) {
+    if (this.shouldBlockInput()) return;
+    if (this.isColorPicking) {
+      e.preventDefault();
+      return;
+    }
+  
+    e.preventDefault();
+  
+    if (e.touches.length === 1) {
+      // Single touch: potential drawing
+      const touch = e.touches[0];
+      const pos = this.getCanvasPosition(touch.clientX, touch.clientY, this.ensureBoundsDrawing);
+      if (!pos) return;
+  
+      // Store touch start info
+      this._touchStartTime = Date.now();
+      this._touchStartPos = { x: touch.clientX, y: touch.clientY };
+      this._touchStartCanvasPos = { x: pos.x, y: pos.y };
+      this._isPotentialTap = true;
+      
+      // Don't start drawing immediately - wait to see if it's a pan
+      this._touchTimer = setTimeout(() => {
+        if (!this.isCanvasResizing && !this.isPanning && this._isPotentialTap) {
+          this.isDrawing = true;
+          this.startX = pos.x;
+          this.startY = pos.y;
+          this.lastX = pos.x;
+          this.lastY = pos.y;
+  
+          if (this.currentTool && this.currentTool.onDown) {
+            this.currentTool.onDown(pos.x, pos.y);
+          }
+        }
+        this._touchTimer = null;
+      }, 64);
+    } else if (e.touches.length === 2) {
+      this.cancelDrawing();
+            
+      // Two fingers: pan and zoom
+      this.isPanning = true;
+      this.isDrawing = false;
+      
+      // Clear any pending drawing timer
+      if (this._touchTimer) {
+        clearTimeout(this._touchTimer);
+        this._touchTimer = null;
+      }
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+  
+      // Store initial touch positions
+      this.touchStart1 = { x: touch1.clientX, y: touch1.clientY };
+      this.touchStart2 = { x: touch2.clientX, y: touch2.clientY };
+  
+      // Calculate initial distance and center
+      this.touchDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+  
+      this.touchCenterX = (touch1.clientX + touch2.clientX) / 2;
+      this.touchCenterY = (touch1.clientY + touch2.clientY) / 2;
+  
+      // Store current transform
+      this.touchStartScale = this.scale;
+      this.touchStartPosX = this.posX;
+      this.touchStartPosY = this.posY;
+      this.startPan({ clientX: this.touchCenterX, clientY: this.touchCenterY });
+  
+      // Get the canvas point under the center using fixed precision
+      const canvasPoint = this.getCanvasPosition(this.touchCenterX, this.touchCenterY, this.ensureBoundsDrawing);
+      
+      if (canvasPoint) {
+        this.touchCenterCanvasX = canvasPoint.x;
+        this.touchCenterCanvasY = canvasPoint.y;
+      }
+    } else if (e.touches.length === 3) {
+      // Three fingers: brush size adjustment
+      e.preventDefault();
+      
+      // Get all three touch points
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const touch3 = e.touches[2];
+  
+      // Calculate the average position of all three touches (center point)
+      const centerX = (touch1.clientX + touch2.clientX + touch3.clientX) / 3;
+      const centerY = (touch1.clientY + touch2.clientY + touch3.clientY) / 3;
+  
+      // Calculate distances from center to each touch
+      const dist1 = Math.hypot(touch1.clientX - centerX, touch1.clientY - centerY);
+      const dist2 = Math.hypot(touch2.clientX - centerX, touch2.clientY - centerY);
+      const dist3 = Math.hypot(touch3.clientX - centerX, touch3.clientY - centerY);
+  
+      // Average the distances to get a stable spread value
+      const currentSpread = (dist1 + dist2 + dist3) / 3;
+  
+      // Store initial values
+      this.initialBrushSpread = currentSpread;
+      this.initialBrushSize = this.brushSize;
+      this.isBrushResizing = true;
+      this.brushResizingCenter = { x: centerX, y: centerY };
+  
+      // Show brush size indicator
+      this.brushSizeIndicator.style.display = "block";
+      this.updateBrushSizeIndicator();
+      
+      // Cancel any pending drawing
+      if (this._touchTimer) {
+        clearTimeout(this._touchTimer);
+        this._touchTimer = null;
+      }
+      this.isDrawing = false;
+    }
+  }
+  
+  handleTouchMove(e) {
+    e.preventDefault();
+  
+    if (e.touches.length === 1 && this.isDrawing) {
+      // Drawing with single finger
+      const touch = e.touches[0];
+      
+      // Check if this is still a tap (minimal movement)
+      if (this._isPotentialTap) {
+        const moveDistance = Math.hypot(
+          touch.clientX - this._touchStartPos.x,
+          touch.clientY - this._touchStartPos.y
+        );
+        if (moveDistance > 5) {
+          this._isPotentialTap = false;
+        }
+      }
+      
+      const pos = this.getCanvasPosition(touch.clientX, touch.clientY, this.ensureBoundsDrawing);
+  
+      if (pos && this.currentTool && this.currentTool.onMove) {
+        this.currentTool.onMove(pos.x, pos.y);
+        this.lastX = pos.x;
+        this.lastY = pos.y;
+      }
+    } else if (e.touches.length === 2 && this.isPanning) {
+      // Two-finger pan and zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+  
+      // Calculate new distance and center
+      const newDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+  
+      const newCenterX = (touch1.clientX + touch2.clientX) / 2;
+      const newCenterY = (touch1.clientY + touch2.clientY) / 2;
+  
+      // Calculate zoom factor with minimum change threshold to reduce flicker
+      if (this.touchDistance > 0 && Math.abs(newDistance - this.touchDistance) > 1) {
+        const zoomFactor = newDistance / this.touchDistance;
+        
+        this.pan(newCenterX, newCenterY, zoomFactor);
+      } else {
+        this.pan(newCenterX, newCenterY, 1);
+      }
+    } else if (e.touches.length === 3 && this.isBrushResizing) {
+      // Three-finger brush size adjustment
+      e.preventDefault();
+      
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const touch3 = e.touches[2];
+  
+      // Calculate current center point
+      const centerX = (touch1.clientX + touch2.clientX + touch3.clientX) / 3;
+      const centerY = (touch1.clientY + touch2.clientY + touch3.clientY) / 3;
+  
+      // Calculate current spread (average distance from center)
+      const dist1 = Math.hypot(touch1.clientX - centerX, touch1.clientY - centerY);
+      const dist2 = Math.hypot(touch2.clientX - centerX, touch2.clientY - centerY);
+      const dist3 = Math.hypot(touch3.clientX - centerX, touch3.clientY - centerY);
+      const currentSpread = (dist1 + dist2 + dist3) / 3;
+  
+      // Only update if spread changed significantly to avoid jitter
+      if (Math.abs(currentSpread - this.initialBrushSpread) > 0.001) {
+        // Calculate scale factor based on spread change
+        const scaleFactor = currentSpread / this.initialBrushSpread;
+        
+        // Calculate new brush size
+        let newSize = Math.round(this.initialBrushSize * scaleFactor);
+        
+        // Constrain to min/max
+        newSize = Math.max(this.minBrushSize, Math.min(newSize, this.maxBrushSize));
+        
+        // Update if changed
+        if (newSize !== this.brushSize) {
+          this.brushSize = newSize;
+          this.updateBrushSizeIndicator();
+          localStorage.setItem("brushSize", this.brushSize);
+        }
+      }
+    }
+  }
+  
+  handleTouchEnd(e) {
+    e.preventDefault();
+  
+    // Clear any pending timer
+    if (this._touchTimer) {
+      clearTimeout(this._touchTimer);
+      this._touchTimer = null;
+    }
+  
+    if (e.touches.length === 0) {
+      // All touches ended
+      if (this.isDrawing) {
+        const wasTap = this._isPotentialTap && (Date.now() - this._touchStartTime < 300);
+  
+        if (this.currentTool && this.currentTool.onUp) {
+          this.currentTool.onUp(this.lastX, this.lastY, this.startX, this.startY);
+        }
+        
+        this.canvas.style.cursor = this.currentTool ? this.currentTool.cursor : "crosshair";
+      }
+  
+      // Reset all states
+      this.isPanning = false;
+      this.isDrawing = false;
+      this._isPotentialTap = false;
+      this.touchDistance = 0;
+  
+      // Hide brush size indicator after delay
+      if (this.isBrushResizing) {
+        setTimeout(() => {
+          this.brushSizeIndicator.style.display = "none";
+        }, 2000);
+      }
+    } else if (e.touches.length === 1) {
+      // One finger remaining: prepare for drawing
+      this.touchDistance = 0;
+      this._isPotentialTap = true;
+      
+      // Store new touch start position
+      const touch = e.touches[0];
+      this._touchStartPos = { x: touch.clientX, y: touch.clientY };
+      this._touchStartTime = Date.now();
+    } else if (e.touches.length === 2) {
+      // Two fingers remaining, prevent zooming and drawing
+      
+      this.isPanning = false;
+      this.isDrawing = false;
+    }
+  }
+
+  handleTouchCancel(e) {
+    if (this.isColorPicking || this.colorPickTimeout) {
+      this.cleanupColorPicking();
+    }
+  }
+
+  handleKeyDown(e) {
+    const { ctrlKey, key } = event;
+    
+    // Handle general keyboard shortcuts
+    if (ctrlKey) {
+      if (key == "z") {
+        this.undo();
+        e.preventDefault();
+        return;
+      } else if (key == "y") {
+        this.undo();
+        e.preventDefault();
+        return;
+      } else if (key == "a") {
+        this.togglePanel("animation");
+        e.preventDefault();
+        return;
+      } else if (key == "l") {
+        this.togglePanel("layers");
+        e.preventDefault();
+        return;
+      } else if (key == " ") {
+        this.switchLastTool();
+        e.preventDefault();
+        return;
+      } else if (key == "Escape") {
+        this.toggleMenu();
+        e.preventDefault();
+        return;
+      }
+    }
+    
+    // Handle selection system shortcuts
+    if (key === 'Delete' || key === 'Supr') {
+      if (this.selectionManager.hasSelection) {
+        this.selectionManager.delete();
+        e.preventDefault();
+        return;
+      }
+    }
+    if (ctrlKey && key === 'c') {
+      if (this.selectionManager.hasSelection) {
+        this.selectionManager.copy();
+        e.preventDefault();
+        return;
+      }
+    }
+    if (ctrlKey && key === 'x') {
+      if (this.selectionManager.hasSelection) {
+        this.selectionManager.cut();
+        e.preventDefault();
+        return;
+      }
+    }
+    if (ctrlKey && key === 'v') {
+      this.selectionManager.paste();
+      e.preventDefault();
+      return;
+    }
+    
+    // Handle tool keyboard shortcuts
+    for (const tool of Object.values(this.tools)) {
+      if (tool.shortcut && tool.shortcut == e.key) {
+        this.setTool(tool.name);
+        return;
+      }
+    };
+  }
+
+  handleResize() {
+    this.updateCanvasTransform();
+    this.adjustTimelinePosition();
+  }
+
+  adjustTimelinePosition() {
+    if (!this.animationPanel) return;
+
+    // Ensure timeline stays above bottom bar
+    const bottomBarHeight = this.bottomBar.offsetHeight;
+    this.animationPanel.style.bottom = `${bottomBarHeight}px`;
+  }
+
+  getCanvasPosition(clientX, clientY, ensureBounds = true) {
+    if (!this.project) return null;
+  
+    // Get container position and dimensions
+    const rect = this.canvasContainer.getBoundingClientRect();
+    
+    // Convert to container coordinates (0,0 at container top-left)
+    const containerX = clientX - rect.left;
+    const containerY = clientY - rect.top;
+  
+    // Convert to viewport coordinates (0,0 at canvas center)
+    const viewportX = containerX - rect.width / 2;
+    const viewportY = containerY - rect.height / 2;
+  
+    // Apply inverse transform to get canvas coordinates
+    // First subtract position offset
+    const worldX = viewportX - this.posX;
+    const worldY = viewportY - this.posY;
+  
+    // Then divide by scale and add canvas center
+    const canvasX = Math.floor(worldX / this.scale + this.project.width / 2);
+    const canvasY = Math.floor(worldY / this.scale + this.project.height / 2);
+  
+    // Check bounds
+    if (ensureBounds) {
+      if (canvasX < 0 || canvasX >= this.project.width || 
+          canvasY < 0 || canvasY >= this.project.height) {
+        return null;
+      }
+    }
+  
+    return { x: canvasX, y: canvasY };
+  }
+  
+  canvasToScreen(canvasX, canvasY) {
+    if (!this.project) return null;
+    
+    const rect = this.canvasContainer.getBoundingClientRect();
+    
+    // Calculate screen position
+    const screenX = rect.left + rect.width / 2 + 
+                    (canvasX - this.project.width / 2) * this.scale + 
+                    this.posX;
+    const screenY = rect.top + rect.height / 2 + 
+                    (canvasY - this.project.height / 2) * this.scale + 
+                    this.posY;
+    
+    return { x: screenX, y: screenY };
+  }
+  
+  checkBounds(x, y) {
+    return x >= 0 && x < this.project.width && y >= 0 && y < this.project.height;
+  }
+  
+  startPan(e) {
+    this.isPanning = true;
+    this.canvas.style.cursor = "grabbing";
+    this.panStartX = e.clientX;
+    this.panStartY = e.clientY;
+    this.panStartCanvasPoint = this.getCanvasPosition(e.clientX, e.clientY);
+    this.panStartScale = this.scale;
+  }
+  
+  pan(clientX, clientY, zoomFactor = 1) {
+    if (!this.panStartCanvasPoint) return;
+    
+    const newScale = this.panStartScale * zoomFactor;
+        
+    // Clamp scale
+    this.scale = Math.max(this.minScale, Math.min(newScale, this.maxScale));
+        
+    // Get container dimensions
+    const rect = this.canvasContainer.getBoundingClientRect();
+        
+    // Calculate where th point should be in canvas coordinates
+    const canvasX = this.panStartCanvasPoint.x;
+    const canvasY = this.panStartCanvasPoint.y;
+        
+    // Calculate where this canvas point should be on screen at new scale
+    // Formula: screenX = (canvasX - width/2) * scale + containerWidth/2 + startPosX
+    const targetScreenX = (canvasX - this.project.width / 2) * this.scale + rect.width / 2 + this.panStartCanvasPoint.x;
+    const targetScreenY = (canvasY - this.project.height / 2) * this.scale + rect.height / 2 + this.panStartCanvasPoint.y;
+        
+    // Calculate the offset needed to keep the canvas point under the new center
+    const deltaX = clientX - targetScreenX;
+    const deltaY = clientY - targetScreenY;
+        
+    // Update position with rounding to reduce subpixel flicker
+    this.posX = Math.round(this.panStartCanvasPoint.x + deltaX);
+    this.posY = Math.round(this.panStartCanvasPoint.y + deltaY);
+    
+    this.updateCanvasTransform();
+  }
+
+  zoom(factor, clientX = this.panStartCanvasPoint.x, clientY = this.panStartCanvasPoint.y) {
+    const oldScale = this.scale;
+    this.scale *= factor;
+
+    // Limit zoom
+    this.scale = Math.max(this.minScale, Math.min(this.scale, this.maxScale));
+
+    if (clientX !== undefined && clientY !== undefined) {
+      // Get container position
+      const rect = this.canvasContainer.getBoundingClientRect();
+      const containerX = clientX - rect.left;
+      const containerY = clientY - rect.top;
+
+      // Calculate mouse position relative to center
+      const mouseX = containerX - this.canvasContainer.clientWidth / 2;
+      const mouseY = containerY - this.canvasContainer.clientHeight / 2;
+
+      // Adjust position to zoom toward mouse
+      this.posX = mouseX - (mouseX - this.posX) * (this.scale / oldScale);
+      this.posY = mouseY - (mouseY - this.posY) * (this.scale / oldScale);
+    }
+
+    this.updateCanvasTransform();
+  }
+
+  resetZoom() {
+    if (!this.project) return;
+
+    // Calculate scale to fit canvas to container
+    const containerWidth = this.canvasContainer.clientWidth;
+    const containerHeight = this.canvasContainer.clientHeight;
+
+    const scaleX = containerWidth / this.project.width;
+    const scaleY = containerHeight / this.project.height;
+    this.scale = Math.min(scaleX, scaleY);
+
+    this.scale = Math.min(this.scale, 10);
+
+    // Reset position
+    this.posX = 0;
+    this.posY = 0;
+
+    this.updateCanvasTransform();
+  }
+
+  updateCanvasTransform() {
+    if (!this.project) return;
+
+    // Get container dimensions
+    const containerWidth = this.canvasContainer.clientWidth;
+    const containerHeight = this.canvasContainer.clientHeight;
+
+    // Calculate the canvas center in its own coordinate space
+    const center = {
+      x: this.project.width / 2,
+      y: this.project.height / 2
+    };
+    
+    // Apply the transform to the wrapper
+    this.canvasWrapper.style.transform = `
+      translate(${this.posX}px, ${this.posY}px)
+      translate(${- center.x * this.scale}px, ${- center.y * this.scale}px)
+      scale(${this.scale})
+    `;
+    
+    // Reverse the scale on background size so it appears constant
+    // Base size is 16px, but we need to divide by scale to counteract the transform
+    const baseSize = 32;
+    const bgSize = Math.min(512, baseSize / this.scale);
+    
+    // Update canvas background style
+    this.canvas.style.backgroundSize = `${bgSize}px ${bgSize}px`;
+  }
+  
+  // Project management
+  newProject(width = this.defaultWidth, height = this.defaultHeight, imageData = null) {
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast(__('Desconectate de la sesión colaborativa primero||Disconnect from collaborative session first'));
+      return;
+    }
+
+    this.project = this.getNewProjectData(width, height, imageData);
+
+    this.transparentBackground = true;
+
+    this.saveLastProjectSize();
+    
+    this.historyManager.clear();
+    
+    if (this.usePerProjectFloatingColors) {
+      this.colorPicker.removeAllFloatingPaletteColors();
+    }
+
+    if (this.collabManager.isConnected && this.collabManager.isHost) {
+      this.collabManager.sendFullState(null, imageData ? 'load_project' : 'new_project');
+    }
+
+    this.animationPanel.classList.remove("visible");
+    this.menuPanelOverlay.classList.remove("visible");
+    this.layersPanel.classList.remove("visible");
+
+    this.resetCanvasSize();
+    this.resetZoom();
+    this.render();
+  }
+  
+  saveLastProjectSize() {
+    localStorage.setItem("lastProjectWidth", this.project.width);
+    localStorage.setItem("lastProjectHeight", this.project.height);
+  }
+  
+  getNewProjectData(width, height, img) {
+    const project =  {
+      version: this.version,
+      backgroundColor: 'transparent',
+      transparentBackground: false,
+      createdAt: new Date().toISOString(),
+      width: width,
+      height: height,
+      frames: [
+        {
+          layers: [this.createBlankLayer(width, height, __("Capa Base||Default Layer"))]
+        }
+      ],
+      currentFrameTime: 1000 / 12,
+      frameTimes: [1000 / 12],
+      floatingColors: [],
+      currentFrame: 0,
+      currentLayer: 0
+    };
+    
+    if (img) {
+      const layer = project.frames[0].layers[0];
+      layer.ctx.drawImage(img, 0, 0);
+    }
+    
+    return project;
+  }
+
+  resetCanvasSize() {
+    if (!this.project) return;
+
+    this.canvas.width = this.project.width;
+    this.canvas.height = this.project.height;
+  }
+  
+  startResizeCanvas(mode = 'crop') {
+    if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast(__('Solo el anfitrión puede redimensionar el canvas||Only host can resize canvas'));
+      return;
+    }
+    
+    this.isCanvasResizing = true;
+    this.canvasResizeMode = mode;
+    
+    // Initialize resize state
+    this.canvasResizeState = {
+      x: 0,
+      y: 0,
+      width: this.project.width,
+      height: this.project.height
+    };
+    
+    // Show controls
+    this.showCanvasResizeControls();
+    this.enterImmersive();
+    
+    // Show bottom confirmation
+    this.showBottomConfirmation(
+      __('Aceptar||Accept'),
+      __('Cancelar||Cancel'),
+      (accepted) => {
+        if (accepted) {
+          this.finishResizeCanvas();
+        } else {
+          this.cancelResizeCanvas();
+        }
+      }
+    );
+    
+    // Setup event handlers
+    this.setupResizeEventHandlers();
+  }
+  
+  setupResizeEventHandlers() {
+    if (this.resizeHandlersSetup) return;
+    
+    // Set cursors
+    this.canvasResizeX.style.cursor = 'ew-resize';
+    this.canvasResizeY.style.cursor = 'ns-resize';
+    this.canvasResizeWidth.style.cursor = 'ew-resize';
+    this.canvasResizeHeight.style.cursor = 'ns-resize';
+    
+    const handleResizeStart = (e, edge) => {
+      if (!this.isCanvasResizing) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Get position in canvas coordinates (project space)
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      
+      const pos = this.getCanvasPosition(clientX, clientY, false);
+      if (!pos) return;
+      
+      this.resizeDragState = {
+        active: true,
+        edge: edge,
+        startCanvasX: pos.x,
+        startCanvasY: pos.y,
+        startState: { ...this.canvasResizeState }
+      };
+      
+      // Add global handlers
+      document.addEventListener('mousemove', this.handleResizeMove);
+      document.addEventListener('mouseup', this.handleResizeEnd);
+      document.addEventListener('touchmove', this.handleResizeMove, { passive: false });
+      document.addEventListener('touchend', this.handleResizeEnd);
+      document.addEventListener('touchcancel', this.handleResizeEnd);
+    };
+    
+    const handleResizeMove = (e) => {
+      if (!this.resizeDragState?.active) return;
+      
+      e.preventDefault();
+      
+      // Get current position in canvas coordinates
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+      
+      const pos = this.getCanvasPosition(clientX, clientY, false);
+      if (!pos) return;
+      
+      const edge = this.resizeDragState.edge;
+      const start = this.resizeDragState.startState;
+      let needsUpdate = false;
+      
+      switch(edge) {
+        case 'x': // Left edge: only X changes
+          {
+            const newX = Math.round(pos.x);
+            if (newX !== this.canvasResizeState.x) {
+              this.canvasResizeState.x = newX;
+              this.canvasResizeState.width = start.width + (start.x - newX);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'y': // Top edge: only Y changes
+          {
+            const newY = Math.round(pos.y);
+            if (newY !== this.canvasResizeState.y) {
+              this.canvasResizeState.y = newY;
+              this.canvasResizeState.height = start.height + (start.y - newY);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'width': // Right edge: only width changes
+          {
+            const newWidth = Math.round(pos.x - start.x);
+            if (newWidth !== this.canvasResizeState.width) {
+              this.canvasResizeState.width = Math.max(1, newWidth);
+              needsUpdate = true;
+            }
+            break;
+          }
+        case 'height': // Bottom edge: only height changes
+          {
+            const newHeight = Math.round(pos.y - start.y);
+            if (newHeight !== this.canvasResizeState.height) {
+              this.canvasResizeState.height = Math.max(1, newHeight);
+              needsUpdate = true;
+            }
+            break;
+          }
+      }
+      
+      // Ensure width/height don't go negative
+      if (this.canvasResizeState.width < 1) this.canvasResizeState.width = 1;
+      if (this.canvasResizeState.height < 1) this.canvasResizeState.height = 1;
+      
+      if (needsUpdate) {
+        this.updateCanvasResizeControls();
+      }
+    };
+    
+    const handleResizeEnd = () => {
+      this.resizeDragState = null;
+      document.removeEventListener('mousemove', this.handleResizeMove);
+      document.removeEventListener('mouseup', this.handleResizeEnd);
+      document.removeEventListener('touchmove', this.handleResizeMove);
+      document.removeEventListener('touchend', this.handleResizeEnd);
+      document.removeEventListener('touchcancel', this.handleResizeEnd);
+    };
+    
+    // Bind methods
+    this.handleResizeMove = handleResizeMove.bind(this);
+    this.handleResizeEnd = handleResizeEnd.bind(this);
+    
+    // Add event listeners
+    this.canvasResizeX.addEventListener('mousedown', (e) => handleResizeStart(e, 'x'));
+    this.canvasResizeX.addEventListener('touchstart', (e) => handleResizeStart(e, 'x'), { passive: false });
+    
+    this.canvasResizeY.addEventListener('mousedown', (e) => handleResizeStart(e, 'y'));
+    this.canvasResizeY.addEventListener('touchstart', (e) => handleResizeStart(e, 'y'), { passive: false });
+    
+    this.canvasResizeWidth.addEventListener('mousedown', (e) => handleResizeStart(e, 'width'));
+    this.canvasResizeWidth.addEventListener('touchstart', (e) => handleResizeStart(e, 'width'), { passive: false });
+    
+    this.canvasResizeHeight.addEventListener('mousedown', (e) => handleResizeStart(e, 'height'));
+    this.canvasResizeHeight.addEventListener('touchstart', (e) => handleResizeStart(e, 'height'), { passive: false });
+    
+    this.resizeHandlersSetup = true;
+  }  
+
+  showCanvasResizeControls() {
+    this.canvasResizeControls.style.display = 'block';
+    this.updateCanvasResizeControls();
+  }
+  
+  updateCanvasResizeControls() {
+    if (!this.canvasResizeState) return;
+    
+    const state = this.canvasResizeState;
+    
+    // Position the container
+    this.canvasResizeControls.style.left = `${state.x}px`;
+    this.canvasResizeControls.style.top = `${state.y}px`;
+    this.canvasResizeControls.style.width = `${state.width}px`;
+    this.canvasResizeControls.style.height = `${state.height}px`;
+    
+    // Position edges
+    this.canvasResizeX.style.left = `-1px`;
+    this.canvasResizeX.style.height = `${state.height}px`;
+    
+    this.canvasResizeY.style.top = `-1px`;
+    this.canvasResizeY.style.width = `${state.width}px`;
+    
+    this.canvasResizeWidth.style.left = `${state.width}px`;
+    this.canvasResizeWidth.style.height = `${state.height}px`;
+    
+    this.canvasResizeHeight.style.top = `${state.height}px`;
+    this.canvasResizeHeight.style.width = `${state.width}px`;
+  }
+  
+  hideCanvasResizeControls() {
+    this.canvasResizeControls.style.display = "none";
+  }
+  
+  finishResizeCanvas() {
+    if (!this.canvasResizeState) return;
+    
+    const state = this.canvasResizeState;
+    
+    // Handle negative dimensions
+    const cropX = state.width < 0 ? state.x + state.width : state.x;
+    const cropY = state.height < 0 ? state.y + state.height : state.y;
+    const cropWidth = Math.abs(state.width);
+    const cropHeight = Math.abs(state.height);
+    
+    // Start history batch
+    this.historyManager.startBatch('resize', __('Redimensionar Canvas||Resize Canvas'));
+    
+    const oldWidth = this.project.width;
+    const oldHeight = this.project.height;
+    
+    // Store all layers image data before resize
+    const framesData = [];
+    this.project.frames.forEach(frame => {
+      const frameData = {
+        layers: []
+      };
+      frame.layers.forEach(layer => {
+        const imageData = layer.ctx.getImageData(0, 0, oldWidth, oldHeight);
+        frameData.layers.push({
+          imageData: Array.from(imageData.data)
+        });
+      });
+      framesData.push(frameData);
+    });
+    
+    if (this.canvasResizeMode === "crop") {
+      // Perform resize
+      this.cropCanvas(cropX, cropY, cropWidth, cropHeight);
+      
+      // Record operation with full layer data
+      const operation = {
+        type: 'crop_canvas',
+        description: __('Recortar Canvas||Crop Canvas'),
+        oldWidth: oldWidth,
+        oldHeight: oldHeight,
+        newWidth: cropWidth,
+        newHeight: cropHeight,
+        cropX: cropX,
+        cropY: cropY,
+        framesData: framesData // Store all layer data for undo
+      };
+      
+      this.historyManager.addChange(operation);
+      this.historyManager.endBatch();
+      
+      // Send crop event if needed
+      if (this.collabManager.isConnected && this.collabManager.isHost) {
+        this.collabManager.sendCropMessage(cropX, cropY, cropWidth, cropHeight);
+      }
+    } else if (this.canvasResizeMode === "resize") {
+      // Perform resize
+      this.resizeCanvas(cropWidth, cropHeight);
+      
+      // Record operation with full layer data
+      const operation = {
+        type: 'resize_canvas',
+        description: __('Redimensionar Canvas||Resize Canvas'),
+        oldWidth: oldWidth,
+        oldHeight: oldHeight,
+        newWidth: cropWidth,
+        newHeight: cropHeight,
+        framesData: framesData // Store all layer data for undo
+      };
+      
+      this.historyManager.addChange(operation);
+      this.historyManager.endBatch();
+      
+      // Send resize event if needed
+      if (this.collabManager.isConnected && this.collabManager.isHost) {
+        this.collabManager.sendResizeMessage(cropWidth, cropHeight);
+      }
+    }
+    
+    this.stopResizeCanvas();
+  }  
+  
+  cancelResizeCanvas() {
+    this.stopResizeCanvas();
+    this.showToast(__('Redimensión cancelada||Resize cancelled'));
+  }
+  
+  stopResizeCanvas() {
+    this.isCanvasResizing = false;
+    this.canvasResizeState = null;
+    this.resizeDragState = null;
+    
+    this.hideCanvasResizeControls();
+    this.hideBottomConfirmation();
+    this.exitImmersive();
+  }
+  
+  cropCanvas(x = 0, y = 0, width = 32, height = 32, silent) {
+    if (!this.project) return;
+    
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
+    x = Math.floor(x);
+    y = Math.floor(y);
+    
+    this.project.width = width;
+    this.project.height = height;
+    this.resetCanvasSize();
+    
+    this.project.frames.forEach(frame => {
+      frame.layers.forEach(layer => {
+        const { canvas: tempCanvas, ctx: tempCtx } = this.getTempCanvas(width, height);
+        
+        tempCtx.drawImage(layer.canvas, -x, -y);
+        
+        layer.canvas.width = width;
+        layer.canvas.height = height;
+        layer.ctx.clearRect(0, 0, width, height);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+      });
+    });
+    
+    this.updateCanvasTransform();
+    this.render();
+    
+    if (!silent) {
+      this.showOperationMessage(__('Canvas recortado||Canvas cropped'));
+    }
+  }
+  
+  resizeCanvas(width = 32, height = 32, silent) {
+    if (!this.project) return;
+    
+    width = Math.max(1, Math.floor(width));
+    height = Math.max(1, Math.floor(height));
+    
+    this.project.width = width;
+    this.project.height = height;
+    this.resetCanvasSize();
+    
+    this.project.frames.forEach(frame => {
+      frame.layers.forEach(layer => {
+        const { canvas: tempCanvas, ctx: tempCtx } = this.getTempCanvas(width, height);
+        
+        tempCtx.drawImage(layer.canvas, 0, 0, width, height);
+        
+        layer.canvas.width = width;
+        layer.canvas.height = height;
+        layer.ctx.clearRect(0, 0, width, height);
+        layer.ctx.drawImage(tempCanvas, 0, 0);
+      });
+    });
+    
+    this.updateCanvasTransform();
+    this.render();
+    
+    if (!silent) {
+      this.showOperationMessage(__('Canvas redimensionado||Canvas resized'));
+    }
+  }
+  
+  enterImmersive() {
+    this.topBar.style.display = "none";
+    this.bottomBar.style.display = "none";
+    this.menuPanelOverlay.style.display = "none";
+    this.animationPanel.style.display = "none";
+    this.layersPanel.style.display = "none";
+    if (this.gridManager) this.gridManager.panel.style.display = "none";
+  }
+  
+  exitImmersive() {
+    this.topBar.style.display = "flex";
+    this.bottomBar.style.display = "flex";
+    this.menuPanelOverlay.style.display = "flex";
+    this.animationPanel.style.display = "flex";
+    this.layersPanel.style.display = "flex";
+    if (this.gridManager) this.gridManager.panel.style.display = "flex";
+  }
+
+  showBottomConfirmation(acceptText, cancelText, callback) {
+    if (!this.bottomConfirmation) {
+      this.bottomConfirmation = document.createElement('div');
+      this.bottomConfirmation.className = 'bottom-confirmation';
+      
+      this.confirmAccept = document.createElement('button');
+      this.confirmAccept.className = 'ui-button confirm-accept';
+      
+      this.confirmCancel = document.createElement('button');
+      this.confirmCancel.className = 'ui-button confirm-cancel';
+      
+      this.bottomConfirmation.appendChild(this.confirmAccept);
+      this.bottomConfirmation.appendChild(this.confirmCancel);
+      this.uiLayer.appendChild(this.bottomConfirmation);
+    }
+    
+    this.confirmAccept.textContent = acceptText;
+    this.confirmCancel.textContent = cancelText;
+    this.resizeCallback = callback;
+    this.bottomConfirmation.style.display = 'flex';
+    
+    this.confirmAccept.removeEventListener('click', this.handleResizeAccept);
+    this.confirmCancel.removeEventListener('click', this.handleResizeCancel);
+    
+    this.handleResizeAccept = () => {
+      if (this.resizeCallback) this.resizeCallback(true);
+      this.hideBottomConfirmation();
+    };
+    
+    this.handleResizeCancel = () => {
+      if (this.resizeCallback) this.resizeCallback(false);
+      this.hideBottomConfirmation();
+    };
+    
+    this.confirmAccept.addEventListener('click', this.handleResizeAccept);
+    this.confirmCancel.addEventListener('click', this.handleResizeCancel);
+  }
+  
+  hideBottomConfirmation() {
+    if (this.bottomConfirmation) {
+      this.bottomConfirmation.style.display = 'none';
+    }
+  }
+
+  render() {
+    if (!this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    if (!frame) return;
+
+    // Draw background if not transparent
+    if (!this.transparentBackground) {
+      this.ctx.fillStyle = this.secondaryColor;
+      this.ctx.fillRect(0, 0, this.project.width, this.project.height);
+    } else {
+      this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    }
+    
+    // Draw trace reference (bottom layer)
+    if (this.referenceManager) {
+      this.referenceManager.renderBottom(this.ctx, this.project.width, this.project.height);
+    }
+  
+    // Draw layers
+    for (let i = 0; i < frame.layers.length; i++) {
+      const layer = frame.layers[i];
+      if (layer.visible) {
+        this.ctx.drawImage(layer.canvas, 0, 0);
+      }
+    }
+      
+    // Draw trace reference (top layer)
+    if (this.referenceManager) {
+      this.referenceManager.renderTop(this.ctx, this.project.width, this.project.height);
+    }
+    
+    //  UI
+    this.updateFramesUI();
+    this.updateLayersUI();
+    this.updateAnimationPreview();
+  }
+  
+  renderQuick(drawReference, excludeParams) {
+    if (!this.project) return;
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    if (!frame) return;
+  
+    // Draw background if not transparent
+    if (!this.transparentBackground) {
+      this.ctx.fillStyle = this.secondaryColor;
+      this.ctx.fillRect(0, 0, this.project.width, this.project.height);
+    } else {
+      this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+    }
+    
+    // Draw trace reference (bottom layer)
+    if (this.referenceManager && drawReference) {
+      this.referenceManager.renderBottom(this.ctx, this.project.width, this.project.height);
+    }
+    
+    // Draw layers
+    for (let i = 0; i < frame.layers.length; i++) {
+      const layer = frame.layers[i];
+      if (layer.visible) {
+        this.ctx.drawImage(layer.canvas, 0, 0);
+      }
+    }
+    
+    // Apply exclusion mask if provided
+    if (excludeParams && excludeParams.pixels && excludeParams.pixels.length > 0) {
+      const { layerIndex, pixels } = excludeParams;
+      
+      // Only apply exclusion to the specified layer
+      if (layerIndex !== undefined && frame.layers[layerIndex]) {
+        const targetLayer = frame.layers[layerIndex];
+        const ctx = targetLayer.ctx;
+        
+        // Clear each excluded pixel from the layer
+        for (const pixel of pixels) {
+          const { x, y } = pixel;
+          if (x >= 0 && x < this.project.width && y >= 0 && y < this.project.height) {
+            ctx.clearRect(x, y, 1, 1);
+          }
+        }
+        
+        // Redraw the layer after clearing excluded pixels
+        this.ctx.drawImage(targetLayer.canvas, 0, 0);
+      }
+    }
+  
+    // Draw trace reference (top layer)
+    if (this.referenceManager && drawReference) {
+      this.referenceManager.renderTop(this.ctx, this.project.width, this.project.height);
+    }
+    
+    // UI
+    this.updateAnimationPreview();
+    this.updateFramesUIQuick();
+  }  
+  
+  getProjectSnapshot() {
+    if (!this.project) return null;
+
+    // Create a deep clone of the project
+    const snapshot = JSON.parse(JSON.stringify(this.project));
+
+    // Clone canvas data for each layer
+    for (let f = 0; f < snapshot.frames.length; f++) {
+      const frame = snapshot.frames[f];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        
+        // Remove useless canvas property
+        delete layer.canvas;
+        
+        const originalLayer = this.project.frames[f].layers[l];
+
+        // Store canvas data as image data
+        const ctx = originalLayer.ctx;
+        layer.imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+      }
+    }
+
+    return snapshot;
+  }
+
+  restoreProjectSnapshot(snapshot) {
+    if (!snapshot) return;
+
+    // Restore basic properties
+    this.project.currentFrame = snapshot.currentFrame;
+    this.project.currentLayer = snapshot.currentLayer;
+    this.project.currentFrameTime = snapshot.currentFrameTime;
+    this.project.frameTimes = snapshot.frameTimes;
+    this.project.width = snapshot.width;
+    this.project.height = snapshot.height;
+
+    // Restore canvas data for each layer
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const snapshotLayer = snapshot.frames[f].layers[l];
+        const existingCanvas = snapshotLayer.canvas;
+
+        // Recreate canvas
+        if (existingCanvas) {
+          layer.canvas = existingCanvas;
+        } else {
+          layer.canvas = document.createElement("canvas");
+        }
+        layer.canvas.width = this.project.width;
+        layer.canvas.height = this.project.height;
+
+        // Restore image data
+        if (snapshotLayer.imageData) {
+          layer.ctx.putImageData(snapshotLayer.imageData, 0, 0);
+        }
+      }
+    }
+
+    this.resetCanvasSize();
+    this.render();
+  }
+
+  saveToHistory() {
+    // End any current batch
+    this.historyManager.endBatch();
+    
+    // Update
+    this.render();
+  }
+  
+  recordDrawOperation(pixels, frame, layer) {
+    const operation = {
+      type: 'draw',
+      description: 'Draw pixels',
+      frameIndex: typeof frame != 'undefined' ? frame : this.project.currentFrame,
+      layerIndex: typeof layer != 'undefined' ? layer : this.project.currentLayer,
+      pixels: pixels
+    };
+    
+    this.historyManager.addChange(operation);
+  }
+  
+  undo() {
+    const undid = this.historyManager.undo()
+
+    if (undid) {
+      this.render();
+      this.showOperationMessage(undid.message);
+    }
+  }
+
+  redo() {
+    const redid = this.historyManager.redo();
+    if (redid) {
+      this.render();
+      this.showOperationMessage(redid.message);
+    }
+  }
+  
+  cancelDrawing() {
+    if (this.isDrawing) {
+      this.historyManager.endBatch(true);
+      this.render();
+    }
+  }
+
+  // Reference image methods
+  loadReferenceImage() {
+    this.referenceManager.showReferenceTypeDialog();
+  }
+
+  // Drawing Operations
+  drawPixel(x, y, options = {}) {
+    if (this.selectionManager.hasSelection && !this.selectionManager.shouldDrawOnSelection(x, y)) {
+      return []; // No dibujar fuera de la selección
+    }
+  
+    const pixels = this.pencilDraw(x, y, {
+      ctx: this.getCurrentLayerContext(),
+      color: this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor,
+      useBrush: true,
+      brushSize: this.brushSize,
+      ...options
+    });
+    this.recordDrawOperation(pixels);
+    this.render();
+    
+    return pixels;
+  }
+  
+  startLine(x, y, color) {
+    this.tempLine = { startX: x, startY: y };
+    this.getTempCanvas();
+    this.tempColor = color ? color : (this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor);
+  }
+
+  previewLine(x, y) {
+    if (!this.tempLine || !this.project) return;
+
+    // Clear temp canvas
+    this.tempCtx.clearRect(0, 0, this.project.width, this.project.height);
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from tool
+
+    // Draw line preview using Bresenham's algorithm
+    this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, this.tempCtx, this.tempColor, useBrush);
+
+    // Combine with main canvas
+    this.renderQuick(true);
+    this.ctx.drawImage(this.tempCanvas, 0, 0);
+  }
+
+  finishLine(x, y, record = true) {
+    if (!this.tempLine || !this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from tool
+
+    // Force render before drawing
+    this.renderQuick();
+
+    // Draw final line
+    let pixels = this.drawBresenhamLine(this.tempLine.startX, this.tempLine.startY, x, y, ctx, this.tempColor, useBrush);;
+    
+    this.recordDrawOperation(pixels);
+
+    // Clean up
+    this.tempLine = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+
+    this.render();
+    
+    return pixels;
+  }
+  
+  startRect(x, y) {
+    this.tempRect = {
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y
+    };
+    this.getTempCanvas();
+  }
+
+  previewRect(x, y) {
+    if (!this.tempRect || !this.project) return;
+
+    // Clear temp canvas
+    this.tempCtx.clearRect(0, 0, this.project.width, this.project.height);
+
+    // Calculate rectangle dimensions
+    let width = x - this.tempRect.startX;
+    let height = y - this.tempRect.startY;
+
+    // Handle perfect rectangle setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Store current position
+    this.tempRect.currentX = this.tempRect.startX + width;
+    this.tempRect.currentY = this.tempRect.startY + height;
+
+    // Settings
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const useBrush = true; // TODO: Get this setting from tool
+    const filled = this.currentTool.settings?.filled?.value;
+    
+    // Draw rectangle preview
+    this.drawRectangle(this.tempCtx, this.tempRect.startX, this.tempRect.startY, width, height, color, filled, useBrush);
+
+    // Combine with main canvas
+    this.renderQuick(true);
+    this.ctx.drawImage(this.tempCanvas, 0, 0);
+  }
+
+  finishRect(x, y) {
+    if (!this.tempRect || !this.project) return;
+
+    const ctx = this.getCurrentLayerContext(); 
+
+    // Calculate rectangle dimensions
+    let width = this.tempRect.currentX - this.tempRect.startX ;
+    let height = this.tempRect.currentY - this.tempRect.startY;
+
+    // Handle perfect rectangle setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Settings
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const useBrush = true; // TODO: Get this setting from tool
+    const filled = this.currentTool.settings?.filled?.value;
+    
+    // Force render before drawing
+    this.renderQuick();
+    
+    // Draw final rectangle
+    const pixels = this.drawRectangle(ctx, this.tempRect.startX, this.tempRect.startY, width, height, color, filled, useBrush);
+    
+    if (pixels.length) {
+      this.recordDrawOperation(pixels);
+    }
+
+    // Clean up
+    this.tempRect = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+
+    this.render();
+    
+    return pixels;
+  }
+
+  startEllipse(x, y) {
+    this.tempEllipse = {
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y
+    };
+    this.getTempCanvas();
+  }
+
+  previewEllipse(x, y) {
+    if (!this.tempEllipse || !this.project) return;
+
+    // Clear temp canvas
+    this.tempCtx.clearRect(0, 0, this.project.width, this.project.height);
+
+    // Calculate ellipse dimensions - ensure integer values
+    let width = Math.floor(x - this.tempEllipse.startX);
+    let height = Math.floor(y - this.tempEllipse.startY);
+
+    // Handle perfect ellipse setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Ensure minimum size of 1 pixel
+    if (Math.abs(width) < 1) width = width < 0 ? -1 : 1;
+    if (Math.abs(height) < 1) height = height < 0 ? -1 : 1;
+
+    // Store current position
+    this.tempEllipse.currentX = this.tempEllipse.startX + width;
+    this.tempEllipse.currentY = this.tempEllipse.startY + height;
+
+    // Draw ellipse preview
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+
+    // Use integer coordinates for preview
+    const startX = Math.floor(this.tempEllipse.startX);
+    const startY = Math.floor(this.tempEllipse.startY);
+
+    if (this.currentTool.settings?.filled?.value) {
+      this.drawFilledEllipse(this.tempCtx, startX, startY, width, height, color);
+    } else {
+      this.drawEllipse(this.tempCtx, startX, startY, width, height, color);
+    }
+
+    // Combine with main canvas
+    this.render();
+    this.ctx.drawImage(this.tempCanvas, 0, 0);
+  }
+
+  finishEllipse(x, y) {
+    if (!this.tempEllipse || !this.project) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    // Calculate final dimensions - ensure integer values
+    let width = Math.floor(this.tempEllipse.currentX - this.tempEllipse.startX);
+    let height = Math.floor(this.tempEllipse.currentY - this.tempEllipse.startY);
+
+    // Handle perfect ellipse setting
+    if (this.currentTool.settings?.perfect?.value) {
+      const size = Math.max(Math.abs(width), Math.abs(height));
+      width = width < 0 ? -size : size;
+      height = height < 0 ? -size : size;
+    }
+
+    // Ensure minimum size of 1 pixel
+    if (Math.abs(width) < 1) width = width < 0 ? -1 : 1;
+    if (Math.abs(height) < 1) height = height < 0 ? -1 : 1;
+
+    // Settings
+    const color = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const startX = Math.floor(this.tempEllipse.startX);
+    const startY = Math.floor(this.tempEllipse.startY);
+    
+    // Force render before drawing
+    this.renderQuick();
+
+    let pixels = [];
+
+    // Draw final ellipse
+    if (this.currentTool.settings?.filled?.value) {
+      pixels = this.drawFilledEllipse(ctx, startX, startY, width, height, color);
+    } else {
+      pixels = this.drawEllipse(ctx, startX, startY, width, height, color);
+    }
+
+    // Only save pixel that really changed
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+
+    if (pixels.length) {
+      this.recordDrawOperation(pixels);
+    }
+
+    // Clean up
+    this.tempEllipse = null;
+    this.tempCanvas = null;
+    this.tempCtx = null;
+
+    this.render();
+    
+    return pixels;
+  }
+
+  pickColor(x, y, includeReferenceImage = true, silent = false) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+
+    const frame = this.project.frames[this.project.currentFrame];
+
+    const pickFromCtx = ctx => {
+      const imageData = ctx.getImageData(x, y, 1, 1);
+      const data = imageData.data;
+
+      if (data[3] > 0) {
+        // If pixel is not transparent
+        const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
+        this.setColor(color);
+        if (!silent) this.showOperationMessage(`<span style="aspect-ratio: 1/1; width: 1em; height: 1em; background: ${color}">${color}</span>`);
+        return true;
+      } else {
+        return false;
+      }
+    };
+    
+    // Check for current layer first
+    const layerCtx = this.getCurrentLayerContext();
+    if (pickFromCtx(layerCtx)) return;
+    
+    // Check layers from top to bottom
+    for (let l = frame.layers.length - 1; l >= 0; l--) {
+      const layer = frame.layers[l];
+      if (layer.visible) {
+        const ctx = layer.ctx;
+        if (pickFromCtx(ctx)) return;
+      }
+    }
+
+    // Check for reference image
+    if (includeReferenceImage && this.referenceManager.traceImage) {
+      if (pickFromCtx(this.ctx)) return;
+    }
+  }
+
+  fillArea(x, y) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) return;
+    
+    // Cancel previous flood fill if running
+    if (this.isFloodFilling) {
+      this.cancelFloodFill();
+      this.showOperationMessage(__('Relleno cancelado||Fill cancelled'));
+      return;
+    }
+    
+    // Check selection
+    if (this.selectionManager.hasSelection && !this.selectionManager.shouldDrawOnSelection(x, y)) {
+      return;
+    }
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+    
+    // Get target color
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    const targetColor = [imageData.data[0], imageData.data[1], imageData.data[2], imageData.data[3]];
+    
+    // Get fill color
+    const fillColorHex = this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor;
+    const fillColor = this.colorPicker.hexToRgb(fillColorHex);
+    
+    // Show loading indicator
+    this.showOperationMessage(__('Rellenando...||Filling...'), 30000);
+    
+    // Start async flood fill
+    this.floodFillStartX = x;
+    this.floodFillStartY = y;
+    this.floodFillFrame = this.project.currentFrame;
+    this.floodFillLayer = this.project.currentLayer;
+    
+    this.floodFill(ctx, x, y, targetColor, fillColor, 
+      // Progress callback
+      (pixels, count) => {
+        this.showOperationMessage(__(`Rellenando: ${count} píxeles...||Filling: ${count} pixels...`), 30000);
+      },
+      // Complete callback
+      (pixels) => {
+        if (pixels && pixels.length) {
+          this.recordDrawOperation(pixels, this.floodFillFrame, this.floodFillLayer);
+          this.showOperationMessage(__(`Rellenado completo: ${pixels.length} píxeles||Fill complete: ${pixels.length} pixels`), 2000);
+        } else {
+          this.showOperationMessage(__('No se pudo rellenar||Could not fill'), 1500);
+        }
+        this.render();
+      }
+    );
+  }
+
+  // Drawing algorithms
+  pencilDraw(x, y, options = {}) {
+    if (!this.project) return;
+
+    const ctx = options.ctx || this.getCurrentLayerContext();
+    const brushSize = options.brushSize || this.brushSize;
+    const color = options.color || (this.selectedColor === "primary" ? this.primaryColor : this.secondaryColor);
+    
+    // Should use brush?
+    const useBrush = !!options.useBrush;
+    
+    let pixels = [];
+
+    if (useBrush && brushSize > 1) {
+      // Use brush for larger sizes
+      pixels = this.drawBrushCircle(ctx, x, y, this.brushSize, color);
+      pixels = pixels.filter(p => p.newColor != p.oldColor);
+    } else {
+      
+      // Save old pixel color
+      const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+      
+      if (color != oldColor) {
+        // Single pixel
+        if (color === "transparent") {
+          ctx.clearRect(x, y, 1, 1);
+        } else {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, 1, 1);
+        }
+        
+        pixels = [
+          {
+            x: x,
+            y: y,
+            oldColor: oldColor,
+            newColor: color
+          }
+        ];
+      }
+    }
+    
+    return pixels;
+  }
+  
+  drawPixels(ctx, pixels = []) {
+    pixels.forEach(pixel => {
+      const { x, y, newColor } = pixel;
+      if (newColor === "transparent") {
+        ctx.clearRect(x, y, 1, 1);
+      } else {
+        ctx.fillStyle = newColor;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    });
+    
+    return pixels;
+  }
+  
+  drawBrushCircle(ctx, centerX, centerY, radius, color) {
+    if (radius < 2) {
+      return [];
+    } else {
+      // Use midpoint circle algorithm for pixel-perfect circles
+      return this.midpointEllipse(ctx, centerX, centerY, radius / 2, radius / 2, color, true);
+    }
+  }
+  
+  drawBresenhamLine(x0, y0, x1, y1, ctx, color, useBrush) {
+    const dx = Math.abs(x1 - x0);
+    const dy = -Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    let e2;
+    
+    let linePixels = [];
+    let lineStrokePixels = [];
+
+    while (true) {
+      // Verificar selección antes de dibujar cada punto
+      const canDraw = !this.selectionManager.hasSelection || 
+                      this.selectionManager.shouldDrawOnSelection(x0, y0);
+      
+      if (canDraw) {
+        if (color === "transparent") {
+          if (useBrush && this.brushSize > 1) {
+            const radius = this.brushSize / 2;
+            lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, "transparent", true)];
+          } else {
+            const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
+            ctx.clearRect(x0, y0, 1, 1);
+            linePixels.push({
+              x: x0,
+              y: y0,
+              newColor: color,
+              oldColor
+            });
+          }
+        } else {
+          if (useBrush && this.brushSize > 1) {
+            const radius = this.brushSize / 2;
+            lineStrokePixels = [...lineStrokePixels, ...this.midpointEllipse(ctx, x0, y0, radius, radius, color, true)];
+          } else {
+            const oldColor = this.getPixelColorFromCtx(ctx, x0, y0);
+            ctx.fillStyle = color;
+            ctx.fillRect(x0, y0, 1, 1);
+            linePixels.push({
+              x: x0,
+              y: y0,
+              newColor: color,
+              oldColor
+            });
+          }
+        }
+      }
+  
+      if (x0 === x1 && y0 === y1) break;
+      e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        x0 += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+    
+    return [...linePixels, ...lineStrokePixels].filter(p => p.newColor != p.oldColor);
+  }
+  
+  drawRectangle(ctx, startX, startY, width, height, color, filled, useBrush) {
+    let pixels = [];
+    
+    if (filled) {
+      // Register pixel changes
+      for (let y = startY; y <= startY + height; y++) {
+        for (let x = startX; x <= startX + width + 1; x++) {
+          // Verificar selección
+          const canDraw = !this.selectionManager.hasSelection || 
+                          this.selectionManager.shouldDrawOnSelection(x, y);
+          if (canDraw) {
+            pixels.push({
+              x, y,
+              newColor: color,
+              oldColor: this.getPixelColorFromCtx(ctx, x, y)
+            });
+          }
+        }
+      }
+      
+      // Draw filled rectangle
+      ctx.fillStyle = color;
+      ctx.fillRect(startX, startY, width, height);
+    } else {
+      // Draw four lines to form a rectangle
+      pixels = [
+        ...this.drawBresenhamLine(startX, startY, startX + width, startY, ctx, color, useBrush),
+        ...this.drawBresenhamLine(startX + width, startY, startX + width, startY + height, ctx, color, useBrush),
+        ...this.drawBresenhamLine(startX + width, startY + height, startX, startY + height, ctx, color, useBrush),
+        ...this.drawBresenhamLine(startX, startY + height, startX, startY, ctx, color, useBrush)
+      ];
+    }
+  
+    // Clean up
+    pixels = pixels.filter(p => p.newColor != p.oldColor);
+          
+    return pixels;
+  }
+
+  drawEllipse(ctx, x, y, width, height, color) {
+    const centerX = Math.floor(x + width / 2);
+    const centerY = Math.floor(y + height / 2);
+    const radiusX = Math.floor(Math.abs(width / 2));
+    const radiusY = Math.floor(Math.abs(height / 2));
+
+    // Should use brush?
+    const useBrush = true; // TODO: Get this setting from Tools
+    
+    return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, false, useBrush);
+  }
+
+  drawFilledEllipse(ctx, x, y, width, height, color) {
+    const centerX = Math.floor(x + width / 2);
+    const centerY = Math.floor(y + height / 2);
+    const radiusX = Math.floor(Math.abs(width / 2));
+    const radiusY = Math.floor(Math.abs(height / 2));
+
+    const useBrush = true; // TODO: Get this setting from Tools
+    
+    return this.midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, true, useBrush);
+  }
+
+  midpointEllipse(ctx, centerX, centerY, radiusX, radiusY, color, filled, useBrush) {
+    // Handle zero or negative radii
+    if (radiusX <= 0 || radiusY <= 0) {
+      // For 1x1 ellipse (single pixel)
+      if (radiusX > 0 && radiusY > 0) {
+        const cx = Math.floor(centerX);
+        const cy = Math.floor(centerY);
+        const pixels = [];
+        
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, cx, cy, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, cx, cy);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(cx, cy, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(cx, cy, 1, 1);
+            }
+            pixels.push({ x: cx, y: cy, newColor: color, oldColor });
+          }
+        }
+        return pixels;
+      }
+      return [];
+    }
+  
+    // Round radii to nearest integer for pixel-perfect drawing
+    // For even sizes, ensure we get proper pixel alignment
+    const rx = Math.round(radiusX);
+    const ry = Math.round(radiusY);
+    
+    // For 1x1 or very small ellipses
+    if (rx === 0 && ry === 0) return [];
+    if (rx === 0) {
+      // Draw vertical line of single pixel width
+      const cx = Math.floor(centerX);
+      let pixels = [];
+      for (let y = -ry; y <= ry; y++) {
+        const py = Math.floor(centerY + y);
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, cx, py, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, cx, py);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(cx, py, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(cx, py, 1, 1);
+            }
+            pixels.push({ x: cx, y: py, newColor: color, oldColor });
+          }
+        }
+      }
+      return pixels;
+    }
+    if (ry === 0) {
+      // Draw horizontal line of single pixel height
+      const cy = Math.floor(centerY);
+      let pixels = [];
+      for (let x = -rx; x <= rx; x++) {
+        const px = Math.floor(centerX + x);
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, px, cy, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, px, cy);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(px, cy, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(px, cy, 1, 1);
+            }
+            pixels.push({ x: px, y: cy, newColor: color, oldColor });
+          }
+        }
+      }
+      return pixels;
+    }
+  
+    // For even dimensions, adjust center to maintain symmetry
+    const cx = Math.floor(centerX);
+    const cy = Math.floor(centerY);
+    
+    let pixels = [];
+  
+    const drawPixel = (x, y) => {
+      const px = Math.floor(x);
+      const py = Math.floor(y);
+      if (px < 0 || px >= ctx.width || py < 0 || py >= ctx.height) return;
+  
+      // Verificar selección
+      const canDraw = !this.selectionManager.hasSelection || 
+                      this.selectionManager.shouldDrawOnSelection(px, py);
+      if (!canDraw) return;
+  
+      if (useBrush && this.brushSize > 1) {
+        pixels = [...pixels, ...this.drawBrushCircle(ctx, px, py, this.brushSize, color)];
+      } else {
+        const oldColor = this.getPixelColorFromCtx(ctx, px, py);
+        if (oldColor !== color) {
+          if (color === "transparent") {
+            ctx.clearRect(px, py, 1, 1);
+          } else {
+            ctx.fillStyle = color;
+            ctx.fillRect(px, py, 1, 1);
+          }
+          pixels.push({ x: px, y: py, newColor: color, oldColor });
+        }
+      }
+    };
+  
+    // For filled ellipses, use scanline approach
+    if (filled) {
+      return this.fillEllipseScanline(ctx, cx, cy, rx, ry, color, useBrush);
+    }
+  
+    // Special handling for small ellipses (1x2, 2x1, 2x2, etc.)
+    if (rx === 1 && ry === 1) {
+      // Draw a diamond/circle for 2x2
+      drawPixel(cx, cy);
+      drawPixel(cx + 1, cy);
+      drawPixel(cx, cy + 1);
+      drawPixel(cx + 1, cy + 1);
+      return pixels;
+    }
+  
+    // Outline drawing using integer-only midpoint algorithm
+    let x = 0;
+    let y = ry;
+    let rx2 = rx * rx;
+    let ry2 = ry * ry;
+  
+    // Initial decision parameter for region 1
+    let d1 = ry2 - rx2 * ry + Math.floor(rx2 / 4);
+    let dx = 2 * ry2 * x;
+    let dy = 2 * rx2 * y;
+  
+    // Region 1
+    while (dx < dy) {
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+  
+      x++;
+      dx += 2 * ry2;
+  
+      if (d1 < 0) {
+        d1 += dx + ry2;
+      } else {
+        y--;
+        dy -= 2 * rx2;
+        d1 += dx - dy + ry2;
+      }
+    }
+  
+    // Decision parameter for region 2
+    let d2 = ry2 * ((x + 0.5) * (x + 0.5)) + rx2 * ((y - 1) * (y - 1)) - rx2 * ry2;
+  
+    // Region 2
+    while (y >= 0) {
+      drawPixel(cx + x, cy + y);
+      drawPixel(cx - x, cy + y);
+      drawPixel(cx + x, cy - y);
+      drawPixel(cx - x, cy - y);
+  
+      y--;
+      dy -= 2 * rx2;
+  
+      if (d2 > 0) {
+        d2 += rx2 - dy;
+      } else {
+        x++;
+        dx += 2 * ry2;
+        d2 += dx - dy + rx2;
+      }
+    }
+    
+    return pixels;
+  }  
+  
+  fillEllipseScanline(ctx, cx, cy, rx, ry, color, useBrush) {
+    if (rx <= 0 || ry <= 0) {
+      // Handle 1x1 case
+      if (rx > 0 && ry > 0) {
+        const pixels = [];
+        if (useBrush && this.brushSize > 1) {
+          pixels.push(...this.drawBrushCircle(ctx, cx, cy, this.brushSize, color));
+        } else {
+          const oldColor = this.getPixelColorFromCtx(ctx, cx, cy);
+          if (oldColor !== color) {
+            if (color === "transparent") {
+              ctx.clearRect(cx, cy, 1, 1);
+            } else {
+              ctx.fillStyle = color;
+              ctx.fillRect(cx, cy, 1, 1);
+            }
+            pixels.push({ x: cx, y: cy, newColor: color, oldColor });
+          }
+        }
+        return pixels;
+      }
+      return [];
+    }
+  
+    let pixels = [];
+  
+    const drawPixel = (x, y) => {
+      if (x < 0 || x >= ctx.width || y < 0 || y >= ctx.height) return;
+  
+      // Verificar selección
+      const canDraw = !this.selectionManager.hasSelection || 
+                      this.selectionManager.shouldDrawOnSelection(x, y);
+      if (!canDraw) return;
+  
+      if (useBrush && this.brushSize > 1) {
+        pixels = [...pixels, ...this.drawBrushCircle(ctx, x, y, this.brushSize, color)];
+      } else {
+        const oldColor = this.getPixelColorFromCtx(ctx, x, y);
+        if (oldColor !== color) {
+          if (color === "transparent") {
+            ctx.clearRect(x, y, 1, 1);
+          } else {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, 1, 1);
+          }
+          pixels.push({ x, y, newColor: color, oldColor });
+        }
+      }
+    };
+  
+    // Precompute squared values for efficiency
+    const rx2 = rx * rx;
+    const ry2 = ry * ry;
+    const twoRx2 = 2 * rx2;
+    const twoRy2 = 2 * ry2;
+  
+    // Region 1: Slope < 1
+    let x = 0;
+    let y = ry;
+    let px = 0;
+    let py = twoRx2 * y;
+  
+    let d1 = Math.floor(ry2 - rx2 * ry + rx2 / 4);
+  
+    while (px < py) {
+      // Fill horizontal lines for this y level
+      for (let i = cx - x; i <= cx + x; i++) {
+        drawPixel(i, cy + y);
+        drawPixel(i, cy - y);
+      }
+  
+      x++;
+      px += twoRy2;
+  
+      if (d1 < 0) {
+        d1 += ry2 + px;
+      } else {
+        y--;
+        py -= twoRx2;
+        d1 += ry2 + px - py;
+      }
+    }
+  
+    // Region 2: Slope >= 1
+    let d2 = Math.floor(ry2 * (x + 0.5) * (x + 0.5) + rx2 * (y - 1) * (y - 1) - rx2 * ry2);
+  
+    while (y >= 0) {
+      // Fill horizontal lines for this y level
+      for (let i = cx - x; i <= cx + x; i++) {
+        drawPixel(i, cy + y);
+        drawPixel(i, cy - y);
+      }
+  
+      y--;
+      py -= twoRx2;
+  
+      if (d2 > 0) {
+        d2 += rx2 - py;
+      } else {
+        x++;
+        px += twoRy2;
+        d2 += rx2 - py + px;
+      }
+    }
+    
+    return pixels;
+  }  
+  
+  floodFill(ctx, startX, startY, targetColor, fillColor, onProgress, onComplete) {
+    const width = this.project.width;
+    const height = this.project.height;
+    
+    // Get target color from start pixel
+    const targetR = targetColor[0];
+    const targetG = targetColor[1];
+    const targetB = targetColor[2];
+    const targetA = targetColor[3];
+    
+    // Get fill color RGB
+    const fillR = fillColor.r;
+    const fillG = fillColor.g;
+    const fillB = fillColor.b;
+    const fillA = 255;
+    
+    // Check if target equals fill
+    if (targetR === fillR && targetG === fillG && targetB === fillB && targetA === fillA) {
+      if (onComplete) onComplete([]);
+      return;
+    }
+    
+    // Get image data
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    
+    // Check start pixel
+    const startIdx = (startY * width + startX) * 4;
+    if (data[startIdx] !== targetR || data[startIdx + 1] !== targetG || 
+        data[startIdx + 2] !== targetB || data[startIdx + 3] !== targetA) {
+      if (onComplete) onComplete([]);
+      return;
+    }
+    
+    // Reset state
+    if (this.floodFillTimeout) {
+      clearTimeout(this.floodFillTimeout);
+    }
+    
+    this.isFloodFilling = true;
+    this.floodFillPixels = [];
+    this.floodFillStep = 0;
+    this.floodFillImageData = imageData;
+    this.floodFillData = data;
+    this.floodFillCtx = ctx;
+    this.floodFillWidth = width;
+    this.floodFillHeight = height;
+    this.floodFillTargetR = targetR;
+    this.floodFillTargetG = targetG;
+    this.floodFillTargetB = targetB;
+    this.floodFillTargetA = targetA;
+    this.floodFillFillR = fillR;
+    this.floodFillFillG = fillG;
+    this.floodFillFillB = fillB;
+    this.floodFillFillA = fillA;
+    this.floodFillOnComplete = onComplete;
+    this.floodFillOnProgress = onProgress;
+    
+    // Initialize stack
+    this.floodFillStack = [{ x: startX, y: startY }];
+    this.floodFillVisited = new Uint8Array(width * height);
+    this.floodFillVisited[startY * width + startX] = 1;
+    
+    // Start async processing
+    this.processFloodFillStep();
+  }
+
+  processFloodFillStep() {
+    if (!this.isFloodFilling) return;
+    
+    const BATCH_SIZE = 500; // Píxeles por frame
+    let processed = 0;
+    
+    while (this.floodFillStack.length > 0 && processed < BATCH_SIZE) {
+      const { x, y } = this.floodFillStack.pop();
+      
+      // Check selection
+      if (this.selectionManager.hasSelection && !this.selectionManager.shouldDrawOnSelection(x, y)) {
+        continue;
+      }
+      
+      // Record pixel
+      const idx = (y * this.floodFillWidth + x) * 4;
+      const oldColor = this.getPixelColorFromCtx(this.floodFillCtx, x, y);
+      
+      this.floodFillPixels.push({
+        x: x, y: y,
+        oldColor: oldColor,
+        newColor: `#${this.floodFillFillR.toString(16).padStart(2, '0')}${this.floodFillFillG.toString(16).padStart(2, '0')}${this.floodFillFillB.toString(16).padStart(2, '0')}`
+      });
+      
+      // Apply color to image data
+      this.floodFillData[idx] = this.floodFillFillR;
+      this.floodFillData[idx + 1] = this.floodFillFillG;
+      this.floodFillData[idx + 2] = this.floodFillFillB;
+      this.floodFillData[idx + 3] = this.floodFillFillA;
+      
+      // Check neighbors
+      const neighbors = [
+        { x: x, y: y - 1 }, // up
+        { x: x, y: y + 1 }, // down
+        { x: x - 1, y: y }, // left
+        { x: x + 1, y: y }  // right
+      ];
+      
+      for (const neighbor of neighbors) {
+        const nx = neighbor.x;
+        const ny = neighbor.y;
+        
+        if (nx < 0 || nx >= this.floodFillWidth || ny < 0 || ny >= this.floodFillHeight) continue;
+        
+        const visitedIdx = ny * this.floodFillWidth + nx;
+        
+        if (this.floodFillVisited[visitedIdx] === 1) continue;
+        
+        const neighborIdx = visitedIdx * 4;
+        
+        if (this.floodFillData[neighborIdx] === this.floodFillTargetR &&
+            this.floodFillData[neighborIdx + 1] === this.floodFillTargetG &&
+            this.floodFillData[neighborIdx + 2] === this.floodFillTargetB &&
+            this.floodFillData[neighborIdx + 3] === this.floodFillTargetA) {
+          
+          this.floodFillVisited[visitedIdx] = 1;
+          this.floodFillStack.push({ x: nx, y: ny });
+        }
+      }
+      
+      processed++;
+    }
+    
+    // Update progress
+    const progress = this.floodFillPixels.length;
+    if (this.floodFillOnProgress) {
+      this.floodFillOnProgress(this.floodFillPixels, progress);
+    }
+    
+    // Show preview (apply current state to canvas)
+    this.applyFloodFillPreview();
+    
+    // Continue or finish
+    if (this.floodFillStack.length > 0) {
+      this.floodFillTimeout = setTimeout(() => this.processFloodFillStep(), 16); // ~60fps
+    } else {
+      this.finishFloodFill();
+    }
+  }
+  
+  applyFloodFillPreview() {
+    if (!this.floodFillImageData) return;
+    
+    if (this.floodFillFrame != this.project.currentFrame) return;
+    
+    // Create a copy of the current image data
+    const previewData = new ImageData(
+      new Uint8ClampedArray(this.floodFillImageData.data),
+      this.floodFillWidth,
+      this.floodFillHeight
+    );
+    
+    // Apply current state
+    for (const p of this.floodFillPixels) {
+      const idx = (p.y * this.floodFillWidth + p.x) * 4;
+      previewData.data[idx] = this.floodFillFillR;
+      previewData.data[idx + 1] = this.floodFillFillG;
+      previewData.data[idx + 2] = this.floodFillFillB;
+      previewData.data[idx + 3] = this.floodFillFillA;
+    }
+    
+    this.renderQuick();
+    
+    // Apply to canvas
+    this.ctx.putImageData(previewData, 0, 0);
+    
+    this.updateAnimationPreview(null, this.canvas);
+  }
+  
+  finishFloodFill() {
+    // Apply final state
+    this.floodFillCtx.putImageData(this.floodFillImageData, 0, 0);
+    
+    const finalPixels = [...this.floodFillPixels];
+    
+    // Clean up
+    this.isFloodFilling = false;
+    this.floodFillPixels = [];
+    this.floodFillImageData = null;
+    this.floodFillData = null;
+    this.floodFillStack = null;
+    this.floodFillVisited = null;
+    
+    if (this.floodFillTimeout) {
+      clearTimeout(this.floodFillTimeout);
+      this.floodFillTimeout = null;
+    }
+    
+    if (this.floodFillOnComplete) {
+      this.floodFillOnComplete(finalPixels);
+    }
+    
+    this.render();
+  }
+  
+  cancelFloodFill() {
+    if (this.isFloodFilling) {
+      this.isFloodFilling = false;
+      if (this.floodFillTimeout) {
+        clearTimeout(this.floodFillTimeout);
+        this.floodFillTimeout = null;
+      }
+      this.render();
+    }
+  }
+  
+  colorsMatch(color1, color2) {
+    return color1[0] === color2[0] && color1[1] === color2[1] && color1[2] === color2[2] && color1[3] === color2[3];
+  }
+
+  // Tools management
+  addTool(toolDef) {
+    if (!toolDef.name) {
+      throw new Error("Tool must have a name");
+    }
+
+    this.tools[toolDef.name] = {
+      name: toolDef.name,
+      displayName: toolDef.displayName || toolDef.name,
+      icon: toolDef.icon,
+      cursor: toolDef.cursor || "default",
+      shortcut: toolDef.shortcut || null,
+      onDown: toolDef.onDown,
+      onMove: toolDef.onMove,
+      onUp: toolDef.onUp,
+      settings: toolDef.settings || {}
+    };
+
+    // Add tool to dropdown
+    const toolButton = this.createButton(`tool-${toolDef.name}`, toolDef.icon, () => {
+      this.setTool(toolDef.name);
+      this.toolDropdown.classList.remove("visible");
+    });
+    toolButton.title = toolDef.shortcut ? toolDef.displayName + ` (${toolDef.shortcut.toUpperCase()})` : toolDef.displayName;
+    this.toolDropdown.appendChild(toolButton);
+  }
+
+  setTool(toolName, silent) {
+    if (!this.tools[toolName]) {
+      throw new Error(`Tool '${toolName}' not found`);
+    }
+
+    // Store previous tool
+    if (this.currentTool && this.currentTool.name !== toolName) {
+      this.lastTool = this.currentTool.name;
+    }
+
+    this.currentTool = this.tools[toolName];
+
+    // Update current tool button
+    const icon = this.currentToolButton.querySelector(".icon");
+    if (icon) {
+      icon.className = `icon ${this.currentTool.icon}`;
+    }
+
+    // Update cursor
+    this.canvas.style.cursor = this.currentTool.cursor;
+
+    // Show/hide settings button
+    this.toolSettingsButton.style.display = Object.keys(this.currentTool.settings).length > 0 ? "flex" : "none";
+
+    if (!silent) this.showOperationMessage(__(this.currentTool.displayName));
+
+    // Hide any open settings popup
+    this.hideToolSettings();
+  }
+
+  switchLastTool() {
+    if (this.lastTool && this.lastTool !== this.currentTool.name) {
+      this.setTool(this.lastTool);
+    }
+  }
+
+  toggleToolDropdown() {
+    this.toolDropdown.classList.toggle("visible");
+
+    // Close dropdown when clicking outside
+    if (this.toolDropdown.classList.contains("visible")) {
+      const clickHandler = e => {
+        if (!this.toolButtonContainer.contains(e.target)) {
+          this.toolDropdown.classList.remove("visible");
+          document.removeEventListener("click", clickHandler);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener("click", clickHandler);
+      }, 0);
+    }
+  }
+
+  showToolSettings() {
+    if (!this.currentTool || Object.keys(this.currentTool.settings).length === 0) return;
+
+    // Clear previous content
+    this.toolSettingsPopup.innerHTML = "";
+
+    // Add title
+    const title = document.createElement("h3");
+    title.textContent = `${this.currentTool.name} Settings`;
+    this.toolSettingsPopup.appendChild(title);
+
+    // Add settings controls
+    for (const [key, setting] of Object.entries(this.currentTool.settings)) {
+      const settingControl = document.createElement("div");
+      settingControl.className = "tool-setting";
+
+      const label = document.createElement("label");
+      label.textContent = key.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase());
+      settingControl.appendChild(label);
+
+      if (setting.type === "boolean") {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = setting.value;
+        checkbox.addEventListener("change", e => {
+          this.currentTool.settings[key].value = e.target.checked;
+        });
+        settingControl.appendChild(checkbox);
+      } else if (setting.type === "number") {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = setting.value;
+        input.min = setting.min || 0;
+        input.max = setting.max || 100;
+        input.addEventListener("change", e => {
+          this.currentTool.settings[key].value = parseFloat(e.target.value);
+        });
+        settingControl.appendChild(input);
+      } else if (setting.type === "select") {
+        const select = document.createElement("select");
+        setting.options.forEach(option => {
+          const optionElement = document.createElement("option");
+          optionElement.value = option.value;
+          optionElement.textContent = option.label;
+          if (option.value === setting.value) {
+            optionElement.selected = true;
+          }
+          select.appendChild(optionElement);
+        });
+        select.addEventListener("change", e => {
+          this.currentTool.settings[key].value = e.target.value;
+        });
+        settingControl.appendChild(select);
+      }
+
+      this.toolSettingsPopup.appendChild(settingControl);
+    }
+
+    // Position near the settings button
+    const rect = this.toolSettingsButton.getBoundingClientRect();
+    this.toolSettingsPopup.style.position = "absolute";
+    this.toolSettingsPopup.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+    this.toolSettingsPopup.style.right = `${window.innerWidth - rect.right}px`;
+    this.toolSettingsPopup.style.display = "block";
+
+    // Close when clicking outside
+    setTimeout(() => {
+      const clickHandler = e => {
+        if (!this.toolSettingsPopup.contains(e.target)) {
+          this.hideToolSettings();
+          document.removeEventListener("click", clickHandler);
+        }
+      };
+      document.addEventListener("click", clickHandler);
+    }, 0);
+  }
+
+  hideToolSettings() {
+    this.toolSettingsPopup.style.display = "none";
+  }
+
+  // Color management
+  toggleSelectedColor() {
+    this.selectedColor = this.selectedColor === "primary" ? "secondary" : "primary";
+    this.updateColorIndicator();
+  }
+
+  updateColorIndicator() {
+    this.colorPrimary.style.backgroundColor = this.primaryColor;
+    this.colorSecondary.style.backgroundColor = this.secondaryColor;
+    
+    this.colorSelector.className = "color-selector";
+    if (this.selectedColor === "secondary") {
+      this.colorSelector.classList.add("secondary");
+    }
+    
+    localStorage.setItem("primaryColor", this.primaryColor);
+    localStorage.setItem("secondaryColor", this.secondaryColor);
+  }
+  
+  showColorPicker() {
+    this.colorPicker.show();
+  }
+  
+  hideColorPicker() {
+    this.colorPicker.hide();
+  }
+  
+  updatePaletteGrid() {
+    // Delegate to colorPicker to update its UI
+    if (this.colorPicker) {
+      this.colorPicker.updatePaletteGrid();
+    }
+  }
+  
+  addToRecentColors(hex) {
+    this.paletteManager.addToRecent(hex);
+  }
+  
+  updateRecentColorsGrid() {
+    if (this.colorPicker) {
+      this.colorPicker.updateRecentColorsGrid();
+    }
+  }
+  
+  updatePaletteGrid() {
+    if (this.colorPicker) {
+      this.colorPicker.updatePaletteGrid();
+    }
+  }
+  
+  addColorToPalette(color) {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.paletteManager.addColorToPalette(currentPalette.id, color);
+      this.updatePaletteGrid();
+    }
+  }
+  
+  removeColorFromPalette(index) {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (currentPalette) {
+      this.paletteManager.removeColorFromPalette(currentPalette.id, index);
+      this.updatePaletteGrid();
+    }
+  }
+  
+  loadPalette() {
+    const fileBrowser = this.getFileBrowser({
+      title: __("Cargar paleta||Load palette"),
+      mode: "open",
+      fileTypes: ["pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.readFile(fileInfo);
+          this.parsePalFile(fileData);
+          this.updatePaletteGrid();
+          this.showToast(__("Paleta cargada||Palette loaded successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error al cargar paleta|Error loading palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+  
+  savePalette() {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    if (!currentPalette || currentPalette.colors.length === 0) {
+      this.showToast(__("No hay paleta que guardar||No palette to save"), 3000);
+      return;
+    }
+    
+    const fileBrowser = this.getFileBrowser({
+      title: __("Guardar paleta||Save palette"),
+      mode: "saveAs",
+      fileTypes: ["pal"],
+      defaultType: "pal",
+      defaultName: currentPalette.name || "palette",
+      onConfirm: async fileInfo => {
+        try {
+          const palContent = this.generatePalFile();
+          await this.saveFile(fileInfo.name, "pal", palContent);
+          this.showToast(__("Paleta guardada||Palette saved successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error al guardar la paleta|Error saving palette): ${error.message}`), 5000);
+        }
+      }
+    });
+    fileBrowser.show();
+  }
+  
+  parsePalFile(content) {
+    const lines = content.split("\n").map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length < 3 || lines[0] !== "JASC-PAL") {
+      throw new Error("Invalid PAL file format: missing JASC-PAL header");
+    }
+    if (lines[1] !== "0100") {
+      throw new Error("Unsupported PAL version: expected 0100");
+    }
+    
+    const colorCount = parseInt(lines[2]);
+    if (isNaN(colorCount)) {
+      throw new Error("Invalid color count: not a number");
+    }
+    
+    if (lines.length < 3 + colorCount) {
+      throw new Error(`File claims to have ${colorCount} colors but only ${lines.length - 3} found`);
+    }
+    
+    const colors = [];
+    for (let i = 3; i < 3 + colorCount; i++) {
+      const components = lines[i].split(/\s+/).filter(c => c.length > 0);
+      if (components.length < 3) {
+        throw new Error(`Invalid color at line ${i + 1}: expected 3 components`);
+      }
+      
+      const r = parseInt(components[0]);
+      const g = parseInt(components[1]);
+      const b = parseInt(components[2]);
+      
+      if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        throw new Error(`Invalid RGB values at line ${i + 1}`);
+      }
+      
+      if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+        throw new Error(`RGB values out of range (0-255) at line ${i + 1}`);
+      }
+      
+      colors.push(this.colorPicker.rgbToHex(r, g, b));
+    }
+    
+    const name = __("Paleta importada||Imported palette");
+    let uniqueName = name;
+    let counter = 1;
+    while (this.paletteManager.palettes.some(p => p.name === uniqueName)) {
+      uniqueName = `${name} ${counter++}`;
+    }
+    this.paletteManager.addPalette(uniqueName, colors);
+  }
+  
+  generatePalFile() {
+    const currentPalette = this.paletteManager.getCurrentPalette();
+    const colors = currentPalette.colors.map(hex => {
+      const rgb = this.colorPicker.hexToRgb(hex);
+      return `${rgb.r} ${rgb.g} ${rgb.b}`;
+    });
+    return ["JASC-PAL", "0100", colors.length.toString(), ...colors].join("\n");
+  }
+    
+  // UI helpers
+  showToast(message, duration = 3000) {
+    this.notificationElement.innerHTML = message;
+    this.notificationElement.classList.add("visible");
+
+    setTimeout(() => {
+      this.notificationElement.classList.remove("visible");
+    }, duration);
+  }
+  
+  showOperationMessage(message, duration = 3000) {
+    this.operationMessageElement.innerHTML = message;
+    this.operationMessageElement.classList.add("visible");
+
+    setTimeout(() => {
+      this.operationMessageElement.classList.remove("visible");
+    }, duration);
+  }
+
+  showPopup(title, content, buttons = [{ text: "OK", action: () => this.hidePopup() }], fullscreen = false) {
+    this.popupContent.innerHTML = "";
+    
+    const titleElement = document.createElement("div");
+    titleElement.className = "popup-title";
+    titleElement.textContent = title;
+    this.popupContent.appendChild(titleElement);
+
+    if (typeof content === "string") {
+      const contentElement = document.createElement("div");
+      contentElement.innerHTML = content;
+      this.popupContent.appendChild(contentElement);
+    } else {
+      this.popupContent.appendChild(content);
+    }
+
+    const buttonsContainer = document.createElement("div");
+    buttonsContainer.className = "popup-buttons";
+    this.popupContent.appendChild(buttonsContainer);
+
+    this.popupButtons = [];
+
+    buttons.forEach(button => {
+      const btnElement = document.createElement("button");
+      btnElement.className = button.class || "confirm";
+      btnElement.textContent = button.text;
+      btnElement.addEventListener("click", button.action);
+      buttonsContainer.appendChild(btnElement);
+      this.popupButtons.push(btnElement);
+    });
+    
+    this.popupOverlay.classList.add("visible");
+    
+    if (fullscreen) {
+      this.popupOverlay.classList.add("fullscreen");
+    } else {
+      this.popupOverlay.classList.remove("fullscreen");
+    }
+
+    this.popupOpen = true;
+  }
+
+  hidePopup() {
+    this.popupOverlay.classList.remove("visible");
+    this.popupOpen = false;
+  }
+
+  hidePopupButtons() {
+    if (this.popupButtons) {
+      this.popupButtons.forEach(btnElement => {
+        btnElement.style.display = "none";
+      });
+    }
+  }
+
+  // Menu actions
+  showNewProjectDialog() {
+    const content = document.createElement("div");
+    content.innerHTML = `
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">Width:</label>
+        <input type="number" id="new-width" value="${this.defaultWidth}">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">Height:</label>
+        <input type="number" id="new-height" value="${this.defaultHeight}">
+      </div>
+    `;
+
+    this.showPopup(__("Nuevo Proyecto||New Project"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Crear||Create"),
+        action: () => {
+          const width = parseInt(document.getElementById("new-width").value);
+          const height = parseInt(document.getElementById("new-height").value);
+
+          if (width > 0 && height > 0) {
+            this.newProject(width, height);
+            this.hidePopup();
+          } else {
+            this.showToast(__("Dimensiones inválidas||Invalid dimensions"));
+          }
+        }
+      }
+    ]);
+  }
+
+  flipHorizontal() {
+    if (!this.project) return;
+    
+    this.historyManager.startBatch("transform", __("Espejo Horizontal||Flip Horizontal"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform flip
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
+    const data = imageData.data;
+  
+    for (let y = 0; y < this.project.height; y++) {
+      for (let x = 0; x < Math.floor(this.project.width / 2); x++) {
+        const index1 = (y * this.project.width + x) * 4;
+        const index2 = (y * this.project.width + (this.project.width - x - 1)) * 4;
+  
+        // Swap pixels
+        for (let i = 0; i < 4; i++) {
+          const temp = data[index1 + i];
+          data[index1 + i] = data[index2 + i];
+          data[index2 + i] = temp;
+        }
+      }
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'transform',
+      description: __('Espejo Horizontal||Flip Horizontal'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      transformType: 'flip_horizontal',
+      transformData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  flipVertical() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("transform", __("Girar Horizontal||Flip Vertical"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform flip
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
+    const data = imageData.data;
+  
+    for (let y = 0; y < Math.floor(this.project.height / 2); y++) {
+      for (let x = 0; x < this.project.width; x++) {
+        const index1 = (y * this.project.width + x) * 4;
+        const index2 = ((this.project.height - y - 1) * this.project.width + x) * 4;
+  
+        // Swap pixels
+        for (let i = 0; i < 4; i++) {
+          const temp = data[index1 + i];
+          data[index1 + i] = data[index2 + i];
+          data[index2 + i] = temp;
+        }
+      }
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'transform',
+      description: __('Girar Horizontal||Flip Vertical'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      transformType: 'flip_vertical',
+      transformData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  rotate(degrees = 0) {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("transform", __(`(Rotar|Rotate) ${degrees}°`));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform rotation
+    const imageData = oldImageData;
+    const newData = new ImageData(
+      degrees === 90 || degrees === 270 ? this.project.height : this.project.width,
+      degrees === 90 || degrees === 270 ? this.project.width : this.project.height
+    );
+  
+    for (let y = 0; y < this.project.height; y++) {
+      for (let x = 0; x < this.project.width; x++) {
+        const srcIndex = (y * this.project.width + x) * 4;
+  
+        let destX, destY;
+  
+        if (degrees === 90) {
+          destX = this.project.height - y - 1;
+          destY = x;
+        } else if (degrees === 180) {
+          destX = this.project.width - x - 1;
+          destY = this.project.height - y - 1;
+        } else if (degrees === 270) {
+          destX = y;
+          destY = this.project.width - x - 1;
+        } else {
+          return;
+        }
+  
+        const destIndex = (destY * newData.width + destX) * 4;
+  
+        for (let i = 0; i < 4; i++) {
+          newData.data[destIndex + i] = imageData.data[srcIndex + i];
+        }
+      }
+    }
+  
+    // Resize layer canvas if needed
+    if (degrees === 90 || degrees === 270) {
+      layer.canvas.width = this.project.height;
+      layer.canvas.height = this.project.width;
+    }
+  
+    ctx.putImageData(newData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'transform',
+      description: __(`(Rotar|Rotate) ${degrees}°`),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      transformType: `rotate_${degrees}`,
+      transformData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height).data),
+        oldWidth: this.project.width,
+        oldHeight: this.project.height,
+        newWidth: layer.canvas.width,
+        newHeight: layer.canvas.height
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    // Update project dimensions if rotating 90 or 270 degrees
+    if (degrees === 90 || degrees === 270) {
+      const temp = this.project.width;
+      this.project.width = this.project.height;
+      this.project.height = temp;
+      this.resetCanvasSize();
+    }
+  
+    this.render();
+  }
+  
+  toggleTransparency() {
+    this.historyManager.startBatch("toggle_transparency", __("Alternar Transparencia||Toggle Transparency"));
+    
+    this.updateTransparencyState();
+    
+    if (this.transparentBackground) {
+      this.removeTransparentColor();
+    } else {
+      this.restoreTransparentColor();
+    }
+    
+    // Toggle transparency and render
+    this.transparentBackground = !this.transparentBackground;
+    this.render();
+    
+    // Register operation
+    const operation = {
+      type: "toggle_transparency",
+      description: __("Alternar Transparencia||Toggle Transparency"),
+      transparent: this.transparentBackground
+    };
+    
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  }
+  
+  removeTransparentColor() {
+    // Elimina la transparencia: Convierte los píxeles transparentes al color secundario opaco
+    if (!this.project) return;
+    
+    const secondaryColor = this.secondaryColor;
+    const secondaryRgb = this.hexToRgb(secondaryColor);
+    let totalPixelsModified = 0;
+    
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[0];
+        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+        const data = imageData.data;
+        
+        // Si el píxel es transparente (alpha = 0)
+        if (data[i + 3] === 0) {
+          // Rellenar con el color secundario y hacerlo opaco
+          data[i] = secondaryRgb.r;
+          data[i + 1] = secondaryRgb.g;
+          data[i + 2] = secondaryRgb.b;
+          data[i + 3] = 255;
+          totalPixelsModified++;
+        }
+        
+        layer.ctx.putImageData(imageData, 0, 0);
+      }
+    }
+    
+    if (totalPixelsModified > 0) {
+      this.render();
+      this.showToast(__(`Transparencia eliminada: ${totalPixelsModified} píxeles rellenados||Transparency removed: ${totalPixelsModified} pixels filled`), 2000);
+    } else {
+      this.showToast(__('No había píxeles transparentes para rellenar||No transparent pixels to fill'), 2000);
+    }
+  }
+  
+  restoreTransparentColor() {
+    // Restaura la transparencia: Convierte los píxeles del color secundario a transparentes
+    if (!this.project) return;
+    
+    const secondaryColor = this.secondaryColor;
+    const secondaryRgb = this.hexToRgb(secondaryColor);
+    let totalPixelsModified = 0;
+    
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+        const data = imageData.data;
+        
+        for (let i = 0; i < data.length; i += 4) {
+          // Si el píxel coincide EXACTAMENTE con el color secundario Y es opaco
+          if (data[i] === secondaryRgb.r && 
+              data[i + 1] === secondaryRgb.g && 
+              data[i + 2] === secondaryRgb.b && 
+              data[i + 3] === 255) {
+            // Hacerlo transparente
+            data[i + 3] = 0;
+            totalPixelsModified++;
+          }
+        }
+        
+        layer.ctx.putImageData(imageData, 0, 0);
+      }
+    }
+    
+    if (totalPixelsModified > 0) {
+      this.render();
+      this.showToast(__(`Transparencia restaurada: ${totalPixelsModified} píxeles convertidos||Transparency restored: ${totalPixelsModified} pixels converted`), 2000);
+    } else {
+      this.showToast(__('No se encontraron píxeles del color secundario||No secondary color pixels found'), 2000);
+    }
+  }
+  
+  hasTransparency() {
+    if (!this.project) return false;
+    
+    // Revisar muestras de píxeles para rendimiento
+    for (let f = 0; f < Math.min(this.project.frames.length, 3); f++) {
+      const frame = this.project.frames[f];
+      
+      for (let l = 0; l < Math.min(frame.layers.length, 2); l++) {
+        const layer = frame.layers[l];
+        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+        const data = imageData.data;
+        
+        // Muestrear aproximadamente el 1% de los píxeles para rendimiento
+        const step = Math.max(1, Math.floor(data.length / 10000));
+        for (let i = 3; i < data.length; i += 4 * step) {
+          if (data[i] < 255) {
+            return true; // Encontrado un píxel transparente
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+  
+  updateTransparencyState() {
+    if (!this.project) return;
+    
+    // Detectar rápidamente si hay algún píxel transparente
+    const hasTransparency = this.checkForTransparency(); // implementación eficiente
+    
+    if (this.transparentBackground !== hasTransparency) {
+      this.transparentBackground = hasTransparency;
+      console.log(`Transparency state updated: ${hasTransparency}`);
+    }
+  }
+  
+  checkForTransparency() {
+    // Solo revisar la capa de fondo (índice 0) de cada frame
+    // Detenerse en el primer píxel transparente encontrado
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const bgLayer = this.project.frames[f].layers[0];
+      if (!bgLayer) continue;
+      
+      const imageData = bgLayer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+      const data = imageData.data;
+      
+      // Muestrear para rendimiento (cada 10 píxeles)
+      for (let i = 3; i < data.length; i += 40) { // alpha channel
+        if (data[i] < 255) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  
+  invertColors() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("color_adjustment", __("Invertir Colores||Invert Colors"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform inversion
+    const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 255 - data[i]; // R
+      data[i + 1] = 255 - data[i + 1]; // G
+      data[i + 2] = 255 - data[i + 2]; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'color_adjustment',
+      description: __('Invertir Colores||Invert Colors'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      adjustmentType: 'invert',
+      adjustmentData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  grayscale() {
+    if (!this.project) return;
+  
+    this.historyManager.startBatch("color_adjustment", __("Escala de Grises||Grayscale"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+  
+    // Store old image data
+    const oldImageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+  
+    // Perform grayscale
+    const imageData = new ImageData(
+      new Uint8ClampedArray(Array.from(oldImageData.data)),
+      this.project.width,
+      this.project.height
+    );
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      data[i] = avg; // R
+      data[i + 1] = avg; // G
+      data[i + 2] = avg; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  
+    // Record operation
+    const operation = {
+      type: 'color_adjustment',
+      description: __('Escala de Grises||Grayscale'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: this.project.currentLayer,
+      adjustmentType: 'grayscale',
+      adjustmentData: {
+        oldImageData: Array.from(oldImageData.data),
+        newImageData: Array.from(ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  showAboutDialog() {
+    this.showPopup(
+      __("Acerca de Pixelite||About Pixelite"),
+      `
+        <div style="text-align: center;">
+          <h2 style="margin-top: 0; color: var(--primary-color);">Pixelite</h2>
+          <p><strong>${__("Versión||Version")} ${this.version}</strong></p>
+          <p>${__("© %Y RETORA. Todos los derechos reservados.||© %Y RETORA. All rights reserved.").replace('%Y', new Date().getFullYear())}</p>
+          <p>${__("Creado por||Created by")} <a onclick="openExternalUrl('https://retora.html-5.me')">retora</a>.</p></p>
+          <div style="display: flex; justify-content: center; gap: 15px; margin: 20px 0;">
+            <a href="https://retora.itch.io/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://retora.itch.io/pixelite')">itch.io</a>
+            <span>•</span>
+            <a href="https://github.com/RetoraDev/pixelite" target="_blank" style="color: var(--primary-color); text-decoration: none;" onclick="openExternalUrl('https://github.com/RetoraDev/pixelite')">GitHub</a>
+          </div>
+          <p style="font-size: 0.9em; color: var(--text-dim); margin-bottom: 0;">
+            ${__("Un editor de pixel art colaborativo con soporte de animación||Collaborative pixel art editor with animation support")}.
+          </p>
+        </div>
+      `,
+      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
+    );
+  }
+
+  showManualDialog() {
+    this.showPopup(
+      "Manual",
+      __(`
+        (El manual no está disponible todavía|Manual is not available yet)
+      `),
+      [{ text: __("Cerrar||Close"), action: () => this.hidePopup() }]
+    );
+  }
+  
+  // Animation Frame Management
+  addFrame(frameIndex = this.project.currentFrame, time) {
+    if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'add_frame',
+        frameIndex, time
+      });
+      return;
+    }
+  
+    const newIndex = frameIndex + 1;
+  
+    this.historyManager.startBatch("add_layer", __("(Añadir|Add) Frame"));
+  
+    const newFrame = {
+      layers: []
+    };
+  
+    // Copy layers from current frame
+    const currentFrame = this.project.frames[frameIndex];
+    for (let i = 0; i < currentFrame.layers.length; i++) {
+      const layer = currentFrame.layers[i];
+      const newLayer = this.createBlankLayer(this.project.width, this.project.height, layer.name);
+      newLayer.visible = layer.visible;
+      newFrame.layers.push(newLayer);
+    }
+  
+    // Insert after current frame
+    this.project.frames.splice(newIndex, 0, newFrame);
+    this.project.frameTimes.splice(newIndex, 0, time || this.project.currentFrameTime);
+    
+    // Switch to the new frame
+    this.project.currentFrame = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'add_frame',
+      description: __('(Añadir|Add) Frame'),
+      index: frameIndex,
+      frameTime: this.project.currentFrameTime,
+      layers: currentFrame.layers.map(layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }))
+    };
+    
+    this.showOperationMessage(__('Nuevo Frame añadido||New Frame added'));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.render();
+  }
+  
+  removeFrame(index = this.project.currentFrame, silent) {
+    if (!this.project || this.project.frames.length <= 1) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'remove_frame',
+        frameIndex
+      });
+      return;
+    }
+    
+    this.historyManager.startBatch("remove_frame", __("(Quitar|Remove) Frame"));
+  
+    const removedFrame = this.project.frames[index];
+    const removedFrameTime = this.project.frameTimes[index];
+  
+    this.project.frames.splice(index, 1);
+    this.project.frameTimes.splice(index, 1);
+    this.project.currentFrame = Math.min(index, this.project.frames.length - 1);
+  
+    // Record operation
+    const operation = {
+      type: 'remove_frame',
+      description: __('(Quitar|Remove) Frame'),
+      index: index,
+      frameTime: removedFrameTime,
+      layers: removedFrame.layers.map(layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }))
+    };
+    
+    if (!silent) this.showOperationMessage(__('Frame quitado||Frame removed'));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  duplicateFrame(currentIndex = this.project.currentFrame) {
+    if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'duplicate_frame',
+        frameIndex: currentIndex
+      });
+      return;
+    }
+    
+    const currentFrame = this.project.frames[currentIndex];
+    const newIndex = currentIndex + 1;
+  
+    this.historyManager.startBatch("duplicate_frame", __("Duplicar Frame||Duplicate Frame"));
+  
+    // Create new frame with same structure
+    const newFrame = {
+      layers: []
+    };
+  
+    // Copy each layer from current frame
+    for (let i = 0; i < currentFrame.layers.length; i++) {
+      const sourceLayer = currentFrame.layers[i];
+      
+      // Create new blank layer
+      const newLayer = this.createBlankLayer(
+        this.project.width, 
+        this.project.height, 
+        `${sourceLayer.name} (${__("copia||copy")})`
+      );
+      newLayer.visible = sourceLayer.visible;
+      
+      // Copy canvas content
+      newLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+      
+      newFrame.layers.push(newLayer);
+    }
+  
+    // Insert new frame after current
+    this.project.frames.splice(newIndex, 0, newFrame);
+    
+    // Copy frame time
+    this.project.frameTimes.splice(newIndex, 0, this.project.frameTimes[currentIndex]);
+    
+    // Set current frame to the new one
+    this.project.currentFrame = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'duplicate_frame',
+      description: __('Duplicar Frame||Duplicate Frame'),
+      index: newIndex,
+      frameTime: this.project.frameTimes[newIndex],
+      layers: newFrame.layers.map(layer => ({
+        name: layer.name,
+        visible: layer.visible,
+        imageData: Array.from(layer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }))
+    };
+    
+    this.showOperationMessage(__('Frame duplicado||Frame duplicated'));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    // Update UI
+    this.updateFramesUI();
+    this.render();
+  }  
+  
+  moveFrame(fromIndex, toIndex, silent) {
+    if (fromIndex === toIndex) return;
+  
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'move_frame',
+        fromIndex, toIndex
+      });
+      return;
+    }
+  
+    this.historyManager.startBatch("move_frame", __("(Move|Mover) Frame"));
+  
+    const frame = this.project.frames.splice(fromIndex, 1)[0];
+    const frameTime = this.project.frameTimes.splice(fromIndex, 1)[0];
+    this.project.frames.splice(toIndex, 0, frame);
+    this.project.frameTimes.splice(toIndex, 0, frameTime);
+    this.project.currentFrame = toIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'move_frame',
+      description: __('(Move|Mover) Frame'),
+      fromIndex: fromIndex,
+      toIndex: toIndex
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    if (!silent) this.showOperationMessage(__("Frame movido||Frame moved"));
+  
+    this.render();
+  }
+  
+  setFrameTime(frameIndex, time) {
+    if (!this.project || frameIndex < 0 || frameIndex >= this.project.frameTimes.length) return;
+  
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.collabManager.requestOperation({
+        type: 'set_frame_time',
+        frameIndex, time
+      });
+      return;
+    }
+  
+    const oldTime = this.project.frameTimes[frameIndex];
+    this.project.frameTimes[frameIndex] = time;
+  
+    // Record operation
+    const operation = {
+      type: 'edit_frame',
+      description: __('Cambiar Tiempo de Frame||Change Frame Time'),
+      frameIndex: frameIndex,
+      property: 'time',
+      oldValue: oldTime,
+      newValue: time
+    };
+  
+    this.historyManager.addChange(operation);
+  }
+
+  updateFramesUI() {
+    if (!this.project) return;
+  
+    const frameCount = this.project.frames.length;
+    
+    // Initialize frame times if needed
+    if (!this.project.frameTimes || this.project.frameTimes.length !== frameCount) {
+      this.project.frameTimes = new Array(frameCount).fill(this.project.currentFrameTime);
+    }
+  
+    // Get all current children
+    const timelineChildren = Array.from(this.timelineContent.children);
+    
+    // Find or create add button
+    let addButton = timelineChildren.find(child => child.classList.contains('add-button'));
+    if (!addButton) {
+      addButton = document.createElement("div");
+      addButton.className = "timeline-frame add-button";
+      addButton.innerHTML = `
+        <div class="add-button-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+        </div>
+        <span>${__("Añadir||Add")}</span>
+      `;
+      addButton.addEventListener("click", () => this.addFrame());
+      this.timelineContent.appendChild(addButton);
+    }
+  
+    // Get existing frame elements (excluding add button)
+    const existingFrames = timelineChildren.filter(child => !child.classList.contains('add-button'));
+    
+    // Calculate how many frames we need to add/remove
+    const framesToAdd = Math.max(0, frameCount - existingFrames.length);
+    const framesToRemove = Math.max(0, existingFrames.length - frameCount);
+    
+    // Remove excess frames from the end
+    for (let i = 0; i < framesToRemove; i++) {
+      const lastFrame = existingFrames[existingFrames.length - 1 - i];
+      if (lastFrame && lastFrame.parentNode) {
+        lastFrame.remove();
+      }
+    }
+    
+    // Update existing frames
+    for (let i = 0; i < Math.min(frameCount, existingFrames.length); i++) {
+      const frame = this.project.frames[i];
+      const frameElement = existingFrames[i];
+      
+      // Update classes
+      frameElement.className = `timeline-frame ${i === this.project.currentFrame ? "active" : ""}`;
+      frameElement.setAttribute("data-index", i);
+      
+      // Update thumbnail
+      const thumbContainer = frameElement.querySelector(".frame-thumb");
+      if (thumbContainer) {
+        // Clear old thumbnail
+        thumbContainer.innerHTML = "";
+        
+        const thumbCanvas = document.createElement("canvas");
+        thumbCanvas.width = this.project.width;
+        thumbCanvas.height = this.project.height;
+        thumbCanvas.style.width = "auto";
+        thumbCanvas.style.height = "60px";
+        thumbCanvas.style.backgroundColor = "#fff";
+        thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+        thumbCanvas.style.backgroundSize = "16px 16px";
+
+        const thumbCtx = this.getCanvasContext(thumbCanvas);
+  
+        // Draw background
+        if (!this.transparentBackground) {
+          thumbCtx.fillStyle = this.secondaryColor;
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
+  
+        // Draw all visible layers
+        for (let l = 0; l < frame.layers.length; l++) {
+          if (frame.layers[l].visible) {
+            thumbCtx.drawImage(frame.layers[l].canvas, 0, 0);
+          }
+        }
+  
+        thumbContainer.appendChild(thumbCanvas);
+      }
+      
+      // Update time display
+      const timeDisplay = frameElement.querySelector(".frame-time");
+      if (timeDisplay) {
+        timeDisplay.textContent = `${this.project.frameTimes[i].toFixed(2)}ms`;
+      }
+      
+      // Update frame number
+      const frameNumber = frameElement.querySelector(".frame-number");
+      if (frameNumber) {
+        frameNumber.textContent = i + 1;
+      }
+    }
+    
+    // Add new frames if needed
+    if (framesToAdd > 0) {
+      for (let i = existingFrames.length; i < frameCount; i++) {
+        const frame = this.project.frames[i];
+        const frameElement = document.createElement("div");
+        frameElement.className = `timeline-frame ${i === this.project.currentFrame ? "active" : ""}`;
+        frameElement.setAttribute("data-index", i);
+        frameElement.draggable = true;
+  
+        // Frame thumbnail
+        const thumbContainer = document.createElement("div");
+        thumbContainer.className = "frame-thumb";
+        frameElement.appendChild(thumbContainer);
+        
+        const thumbCanvas = document.createElement("canvas");
+        thumbCanvas.width = this.project.width;
+        thumbCanvas.height = this.project.height;
+        thumbCanvas.style.width = "auto";
+        thumbCanvas.style.height = "60px";
+        thumbCanvas.style.backgroundColor = "#fff";
+        thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+        thumbCanvas.style.backgroundSize = "16px 16px";
+        
+        const thumbCtx = this.getCanvasContext(thumbCanvas);
+  
+        // Draw background
+        if (!this.transparentBackground) {
+          thumbCtx.fillStyle = this.secondaryColor;
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        }
+  
+        // Draw all visible layers
+        for (let l = 0; l < frame.layers.length; l++) {
+          if (frame.layers[l].visible) {
+            thumbCtx.drawImage(frame.layers[l].canvas, 0, 0);
+          }
+        }
+  
+        thumbContainer.appendChild(thumbCanvas);
+  
+        // Frame time display
+        const timeDisplay = document.createElement("div");
+        timeDisplay.className = "frame-time";
+        timeDisplay.textContent = `${this.project.frameTimes[i].toFixed(2)}ms`;
+        frameElement.appendChild(timeDisplay);
+  
+        // Frame number
+        const frameNumber = document.createElement("div");
+        frameNumber.className = "frame-number";
+        frameNumber.textContent = i + 1;
+        frameElement.appendChild(frameNumber);
+  
+        // Event listeners
+        frameElement.addEventListener("dragstart", e => {
+          e.dataTransfer.setData("text/plain", i.toString());
+          frameElement.classList.add("dragging");
+        });
+  
+        frameElement.addEventListener("dragend", () => {
+          frameElement.classList.remove("dragging");
+        });
+  
+        frameElement.addEventListener("dragover", e => {
+          e.preventDefault();
+        });
+  
+        frameElement.addEventListener("drop", e => {
+          e.preventDefault();
+          const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+          const toIndex = i;
+          if (fromIndex !== toIndex) {
+            this.moveFrame(fromIndex, toIndex);
+          }
+        });
+  
+        timeDisplay.addEventListener("click", e => {
+          this.showFrameTimeDialog(i);
+          e.stopPropagation();
+        });
+  
+        frameElement.addEventListener("click", e => {
+          this.project.currentFrame = i;
+          this.render();
+          e.stopPropagation();
+        });
+  
+        this.setupTimelineSwipe(frameElement, i);
+  
+        // Insert before add button
+        this.timelineContent.insertBefore(frameElement, addButton);
+      }
+    }
+  
+    this.updateAnimationPreview();
+  }
+  
+  updateFramesUIQuick() {
+    if (!this.project) return;
+  
+    // Update active class on frames
+    const frameElements = this.timelineContent.children;
+    for (let i = 0; i < frameElements.length - 1; i++) { // -1 for add button
+      const frameEl = frameElements[i];
+      if (frameEl.classList.contains('timeline-frame')) {
+        if (i === this.project.currentFrame) {
+          frameEl.classList.add('active');
+        } else {
+          frameEl.classList.remove('active');
+        }
+      }
+    }
+  
+    // Update animation preview only
+    this.updateAnimationPreview();
+  }
+  
+  // Layer Management
+  addLayer() {
+    if (!this.project) return;
+        
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede añadir nuevas capas||Only host can add new layers');
+      return;
+    }
+  
+    this.historyManager.startBatch("add_layer", __("Añadir Capa||Add Layer"));
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    const newLayer = this.createBlankLayer(this.project.width, this.project.height, `Layer ${frame.layers.length + 1}`);
+    const layerIndex = frame.layers.length;
+  
+    frame.layers.push(newLayer);
+    this.project.currentLayer = layerIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'add_layer',
+      description: __('Añadir Capa||Add Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: layerIndex,
+      layerData: {
+        name: newLayer.name,
+        visible: this.registerLayerVisibilityChanges ? newLayer.visible : true,
+        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+    
+    this.showOperationMessage(__("Nueva capa añadida||New layer added"));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+  
+  removeLayer() {
+    if (!this.project) return;
+  
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede quitar capas||Only host can remove layers');
+      return;
+    }
+  
+    const frame = this.project.frames[this.project.currentFrame];
+    if (frame.layers.length <= 1) return;
+  
+    this.historyManager.startBatch("remove_layer", __("Quitar capa||Remove Layer"));
+  
+    const layerIndex = this.project.currentLayer;
+    const removedLayer = frame.layers[layerIndex];
+  
+    frame.layers.splice(layerIndex, 1);
+    this.project.currentLayer = Math.min(layerIndex, frame.layers.length - 1);
+  
+    // Record operation
+    const operation = {
+      type: 'remove_layer',
+      description: __('Quitar capa||Remove Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: layerIndex,
+      layerData: {
+        name: removedLayer.name,
+        visible: this.registerLayerVisibilityChanges ? removedLayer.visible : true,
+        imageData: Array.from(removedLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+    
+    this.showOperationMessage(__("Capa quitada||Layer removed"));
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.render();
+  }
+  
+  setLayerVisibility(frameIndex, layerIndex, visible) {
+    if (!this.project || !this.project.frames[frameIndex] || !this.project.frames[frameIndex].layers[layerIndex]) return;
+  
+    const layer = this.project.frames[frameIndex].layers[layerIndex];
+    const oldVisibility = layer.visible;
+    layer.visible = visible;
+  
+    // Record operation
+    const operation = {
+      type: 'change_layer_visibility',
+      description: __('Cambiar visibilidad de la capa||Change Layer Visibility'),
+      frameIndex: frameIndex,
+      layerIndex: layerIndex,
+      visible: visible,
+      oldVisible: oldVisibility
+    };
+  
+    // Only save if enabled
+    if (this.registerLayerVisibilityChanges) {
+      this.historyManager.addChange(operation);
+    }
+    
+    this.render();
+  }
+  
+  moveLayer(frameIndex, fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+  
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede mover las capas||Only host can move layers');
+      return;
+    }
+  
+    this.historyManager.startBatch("move_layer", "Move Layer");
+  
+    const frame = this.project.frames[frameIndex];
+    const layer = frame.layers.splice(fromIndex, 1)[0];
+    frame.layers.splice(toIndex, 0, layer);
+    this.project.currentLayer = toIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'move_layer',
+      description: 'Move Layer',
+      frameIndex: frameIndex,
+      fromIndex: fromIndex,
+      toIndex: toIndex
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.render();
+  }
+    
+  prevLayer() {
+    if (!this.project) return;
+    const newIndex = Math.max(0, this.project.currentLayer - 1);
+    this.project.currentLayer = newIndex;
+    this.updateLayersUI();
+  }
+  
+  nextLayer() {
+    if (!this.project) return;
+    const frame = this.project.frames[this.project.currentFrame];
+    const newIndex = Math.min(frame.layers.length - 1, this.project.currentLayer + 1);
+    this.project.currentLayer = newIndex;
+    this.updateLayersUI();
+  }
+  
+  duplicateLayer() {
+    if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede añadir nuevas capas||Only host can add new layers');
+      return;
+    }
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const sourceIndex = this.project.currentLayer;
+    const sourceLayer = frame.layers[sourceIndex];
+    const newIndex = sourceIndex + 1;
+  
+    this.historyManager.startBatch("duplicate_layer", __("Duplicar capa||Duplicate Layer"));
+  
+    // Create new layer with copy of content
+    const newLayer = this.createBlankLayer(
+      this.project.width, 
+      this.project.height, 
+      `${sourceLayer.name} (${__("copia||copy")})`
+    );
+    newLayer.visible = sourceLayer.visible;
+    newLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+  
+    // Insert after current
+    frame.layers.splice(newIndex, 0, newLayer);
+    this.project.currentLayer = newIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'duplicate_layer',
+      description: __('Duplicar capa||Duplicate Layer'),
+      frameIndex: this.project.currentFrame,
+      layerIndex: newIndex,
+      layerData: {
+        name: newLayer.name,
+        visible: newLayer.visible,
+        imageData: Array.from(newLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+      }
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+  
+    this.showOperationMessage(__('Capa duplicada||Layer duplicated'));
+    this.updateLayersUI();
+    this.render();
+  }
+
+  renameLayer(name, index) {
+    if (!this.project) return;
+    
+    this.historyManager.startBatch("rename_layer", __("Renombrar capa||Rename Layer"));
+    
+    const layerIndex = typeof index != "undefined" ? index : this.currentLayer;
+    let previousName;
+    let newName = name;
+    
+    // Rename the layer in all frames
+    this.project.frames.forEach(frame => {
+      const layer = frame.layers[layerIndex];
+      
+      if (!previousName) previousName = layer.name;
+      
+      layer.name = newName || layer.name;
+    });
+    
+    // Record operation
+    const operation = {
+      type: 'rename_layer',
+      description: __('Renombrar capa||Rename Layer'),
+      layerIndex,
+      previousName,
+      newName
+    };
+
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+
+    this.showOperationMessage(__("Nombre editado||Name edited"));
+  }
+  
+  mergeLayerUp(layerIndex = this.project.currentLayer) {
+    if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede mezclar capas||Only host can merge layers');
+      return;
+    }
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    if (layerIndex >= frame.layers.length - 1) return; // Already top layer
+  
+    const sourceIndex = layerIndex;
+    const targetIndex = layerIndex + 1;
+    
+    this.historyManager.startBatch("merge_layers", __("Combinar capas||Merge Layers"));
+  
+    // Store data before merge
+    const sourceLayer = frame.layers[sourceIndex];
+    const targetLayer = frame.layers[targetIndex];
+    
+    const sourceData = {
+      name: sourceLayer.name,
+      visible: sourceLayer.visible,
+      imageData: Array.from(sourceLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+    
+    const targetData = {
+      name: targetLayer.name,
+      visible: targetLayer.visible,
+      imageData: Array.from(targetLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+  
+    // Perform merge
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    frame.layers.splice(sourceIndex, 1);
+    this.project.currentLayer = targetIndex - 1;
+  
+    // Record operation
+    const operation = {
+      type: 'merge_layers',
+      description: __('Combinar capas||Merge Layers'),
+      frameIndex: this.project.currentFrame,
+      sourceIndex: sourceIndex,
+      targetIndex: targetIndex,
+      sourceData: sourceData,
+      targetData: targetData
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    this.showOperationMessage(__('Capas combinadas||Layers merged'));
+    this.updateLayersUI();
+    this.render();
+  }  
+  
+  mergeLayerDown(layerIndex = this.project.currentLayer) {
+    if (!this.project) return;
+    
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast('Solo el host puede mezclar capas||Only host can merge layers');
+      return;
+    }
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    if (layerIndex <= 0) return; // Already bottom layer
+  
+    const sourceIndex = layerIndex;
+    const targetIndex = layerIndex - 1;
+    
+    this.historyManager.startBatch("merge_layers", __("Combinar capas||Merge Layers"));
+  
+    // Store data before merge
+    const sourceLayer = frame.layers[sourceIndex];
+    const targetLayer = frame.layers[targetIndex];
+    
+    const sourceData = {
+      name: sourceLayer.name,
+      visible: sourceLayer.visible,
+      imageData: Array.from(sourceLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+    
+    const targetData = {
+      name: targetLayer.name,
+      visible: targetLayer.visible,
+      imageData: Array.from(targetLayer.ctx.getImageData(0, 0, this.project.width, this.project.height).data)
+    };
+  
+    // Perform merge
+    targetLayer.ctx.drawImage(sourceLayer.canvas, 0, 0);
+    frame.layers.splice(sourceIndex, 1);
+    this.project.currentLayer = targetIndex;
+  
+    // Record operation
+    const operation = {
+      type: 'merge_layers',
+      description: __('Combinar capas||Merge Layers'),
+      frameIndex: this.project.currentFrame,
+      sourceIndex: sourceIndex,
+      targetIndex: targetIndex,
+      sourceData: sourceData,
+      targetData: targetData
+    };
+  
+    this.historyManager.addChange(operation);
+    this.historyManager.endBatch();
+    
+    this.showOperationMessage(__('Capas combinadas||Layers merged'));
+    this.updateLayersUI();
+    this.render();
+  }
+      
+  createBlankLayer(width, height, name = `Layer ${this.project && this.project.frames.length ? this.project.frames[0].layers.length + 1 : 1}`) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = this.getCanvasContext(canvas);
+
+    return {
+      canvas: canvas,
+      ctx: ctx,
+      visible: true,
+      name
+    };
+  }
+  
+  updateLayersUI() {
+    if (!this.project) return;
+    
+    const frame = this.project.frames[this.project.currentFrame];
+    const layerCount = frame.layers.length;
+    
+    // Clear the entire container (just like animation panel)
+    this.layersContainer.innerHTML = "";
+    
+    // Create header with controls (like timeline header)
+    const header = document.createElement("div");
+    header.className = "layers-header";
+    
+    // Previous layer button
+    const prevLayerBtn = document.createElement("button");
+    prevLayerBtn.className = "ui-button";
+    prevLayerBtn.innerHTML = '<div class="icon icon-prev"></div>';
+    prevLayerBtn.title = __("Capa anterior||Previous Layer");
+    prevLayerBtn.addEventListener("click", () => this.prevLayer());
+    header.appendChild(prevLayerBtn);
+    
+    // Next layer button
+    const nextLayerBtn = document.createElement("button");
+    nextLayerBtn.className = "ui-button";
+    nextLayerBtn.innerHTML = '<div class="icon icon-next"></div>';
+    nextLayerBtn.title = __("Capa siguiente||Next Layer");
+    nextLayerBtn.addEventListener("click", () => this.nextLayer());
+    header.appendChild(nextLayerBtn);
+    
+    // Add layer button
+    const addLayerBtn = document.createElement("button");
+    addLayerBtn.className = "ui-button";
+    addLayerBtn.innerHTML = '<div class="icon icon-add"></div>';
+    addLayerBtn.title = __("Añadir capa||Add Layer");
+    addLayerBtn.addEventListener("click", () => this.addLayer());
+    header.appendChild(addLayerBtn);
+    
+    // Duplicate layer button
+    const duplicateLayerBtn = document.createElement("button");
+    duplicateLayerBtn.className = "ui-button";
+    duplicateLayerBtn.innerHTML = '<div class="icon icon-copy"></div>';
+    duplicateLayerBtn.title = __("Duplicar capa||Duplicate Layer");
+    duplicateLayerBtn.addEventListener("click", () => this.duplicateLayer());
+    header.appendChild(duplicateLayerBtn);
+    
+    // Merge with top button
+    const mergeTopBtn = document.createElement("button");
+    mergeTopBtn.className = "ui-button";
+    mergeTopBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
+    mergeTopBtn.title = __("Combinar con superior||Merge with Top");
+    mergeTopBtn.addEventListener("click", () => this.mergeLayerUp());
+    header.appendChild(mergeTopBtn);
+    
+    // Merge with bottom button
+    const mergeBottomBtn = document.createElement("button");
+    mergeBottomBtn.className = "ui-button";
+    mergeBottomBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
+    mergeBottomBtn.title = __("Combinar con inferior||Merge with Bottom");
+    mergeBottomBtn.addEventListener("click", () => this.mergeLayerDown());
+    header.appendChild(mergeBottomBtn);
+    
+    this.layersContainer.appendChild(header);
+    
+    // Create layers in reverse order (top layer first in UI)
+    for (let i = layerCount - 1; i >= 0; i--) {
+      const layer = frame.layers[i];
+      const layerElement = document.createElement("div");
+      layerElement.className = "layer-item";
+      if (i === this.project.currentLayer) {
+        layerElement.classList.add('active');
+      }
+      layerElement.setAttribute("data-index", i);
+      layerElement.draggable = true;
+  
+      // Thumbnail container
+      const thumbContainer = document.createElement("div");
+      thumbContainer.className = "layer-thumb";
+      layerElement.appendChild(thumbContainer);
+  
+      const thumbCanvas = document.createElement("canvas");
+      thumbCanvas.width = this.project.width;
+      thumbCanvas.height = this.project.height;
+      thumbCanvas.style.width = "auto";
+      thumbCanvas.style.height = "44px";
+      thumbCanvas.style.backgroundColor = "#fff";
+      thumbCanvas.style.backgroundImage = "var(--transparent-bg)";
+      thumbCanvas.style.backgroundSize = "16px 16px";
+      
+      const thumbCtx = this.getCanvasContext(thumbCanvas);
+      
+      // Draw background
+      if (!this.transparentBackground) {
+        thumbCtx.fillStyle = this.secondaryColor;
+        thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+      }
+      
+      // Draw layer content
+      if (layer.canvas) {
+        thumbCtx.drawImage(layer.canvas, 0, 0);
+      }
+      
+      thumbContainer.appendChild(thumbCanvas);
+  
+      // Layer name
+      const layerName = document.createElement("input");
+      layerName.className = "layer-name";
+      layerName.value = layer.name;
+      layerElement.appendChild(layerName);
+  
+      // Layer actions
+      const layerActions = document.createElement("div");
+      layerActions.className = "layer-actions";
+  
+      // Move up button
+      const moveUpBtn = document.createElement("button");
+      moveUpBtn.className = "ui-button layer-action";
+      moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
+      moveUpBtn.title = __("Subir||Move Up");
+      if (i >= layerCount - 1) {
+        moveUpBtn.disabled = true;
+        moveUpBtn.classList.add("disabled");
+      } else {
+        moveUpBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.moveLayer(this.project.currentFrame, i, i + 1);
+        });
+      }
+      layerActions.appendChild(moveUpBtn);
+  
+      // Move down button
+      const moveDownBtn = document.createElement("button");
+      moveDownBtn.className = "ui-button layer-action";
+      moveDownBtn.innerHTML = '<div class="icon icon-down"></div>';
+      moveDownBtn.title = __("Bajar||Move Down");
+      if (i <= 0) {
+        moveDownBtn.disabled = true;
+        moveDownBtn.classList.add("disabled");
+      } else {
+        moveDownBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.moveLayer(this.project.currentFrame, i, i - 1);
+        });
+      }
+      layerActions.appendChild(moveDownBtn);
+  
+      // Visibility toggle
+      const visibilityBtn = document.createElement("button");
+      visibilityBtn.className = "ui-button layer-action";
+      visibilityBtn.innerHTML = layer.visible ? 
+        '<div class="icon icon-visible"></div>' : 
+        '<div class="icon icon-hidden"></div>';
+      visibilityBtn.title = __("Visibilidad||Toggle Visibility");
+      visibilityBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        this.setLayerVisibility(this.project.currentFrame, i, !layer.visible);
+      });
+      layerActions.appendChild(visibilityBtn);
+  
+      // Merge up button
+      const mergeUpBtn = document.createElement("button");
+      mergeUpBtn.className = "ui-button layer-action";
+      mergeUpBtn.innerHTML = '<div class="icon icon-merge-up"></div>';
+      mergeUpBtn.title = __("Combinar arriba||Merge Up");
+      if (i >= layerCount - 1) {
+        mergeUpBtn.disabled = true;
+        mergeUpBtn.classList.add("disabled");
+      } else {
+        mergeUpBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.mergeLayerUp(i);
+        });
+      }
+      layerActions.appendChild(mergeUpBtn);
+  
+      // Merge down button
+      const mergeDownBtn = document.createElement("button");
+      mergeDownBtn.className = "ui-button layer-action";
+      mergeDownBtn.innerHTML = '<div class="icon icon-merge-down"></div>';
+      mergeDownBtn.title = __("Combinar abajo||Merge Down");
+      if (i <= 0) {
+        mergeDownBtn.disabled = true;
+        mergeDownBtn.classList.add("disabled");
+      } else {
+        mergeDownBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.mergeLayerDown(i);
+        });
+      }
+      layerActions.appendChild(mergeDownBtn);
+  
+      // Remove button
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "ui-button layer-action";
+      removeBtn.innerHTML = '<div class="icon icon-close"></div>';
+      removeBtn.title = __("Eliminar||Remove");
+      if (layerCount <= 1) {
+        removeBtn.disabled = true;
+        removeBtn.classList.add("disabled");
+      } else {
+        removeBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          this.removeLayer(i);
+        });
+      }
+      layerActions.appendChild(removeBtn);
+  
+      layerElement.appendChild(layerActions);
+  
+      // Drag and drop events
+      layerElement.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", i.toString());
+        layerElement.classList.add("dragging");
+      });
+  
+      layerElement.addEventListener("dragend", () => {
+        layerElement.classList.remove("dragging");
+      });
+  
+      layerElement.addEventListener("dragover", e => {
+        e.preventDefault();
+      });
+  
+      layerElement.addEventListener("drop", e => {
+        e.preventDefault();
+        const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
+        const toIndex = i;
+        if (fromIndex !== toIndex) {
+          this.moveLayer(this.project.currentFrame, fromIndex, toIndex);
+        }
+      });
+  
+      layerElement.addEventListener("click", () => {
+        if (this.project.currentLayer != i) {
+          this.project.currentLayer = i;
+          this.updateLayersUI();
+        }
+      });
+      
+      layerName.addEventListener("change", () => {
+        this.renameLayer(layerName.value, i);
+        layerName.blur();
+      });
+  
+      this.layersContainer.appendChild(layerElement);
+    }
+  }  
+  
+  showButtonToast(message, button, undoCallback) {
+    const toast = document.createElement("div");
+    toast.className = "toast-with-button";
+      toast.innerHTML = `
+      <span>${message || ''}</span>
+      <button class="toast-button">${button || __("Deshacer||Undo")}</button>
+    `;
+
+    this.editorElement.appendChild(toast);
+
+    // Add event listener
+    toast.querySelector(".toast-button").addEventListener("click", () => {
+      undoCallback();
+      toast.remove();
+    });
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.remove();
+      }
+    }, 5000);
+  }
+
+  setupTimelineSwipe(element, index) {
+    let startY;
+    let isSwiping = false;
+
+    element.addEventListener("touchstart", e => {
+      startY = e.touches[0].clientY;
+      isSwiping = true;
+    });
+
+    element.addEventListener("touchmove", e => {
+      if (!isSwiping) return;
+
+      const currentY = e.touches[0].clientY;
+      const deltaY = currentY - startY;
+
+      // Vertical swipe up (delete)
+      if (deltaY < -30) {
+        e.preventDefault();
+        element.style.transform = `translateY(${deltaY}px)`;
+        element.style.opacity = `${1 - Math.abs(deltaY) / 100}`;
+      }
+    });
+
+    element.addEventListener("touchend", e => {
+      if (!isSwiping) return;
+
+      const currentY = e.changedTouches[0].clientY;
+      const deltaY = currentY - startY;
+
+      if (deltaY < -60) {
+        // Swipe threshold reached: delete frame
+        this.removeFrame(index);
+      }
+
+      // Reset transform
+      element.style.transform = "";
+      element.style.opacity = "";
+      isSwiping = false;
+    });
+  }
+
+  showFrameTimeDialog(frameIndex) {
+    const content = document.createElement("div");
+    content.innerHTML = `
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; margin-bottom: 5px;">${__("Tiempo del Frame||Frame Time")} (ms):</label>
+      <input type="number" id="frame-time-value" value="${this.project.frameTimes[frameIndex]}" min="1" max="5000" style="width: 100%; padding: 5px;">
+    </div>
+  `;
+
+    this.showPopup(__("Cambiar Tiempo del Frame||Set Frame Time"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Aplicar||Apply"),
+        action: () => {
+          const time = parseInt(document.getElementById("frame-time-value").value);
+          if (time >= 1 && time <= 5000) {
+            this.setFrameTime(frameIndex, time);
+            this.updateFramesUI();
+            this.hidePopup();
+          }
+        }
+      }
+    ]);
+  }
+
+  updateFPS(input) {
+    let fps = parseInt(input || this.fpsInput.value);
+    if (fps >= 1 && fps <= 60) {
+      const oldFPS = 1000 / this.project.currentFrameTime;
+      const oldFrameTimes = this.project.frameTimes;
+      this.project.currentFrameTime = 1000 / fps;
+  
+      // Update all frame times
+      this.project.frameTimes = this.project.frameTimes.map(() => this.project.currentFrameTime);
+  
+      // Record operation
+      const operation = {
+        type: 'change_animation_fps',
+        description: __('Cambiar FPS||Change FPS'),
+        oldFPS: oldFPS,
+        newFPS: fps,
+        oldFrameTimes: oldFrameTimes,
+        newFrameTimes: this.project.frameTimes
+      };
+  
+      this.historyManager.addChange(operation);
+  
+      this.updateFramesUI();
+  
+      // Restart animation if playing
+      if (this.isPlaying) {
+        this.stopAnimation();
+        this.startAnimation();
+      }
+    }
+  }
+  
+  togglePlayback() {
+    if (this.isPlaying) {
+      this.stopAnimation();
+    } else {
+      this.startAnimation();
+    }
+  }
+
+  startAnimation() {
+    if (this.project.frames.length <= 1) return;
+
+    this.isPlaying = true;
+    this.playPauseButton.querySelector(".icon").className = "icon icon-pause";
+
+    let currentFrame = this.project.currentFrame;
+    let startTime = Date.now();
+    let accumulatedTime = 0;
+
+    this.animationInterval = setInterval(() => {
+      const now = Date.now();
+      const delta = now - startTime - accumulatedTime;
+      accumulatedTime += delta;
+
+      // Calculate which frame to show based on accumulated time
+      let timeSum = 0;
+      let nextFrame = currentFrame;
+
+      for (let i = 0; i < this.project.frameTimes.length; i++) {
+        timeSum += this.project.frameTimes[i];
+        if (accumulatedTime < timeSum) {
+          nextFrame = i;
+          break;
+        }
+      }
+
+      // Loop around if we've passed the end
+      if (accumulatedTime >= timeSum) {
+        accumulatedTime = 0;
+        nextFrame = 0;
+        startTime = Date.now();
+      }
+
+      if (nextFrame !== currentFrame) {
+        currentFrame = nextFrame;
+        if (!this.showMiniView) {
+          this.project.currentFrame = currentFrame;
+          this.renderQuick();
+        } else if (!this.isDrawing) {
+          this.updateAnimationPreview(currentFrame);
+        }        
+      }
+    }, 16); // ~60fps update rate
+  }
+
+  stopAnimation() {
+    this.isPlaying = false;
+    if (this.playPauseButton) {
+      this.playPauseButton.querySelector(".icon").className = "icon icon-play";
+    }
+
+    if (this.animationInterval) {
+      clearInterval(this.animationInterval);
+      this.animationInterval = null;
+    }
+  }
+
+  prevFrame() {
+    if (this.project.frames.length <= 1) return;
+
+    this.project.currentFrame = (this.project.currentFrame - 1 + this.project.frames.length) % this.project.frames.length;
+    this.render();
+  }
+
+  nextFrame() {
+    if (this.project.frames.length <= 1) return;
+
+    this.project.currentFrame = (this.project.currentFrame + 1) % this.project.frames.length;
+    this.render();
+  }
+
+  updateAnimationPreview(currentFrame = this.project.currentFrame, fromCanvas) {
+    if (!this.project || !this.animationPreview) return;
+    
+
+    const frame = this.project.frames[currentFrame];
+    this.animationPreview.width = this.project.width;
+    this.animationPreview.height = this.project.height;
+
+    const ctx = this.getCanvasContext(this.animationPreview);
+    ctx.clearRect(0, 0, this.animationPreview.width, this.animationPreview.height);
+
+    if (fromCanvas) {
+      ctx.drawImage(fromCanvas, 0, 0);
+      return;
+    }
+
+    // Draw background
+    if (!this.transparentBackground) {
+      ctx.fillStyle = this.secondaryColor;
+      ctx.fillRect(0, 0, this.animationPreview.width, this.animationPreview.height);
+    }
+
+    // Draw all visible layers
+    for (let l = 0; l < frame.layers.length; l++) {
+      if (frame.layers[l].visible) {
+        ctx.drawImage(frame.layers[l].canvas, 0, 0, this.project.width, this.project.height, 0, 0, this.animationPreview.width, this.animationPreview.height);
+      }
+    }
+  }
+
+  canvasHasTransparency(canvas) {
+    const ctx = this.getCanvasContext(canvas);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 255) return true;
+    }
+    return false;
+  }
+
+  showFPSDialog() {
+    const content = document.createElement("div");
+    content.innerHTML = `
+    <div style="margin-bottom: 15px;">
+      <label style="display: block; margin-bottom: 5px;">${__("Frames Por Segundo||Frames Per Second")}:</label>
+      <input type="number" id="fps-value" value="${parseInt(1000 / this.project.currentFrameTime)}" min="1" max="60" style="width: 100%; padding: 5px;">
+    </div>
+  `;
+
+    this.showPopup(__("Cambiar FPS||Set Animation FPS"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Aplicar||Apply"),
+        action: () => {
+          const fps = parseInt(document.getElementById("fps-value").value);
+          if (fps >= 1 && fps <= 60) {
+            this.fpsInput.value = fps;
+            this.updateFPS(fps);
+            this.hidePopup();
+          }
+        }
+      }
+    ]);
+  }
+
+  showCurrentFrameTimeDialog() {
+    this.showFrameTimeDialog(this.project.currentFrame);
+  }
+
+  // Initialize file handling
+  initFileHandling() {
+    this.isCordova = typeof window.cordova !== "undefined";
+    this.isFilePluginAvailable = this.isCordova && typeof window.File !== "undefined";
+    this.lastSavedPath = null;
+  }
+
+  // Main file operations
+  openFile() {
+    if (this.collabManager.isConnected && !this.collabManager.isHost) {
+      this.showToast(__('Desconectate de la sesión colaborativa primero||Disconnect from collaborative session first'));
+      return;
+    }
+    
+    const fileBrowser = this.getFileBrowser({
+      mode: "open",
+      fileTypes: ["pxl", "psd", "png", "jpg", "jpeg", "pal"],
+      onConfirm: async fileInfo => {
+        try {
+          const fileData = await this.readFile(fileInfo);
+          
+          if (fileInfo.type === "pxl") {
+            this.loadProject(fileData);
+          } else if (fileInfo.type === "psd") {
+            await this.importPSD(fileData, fileInfo.name);
+          } else if (fileInfo.type === "pal") {
+            this.parsePalFile(fileData);
+            this.updatePaletteGrid();
+            this.showToast(__(`(Paleta|Palette) ${fileInfo.name} (cargada|loaded)`));
+          } else {
+            this.importImage(fileData, fileInfo.name);
+          }
+          
+          this.showToast(__(`(Archivo|File) ${fileInfo.name} (abierto|opened)`));
+          this.menuPanelOverlay.classList.remove("visible");
+        } catch (error) {
+          this.showToast(__(`(Error al abrir el archivo|Error opening file): ${error.message}`), 5000);
+          console.error(error);
+        }
+      },
+      onError: error => {
+        this.showToast(__(`(Error de archivo|File error): ${error.message}`), 5000);
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  saveProject(quickSave) {
+    if (!this.project) return;
+
+    if (quickSave && this.lastSavedPath) {
+      this.saveFile(this.lastSavedPath, "pxl", this.getProjectData(true));
+    } else {
+      this.saveAs();
+    }
+  }
+
+  saveAs() {
+    const fileBrowser = this.getFileBrowser({
+      mode: "saveAs",
+      fileTypes: ["pxl", "psd", "png"],
+      defaultType: "pxl",
+      defaultName: this.project.name || "untitled",
+      onConfirm: async fileInfo => {
+        try {
+          this.lastSavedPath = fileInfo.name;
+
+          if (fileInfo.type === "pxl") {
+            await this.saveFile(fileInfo.name, "pxl", this.getProjectData());
+          } else if (fileInfo.type === "psd") {
+            const psdBlob = await this.exportAsPSD();
+            await this.saveFile(fileInfo.name, "psd", psdBlob);
+          } else {
+            this.renderQuick();
+            const dataURL = this.canvas.toDataURL("image/png");
+            await this.saveFile(fileInfo.name, "png", dataURL);
+          }
+          
+          this.showToast(__(`(Archivo guardado como|File saved as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error al guardar el archivo|Error saving file): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  exportCurrentFrame() {
+    if (!this.project) return;
+
+    const fileBrowser = this.getFileBrowser({
+      title: "Export frame",
+      mode: "saveAs",
+      fileTypes: ["png"],
+      defaultType: "png",
+      defaultName: `frame_${this.project.currentFrame + 1}`,
+      onConfirm: async fileInfo => {
+        try {
+          const frame = this.project.frames[this.project.currentFrame];
+          const canvas = this.renderFrameToCanvas(frame);
+          const dataURL = canvas.toDataURL("image/png");
+
+          await this.saveFile(fileInfo.name, "png", dataURL);
+          this.showToast(__(`Frame (exportado como|exported as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error exportando el frame|Error exporting frame): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  exportSelection() {
+    if (!this.project) return;
+
+    const fileBrowser = this.getFileBrowser({
+      title: "Export frame",
+      mode: "saveAs",
+      fileTypes: ["png"],
+      defaultType: "png",
+      defaultName: `selection_${Date.now()}`,
+      onConfirm: async fileInfo => {
+        try {
+          const canvas = this.selectionManager.getSelectedAreaCanvas();
+          
+          if (canvas) {
+            const dataURL = canvas.toDataURL("image/png");
+
+            await this.saveFile(fileInfo.name, "png", dataURL);
+            this.showToast(__(`(Selección exportada como|Selection exported as) ${fileInfo.name}`));
+          } else {
+            this.showToast(__(`No hay nada seleccionado||Nothing selected`));
+          }
+        } catch (error) {
+          this.showToast(__(`(Error exportando el frame|Error exporting frame): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  exportAnimation() {
+    if (!this.project || this.project.frames.length <= 1) {
+      this.showToast("Project has only one frame", 3000);
+      return;
+    }
+
+    const fileBrowser = this.getFileBrowser({
+      title: "Export animation sheet",
+      mode: "saveAs",
+      fileTypes: ["png"],
+      defaultType: "png",
+      defaultName: `animation_${this.project.name || Date.now()}`,
+      onConfirm: async fileInfo => {
+        try {
+          const spriteSheet = this.createSpriteSheet();
+          const dataURL = spriteSheet.toDataURL("image/png");
+
+          await this.saveFile(fileInfo.name, "png", dataURL);
+          this.showToast(__(`(Animación exportada como|Animation exported as) ${fileInfo.name}`));
+        } catch (error) {
+          this.showToast(__(`(Error exportando animación|Error exporting animation): ${error.message}`), 5000);
+          console.error(error);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+  
+  showSpritesheetLoader() {
+    if (!this.spritesheetLoader) {
+      this.spritesheetLoader = new SpritesheetLoader(this);
+    }
+    this.spritesheetLoader.show();
+  }
+  
+  async readFile(fileInfo) {
+    if (fileInfo.entry) {
+      // Cordova file entry
+      return this.readCordovaFile(fileInfo.entry);
+    } else if (fileInfo.file) {
+      // Browser file object
+      return this.readBrowserFile(fileInfo.file);
+    }
+    throw new Error("Unsupported file source");
+  }
+
+  async readCordovaFile(fileEntry) {
+    return new Promise((resolve, reject) => {
+      fileEntry.file(
+        file => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Failed to read file"));
+
+          if (file.name.endsWith(".pxl") || file.name.endsWith(".anim") || file.name.endsWith(".pal") || file.name.endsWith(".txt")) {
+            reader.readAsText(file);
+          } else {
+            reader.readAsDataURL(file);
+          }
+        },
+        error => {
+          reject(new Error(`Could not read file: ${error.code}`));
+        }
+      );
+    });
+  }
+
+  async readBrowserFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+
+      if (file.name.endsWith(".pxl") || file.name.endsWith(".anim") || file.name.endsWith(".pal") || file.name.endsWith(".txt")) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  async saveFile(filename, type, data) {
+    if (this.isCordova && this.isFilePluginAvailable) {
+      try {
+        await this.saveWithCordova(filename, type, data);
+      } catch (error) {
+        console.error("Cordova save failed, falling back to browser:", error);
+        this.saveWithBrowser(filename, type, data);
+      }
+    } else {
+      this.saveWithBrowser(filename, type, data);
+    }
+  }
+
+  async saveWithCordova(filename, type, data) {
+    return new Promise((resolve, reject) => {
+      // Check if Cordova is available
+      if (!window.requestFileSystem) {
+        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+      }
+
+      if (!window.requestFileSystem) {
+        reject(new Error("File system API not available"));
+        return;
+      }
+
+      // Use PERSISTENT storage (same as your working code)
+      window.requestFileSystem(
+        window.PERSISTENT || 1, // Use 1 if PERSISTENT is undefined
+        5 * 1024 * 1024, // 5MB
+        fileSystem => {
+          // Create or get the file
+          fileSystem.root.getFile(
+            this.fileBrowser.workingDirectory + filename,
+            { create: true, exclusive: false },
+            entry => {
+              entry.createWriter(
+                writer => {
+                  writer.onwriteend = () => {
+                    this.lastSavedPath = filename;
+                    resolve();
+                  };
+                  writer.onerror = error => {
+                    reject(new Error(`File write error: ${error.code}`));
+                  };
+
+                  let blob;
+                  if (type === "pxl") {
+                    blob = new Blob([data], { type: "application/json" });
+                  } else {
+                    blob = this.dataURLtoBlob(data);
+                  }
+
+                  writer.write(blob);
+                },
+                error => {
+                  reject(new Error(`Could not create file writer: ${error.code}`));
+                }
+              );
+            },
+            error => {
+              reject(new Error(`Could not create file: ${error.code}`));
+            }
+          );
+        },
+        error => {
+          reject(new Error(`Could not access file system: ${error.code}`));
+        }
+      );
+    });
+  }
+
+  async saveWithBrowser(filename, type, data) {
+    try {
+      let blob;
+
+      if (data instanceof Blob) {
+        // If it's already a Blob, use it directly
+        blob = data;
+      } else if (type === "pxl") {
+        blob = new Blob([data], { type: "application/json" });
+      } else if (type === "pal") {
+        blob = new Blob([data], { type: "text/plain" });
+      } else {
+        // Assume it's a data URL for images
+        blob = this.dataURLtoBlob(data);
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error("Browser save failed:", error);
+      this.showToast(__("Error al guardar||Failed to save file"), 3000);
+    }
+  }
+
+  async exportAsPSD() {
+    if (!this.project) return;
+  
+    try {
+      // Build PSD structure from current frame
+      const frame = this.project.frames[this.project.currentFrame];
+      
+      // Create PSD data structure
+      const psdData = {
+        width: this.project.width,
+        height: this.project.height,
+        children: []
+      };
+  
+      // Add all layers (PSD layers are ordered from bottom to top)
+      for (let i = 0; i < frame.layers.length; i++) {
+        const layer = frame.layers[i];
+        
+        // Create a new canvas with the exact content (including transparency)
+        const layerCanvas = document.createElement('canvas');
+        layerCanvas.width = this.project.width;
+        layerCanvas.height = this.project.height;
+        const ctx = layerCanvas.getContext('2d');
+        ctx.drawImage(layer.canvas, 0, 0);
+        
+        psdData.children.push({
+          name: layer.name,
+          canvas: layerCanvas,
+          visible: layer.visible,
+          opacity: 255, // Full opacity (PSD uses 0-255)
+          blendMode: 'normal'
+        });
+      }
+  
+      // Write PSD data to ArrayBuffer
+      const arrayBuffer = agPsd.writePsd(psdData);
+      return new Blob([arrayBuffer], { type: 'application/octet-stream' });
+      
+    } catch (error) {
+      console.error('Error exporting PSD:', error);
+      throw new Error('Failed to export PSD');
+    }
+  }
+
+  // Timelapse export methods
+  async exportTimelapse() {
+    if (!this.project || !this.historyManager.history.length) {
+      this.showToast(__("No hay suficiente historia para exportar el proceso||Not enough history to export a timelapse"));
+      return;
+    }
+
+    // Show configuration dialog
+    const content = document.createElement("div");
+    content.innerHTML = `
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">FPS:</label>
+        <input type="number" id="timelapse-fps" value="${this.timelapseFPS}" min="1" max="60" style="width: 100%; padding: 5px;">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">${__("Escala||Scale")}:</label>
+        <input type="number" id="timelapse-scale" value="4" min="1" max="10" style="width: 100%; padding: 5px;">
+      </div>
+      <img style="display:none;image-rendering:pixelated;width:100%;height:auto;background-color:#fff;border:1px solid #000" class="timelapse-preview">
+      <div class="timelapse-progress" style="display: none;">
+        <div style="text-align: center; margin-bottom: 5px;">${__("Generando||Generating")} timelapse...</div>
+        <progress value="0" max="100" style="width: 100%;"></progress>
+        <div class="progress-text" style="text-align: center; margin-top: 5px;">0%</div>
+      </div>
+    `;
+
+    const progressSection = content.querySelector(".timelapse-progress");
+    const progressBar = content.querySelector("progress");
+    const progressText = content.querySelector(".progress-text");
+
+    this.showPopup(__("Exportar Timelapse||Export Timelapse"), content, [
+      {
+        text: __("Cancelar||Cancel"),
+        class: "cancel",
+        action: () => this.hidePopup()
+      },
+      {
+        text: __("Generar||Generate"),
+        action: async () => {
+          const fps = parseInt(document.getElementById("timelapse-fps").value) || 30;
+          const scale = parseInt(document.getElementById("timelapse-scale").value) || 4;
+
+          // Show progress UI
+          content.querySelector("div:first-child").style.display = "none";
+          content.querySelector("div:nth-child(2)").style.display = "none";
+          progressSection.style.display = "block";
+          
+          this.hidePopupButtons();
+
+          try {
+            const videoBlob = await this.generateTimelapse(fps, scale, (progress, previewImageData) => {
+              progressBar.value = progress;
+              progressText.textContent = `${progress}%`;
+              const preview = content.querySelector(".timelapse-preview");
+              if (preview && previewImageData) {
+                preview.style.display = "flex";
+                preview.src = previewImageData;
+              }
+            });
+
+            // Now show file browser to save the video
+            this.hidePopup();
+            this.saveTimelapseWithBrowser(videoBlob);
+          } catch (error) {
+            this.showToast(__(`(Error generando proceso|Error generating timelapse): ${error.message}`), 5000);
+            throw error;
+          }
+        }
+      }
+    ]);
+  }
+
+  async generateTimelapse(fps, scale, progressCallback) {
+    return this.historyManager.generateTimelapse(fps, scale, progressCallback);
+  }
+
+  saveTimelapseWithBrowser(videoBlob) {
+    const fileBrowser = this.getFileBrowser({
+      mode: "saveAs",
+      fileTypes: ["webm"],
+      defaultType: "webm",
+      defaultName: `timelapse_${this.project.name || "artwork"}_${this.formatDate(new Date())}`,
+      onConfirm: async fileInfo => {
+        try {
+          await this.saveFile(fileInfo.name, "webm", videoBlob);
+          this.showToast(__("Timelapse exportado||Timelapse saved successfully"));
+        } catch (error) {
+          this.showToast(__(`(Error guardando proceso|Error saving timelapse): ${error.message}`), 5000);
+        }
+      }
+    });
+
+    fileBrowser.show();
+  }
+
+  getFileBrowser(options = {}) {
+    if (!this.fileBrowser) {
+      this.fileBrowser = new FileBrowser({
+        container: this.container,
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+        onError: options.onError,
+        title: options.title || null,
+        fileTypes: options.fileTypes || ["pxl", "png"],
+        mode: options.mode || "open",
+        defaultType: options.defaultType || "pxl",
+        defaultName: options.defaultName || "untitled"
+      });
+      this.fileBrowser.currentPath = this.defaultFileBrowserPathUrl;
+    } else {
+      // Update options and refresh UI
+      this.fileBrowser.updateOptions({
+        onConfirm: options.onConfirm,
+        onCancel: options.onCancel,
+        onError: options.onError,
+        title: options.title || null,
+        fileTypes: options.fileTypes || ["pxl", "png"],
+        mode: options.mode || "open",
+        defaultType: options.defaultType || "pxl",
+        defaultName: options.defaultName || "untitled"
+      });
+    }
+
+    return this.fileBrowser;
+  }
+
+  // Project methods
+  loadProject(projectData) {
+    // Handle both string and object input
+    if (typeof projectData === "string") {
+      try {
+        projectData = JSON.parse(projectData)
+      } catch (error) {
+        throw new Error("Invalid project file format: Not valid JSON");
+      }
+    }
+    
+    // Validate project
+    if (!projectData || !projectData.width || !projectData.height) {
+      throw new Error("Invalid project file format: Missing width or height");
+    }
+
+    this.project = JSON.parse(JSON.stringify(projectData));
+    this.project.frames = [];
+
+    // Load frame times or set defaults
+    this.project.frameTimes = projectData.frameTimes || new Array(projectData.frames.length).fill(1000 / (projectData.fps || 12));
+
+    this.project.currentFrameTime = projectData.currentFrameTime;
+
+    // Load frames
+    if (!projectData.frames || !Array.isArray(projectData.frames)) {
+      throw new Error("Invalid project file format: Missing or invalid frames array");
+    }
+
+    for (let f = 0; f < projectData.frames.length; f++) {
+      const frameData = projectData.frames[f];
+      const frame = {
+        layers: []
+      };
+
+      // Ensure layers array exists
+      if (!frameData.layers || !Array.isArray(frameData.layers)) {
+        console.warn(`Frame ${f} has invalid layers array, creating default layer`);
+        frameData.layers = [
+          {
+            name: `Layer 1`,
+            visible: true,
+            imageData: null
+          }
+        ];
+      }
+
+      for (let l = 0; l < frameData.layers.length; l++) {
+        const layerData = frameData.layers[l];
+        const layer = this.createBlankLayer(this.project.width, this.project.height);
+        
+        // Set layer properties with defaults
+        layer.name = layerData.name || `Layer ${l + 1}`;
+        layer.visible = layerData.visible !== undefined ? layerData.visible : true;
+
+        // Restore image data if available
+        if (layerData.imageData && Array.isArray(layerData.imageData)) {
+          try {
+            const ctx = layer.ctx;
+            const imageData = new ImageData(new Uint8ClampedArray(layerData.imageData), this.project.width, this.project.height);
+            ctx.putImageData(imageData, 0, 0);
+          } catch (error) {
+            console.error(`Error loading image data for frame ${f}, layer ${l}:`, error);
+            // Continue with blank layer
+          }
+        }
+        frame.layers.push(layer);
+      }
+
+      this.project.frames.push(frame);
+    }
+
+    // Load transparency state
+    this.checkForTransparency();
+    
+    // Load history if available
+    if (projectData.history) {
+      this.historyManager.deserialize(projectData.history);
+    } else {
+      // Create initial history entry for legacy projects
+      this.historyManager.clear();
+    }
+    
+    // Load floating colors
+    if (projectData.floatingColors && this.usePerProjectFloatingColors) {
+      this.colorPicker.removeAllFloatingPaletteColors();
+      this.colorPicker.loadFloatingColors(JSON.parse(projectData.floatingColors));
+    }
+
+    // Initialize project
+    this.resetCanvasSize();
+    this.resetZoom();
+
+    // Update UI
+    this.render();
+  }
+
+  recreateProjectCanvases() {
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+
+        // Recreate canvas
+        layer.canvas = document.createElement("canvas");
+        layer.canvas.width = this.project.width;
+        layer.canvas.height = this.project.height;
+
+        // Restore image data if available
+        if (layer.imageData) {
+          this.drawImageToCanvas(layer.canvas, layer.imageData);
+        }
+      }
+    }
+  }
+
+  drawImageToCanvas(canvas, imageData) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = this.getCanvasContext(canvas);
+        ctx.drawImage(img, 0, 0);
+        resolve();
+      };
+      img.src = imageData;
+    });
+  }
+
+  importImage(imageData, name = "Imported Image") {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        // Create a new project sized to image dimensions
+        this.newProject(img.width, img.height, img);
+
+        // Update UI and render
+        this.render();
+
+        resolve();
+      };
+      img.src = imageData;
+    });
+  }
+  
+  async importPSD(fileData, fileName) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Convert file data to ArrayBuffer if it's a string
+        let buffer;
+        if (typeof fileData === 'string') {
+          // Handle base64 or data URL
+          if (fileData.startsWith('data:')) {
+            // Convert data URL to ArrayBuffer
+            const base64 = fileData.split(',')[1];
+            const binary = atob(base64);
+            buffer = new ArrayBuffer(binary.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < binary.length; i++) {
+              view[i] = binary.charCodeAt(i);
+            }
+          } else {
+            // Assume it's binary data as string
+            buffer = new ArrayBuffer(fileData.length);
+            const view = new Uint8Array(buffer);
+            for (let i = 0; i < fileData.length; i++) {
+              view[i] = fileData.charCodeAt(i);
+            }
+          }
+        } else if (fileData instanceof ArrayBuffer) {
+          buffer = fileData;
+        } else if (fileData instanceof Blob) {
+          // Handle blob by reading it
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.importPSDFromBuffer(e.target.result, fileName).then(resolve).catch(reject);
+          };
+          reader.onerror = reject;
+          reader.readAsArrayBuffer(fileData);
+          return;
+        } else {
+          reject(new Error('Unsupported file format'));
+          return;
+        }
+  
+        // Parse the PSD
+        const psd = agPsd.readPsd(buffer);
+        
+        // Create new project with PSD dimensions
+        this.newProject(psd.width, psd.height);
+        
+        // Clear existing layers (newProject creates one default layer)
+        const frame = this.project.frames[0];
+        frame.layers = [];
+        
+        // Import PSD layers (they come in bottom-to-top order)
+        if (psd.children && psd.children.length > 0) {
+          for (let i = 0; i < psd.children.length; i++) {
+            const psdLayer = psd.children[i];
+            
+            console.log(psdLayer)
+            
+            // Create new layer
+            const layer = this.createBlankLayer(
+              psd.width, 
+              psd.height, 
+              psdLayer.name || `Layer ${i + 1}`
+            );
+            
+            // Set visibility
+            layer.visible = psdLayer.hidden === false;
+            
+            // If the layer has canvas data, draw it
+            if (psdLayer.canvas) {
+              layer.ctx.drawImage(psdLayer.canvas, psdLayer.left, psdLayer.top, psdLayer.canvas.width, psdLayer.canvas.height);
+            } else if (psdLayer.imageData) {
+              // Some PSD libraries provide imageData
+              const imageData = new ImageData(
+                new Uint8ClampedArray(psdLayer.imageData),
+                psd.width,
+                psd.height
+              );
+              layer.ctx.putImageData(imageData, 0, 0);
+            }
+            
+            frame.layers.push(layer);
+          }
+        } else {
+          // If no layers found, create a merged layer from the PSD
+          console.warn('PSD has no layer structure, creating merged layer');
+          const layer = this.createBlankLayer(psd.width, psd.height, 'Merged');
+          
+          // Try to get the merged image data
+          if (psd.canvas) {
+            layer.ctx.drawImage(psd.canvas, 0, 0);
+          }
+          
+          frame.layers.push(layer);
+        }
+        
+        // Set current layer to top layer
+        this.project.currentLayer = frame.layers.length - 1;
+        
+        // Update UI
+        this.updateLayersUI();
+        this.updateFramesUI();
+        this.render();
+        
+        this.showToast(__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+        resolve();
+        
+      } catch (error) {
+        console.error('Error importing PSD:', error);
+        reject(new Error('Failed to import PSD file'));
+      }
+    });
+  }
+  
+  async importPSDFromBuffer(buffer, fileName) {
+    try {
+      const psd = agPsd.readPsd(buffer);
+      
+      // Create new project with PSD dimensions
+      this.newProject(psd.width, psd.height);
+      
+      // Clear existing layers
+      const frame = this.project.frames[0];
+      frame.layers = [];
+      
+      // Import PSD layers
+      if (psd.children && psd.children.length > 0) {
+        for (let i = 0; i < psd.children.length; i++) {
+          const psdLayer = psd.children[i];
+          
+          const layer = this.createBlankLayer(
+            psd.width, 
+            psd.height, 
+            psdLayer.name || `Layer ${i + 1}`
+          );
+          
+          layer.visible = psdLayer.visible !== false;
+          
+          if (psdLayer.canvas) {
+            layer.ctx.drawImage(psdLayer.canvas, 0, 0);
+          }
+          
+          frame.layers.push(layer);
+        }
+      }
+      
+      this.project.currentLayer = frame.layers.length - 1;
+      this.updateLayersUI();
+      this.updateFramesUI();
+      this.render();
+      
+      this.showToast(__(`PSD importado: ${fileName}||PSD imported: ${fileName}`));
+      
+    } catch (error) {
+      console.error('Error importing PSD from buffer:', error);
+      throw error;
+    }
+  }
+
+  getProjectData(compressed = false) {
+    const projectData = {
+      version: this.version,
+      width: this.project.width,
+      height: this.project.height,
+      frames: [],
+      floatingColors: this.colorPicker.getFloatingColorsData(),
+      backgroundColor: this.transparentBackground ? this.secondaryColor : 'transparent',
+      transparentBackground: this.transparentBackground, // quitar esto
+      currentFrameTime: this.project.currentFrameTime,
+      frameTimes: this.project.frameTimes,
+      createdAt: new Date().toISOString(),
+      history: this.historyManager.serialize(),
+      currentFrame: this.project.currentFrame,
+      currentLayer: this.project.currentLayer
+    };
+
+    // Convert frames to serializable format
+    for (let f = 0; f < this.project.frames.length; f++) {
+      const frame = this.project.frames[f];
+      const serializedFrame = {
+        layers: []
+      };
+
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        const ctx = layer.ctx;
+        const imageData = ctx.getImageData(0, 0, this.project.width, this.project.height);
+
+        serializedFrame.layers.push({
+          name: layer.name || `Layer ${l + 1}`,
+          visible: layer.visible !== undefined ? layer.visible : true,
+          imageData: Array.from(imageData.data)
+        });
+      }
+
+      projectData.frames.push(serializedFrame);
+    }
+    
+    return JSON.stringify(projectData);
+  }
+
+  serializeSnapshot(snapshot) {
+    if (!snapshot) return null;
+
+    const serialized = {
+      frames: [],
+      currentFrame: snapshot.currentFrame,
+      currentLayer: snapshot.currentLayer
+    };
+
+    for (let f = 0; f < snapshot.frames.length; f++) {
+      const frame = snapshot.frames[f];
+      const serializedFrame = {
+        layers: []
+      };
+
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+
+        serializedFrame.layers.push({
+          name: layer.name,
+          visible: layer.visible,
+          imageData: layer.imageData ? Array.from(layer.imageData.data) : null
+        });
+      }
+
+      serialized.frames.push(serializedFrame);
+    }
+
+    return serialized;
+  }
+
+  deserializeSnapshot(serialized) {
+    if (!serialized) return null;
+
+    const snapshot = {
+      frames: [],
+      currentFrame: serialized.currentFrame,
+      currentLayer: serialized.currentLayer
+    };
+
+    for (let f = 0; f < serialized.frames.length; f++) {
+      const frameData = serialized.frames[f];
+      const frame = {
+        layers: []
+      };
+
+      for (let l = 0; l < frameData.layers.length; l++) {
+        const layerData = frameData.layers[l];
+
+        const imageData = layerData.imageData ? new ImageData(new Uint8ClampedArray(layerData.imageData), this.project.width, this.project.height) : null;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = this.project.width;
+        canvas.height = this.project.height;
+        this.drawImageToCanvas(canvas, imageData);
+
+        const layer = {
+          name: layerData.name,
+          visible: layerData.visible,
+          imageData: imageData,
+          canvas: canvas,
+          ctx: this.getCanvasContext(canvas)
+        };
+
+        frame.layers.push(layer);
+      }
+
+      snapshot.frames.push(frame);
+    }
+
+    return snapshot;
+  }
+
+  renderFrameToCanvas(frame) {
+    const canvas = document.createElement("canvas");
+    canvas.width = this.project.width;
+    canvas.height = this.project.height;
+    const ctx = this.getCanvasContext(canvas);
+    
+    // Draw all visible layers
+    for (let l = 0; l < frame.layers.length; l++) {
+      const layer = frame.layers[l];
+      if (layer.visible) {
+        ctx.drawImage(layer.canvas, 0, 0);
+      }
+    }
+
+    return canvas;
+  }
+
+  createSpriteSheet() {
+    const frameCount = this.project.frames.length;
+    const cols = Math.ceil(Math.sqrt(frameCount));
+    const rows = Math.ceil(frameCount / cols);
+
+    const spriteCanvas = document.createElement("canvas");
+    spriteCanvas.width = cols * this.project.width;
+    spriteCanvas.height = rows * this.project.height;
+    const spriteCtx = this.getCanvasContext(spriteCanvas);
+
+    // Draw all frames
+    for (let f = 0; f < frameCount; f++) {
+      const col = f % cols;
+      const row = Math.floor(f / cols);
+      const frame = this.project.frames[f];
+
+      // Draw all visible layers
+      for (let l = 0; l < frame.layers.length; l++) {
+        const layer = frame.layers[l];
+        if (layer.visible) {
+          spriteCtx.drawImage(layer.canvas, col * this.project.width, row * this.project.height);
+        }
+      }
+    }
+
+    return spriteCanvas;
+  }
+  
+  // Compresión
+  getDictionary() {
+    const DICTIONARY = {
+      // Project
+      project: {
+        'version': 'v',
+        'width': 'w',
+        'height': 'h',
+        'frames': 'c',
+        'frameTimes': 't',
+        'currentFrame': 'f',
+        'currentLayer': 'l',
+        'backgroundColor': 'b',
+        'transparentBackground': 'a',
+        'floatingColors': 'd',
+        'currentFrameTime': 'e',
+        'createdAt': 'g',
+        'history': 'i'
+      },
+      frame: {
+        'layers': 'l'
+      },
+      // Layer
+      layer: {
+        'name': 'n',
+        'visible': 'v',
+        'png': 'p',
+        'imageData': 'p'
+      }
+    };
+    
+    return DICTIONARY;
+  }
+  
+  getReverseDictionary() {
+    const dictionary = this.getDictionary();
+    
+    const reverseDictionary = {};
+    
+    Object.keys(dictionary).forEach(key => {
+      const category = dictionary[key];
+      const reverseCategory = {};
+      Object.entries(category).forEach(entry => reverseCategory[entry[1]] = entry[0]);
+      reverseDictionary[key] = reverseCategory;
+    });
+    
+    return reverseDictionary;
+  }
+  
+  async compressData(data = {}, cat = 'project') {
+    const DICTIONARY = this.getDictionary();
+    const category = DICTIONARY[cat];
+    
+    const encoded = {};
+    
+    // Encode content
+    switch(cat) {
+      case 'layer':
+        data = {
+          name: data.name,
+          visible: data.visible,
+          png: await this.encodeCanvasToData(data.canvas)
+        }
+        break;
+    }
+    
+    // Also encode keys
+    Object.keys(data).forEach(key => {
+      const encodedKey = category[key] ? category[key] : key;
+      const content = data[key];
+      const encodedContent = content;
+      encoded[encodedKey] = encodedContent;
+    });
+    
+    return encoded;
+  }
+
+  async decompressData(data = {}, cat = 'project') {
+    const DICTIONARY = this.getReverseDictionary();
+    const category = DICTIONARY[cat];
+        
+    const decoded = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      const decodedKey = category[key] ? category[key] : key;
+      let decodedValue = value;
+      
+      // Decode content based on category and key
+      if (cat === 'layer' && key === 'p') { // 'p' es la clave para PNG
+        try {
+          decodedValue = await this.decodeDataToImageData(value, this.project?.width || 32, this.project?.height || 32);
+        } catch (error) {
+          console.error('Error decoding PNG:', error);
+          decodedValue = null;
+        }
+      }
+      
+      decoded[decodedKey] = decodedValue;
+    }
+    
+    return decoded;
+  }
+
+  async encodeCanvasToData(canvas) {
+    // Encode: Canvas → Compressed Data
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const arrayBuffer = await blob.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Convert to base64 (JSON safe)
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    return btoa(binary);
+  }
+
+  async decodeDataToImageData(encodedData, width, height) {
+    // Decode: Compressed Data → ImageData
+    const binary = atob(encodedData);
+    const uint8Array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      uint8Array[i] = binary.charCodeAt(i);
+    }
+    
+    // Create blob and load as image
+    const blob = new Blob([uint8Array], { type: 'image/png' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    
+    return new Promise((resolve, reject) => {
+      img.onload = () => {
+        // Create canvas to extract ImageData
+        const canvas = new OffscreenCanvas(width, height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, width, height);
+        URL.revokeObjectURL(url);
+        resolve(imageData);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  // Utilities
+  dataURLtoBlob(dataURL) {
+    try {
+      // Handle both regular data URLs and blob data URLs
+      if (dataURL instanceof Blob) {
+        return dataURL;
+      }
+
+      const parts = dataURL.split(",");
+      const mime = parts[0].match(/:(.*?);/)[1];
+      const byteString = atob(parts[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+
+      return new Blob([ab], { type: mime });
+    } catch (error) {
+      console.error("Error converting data URL to blob:", error);
+      throw new Error("Invalid data URL format");
+    }
+  }
+
+  distance(x1, y1, x2, y2) {
+    var dx = x1 - x2;
+    var dy = y1 - y2;
+
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  
+  getLayerContext(frameIndex = this.project.currentFrame, layerIndex = this.project.currentLayer) {
+    if (!this.project) return null;
+    const frame = this.project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    return layer.ctx || null;
+  }
+  
+  getCurrentLayerContext() {
+    if (!this.project) return null;
+    return this.getLayerContext(this.project.currentFrame, this.project.currentLayer);
+  }
+
+  getPixelColor(x, y) {
+    if (!this.project || x < 0 || y < 0 || x >= this.project.width || y >= this.project.height) {
+      return null;
+    }
+
+    const frame = this.project.frames[this.project.currentFrame];
+    const layer = frame.layers[this.project.currentLayer];
+    const ctx = layer.ctx;
+
+    return this.getPixelColorFromCtx(ctx, x, y);
+  }
+
+  getPixelColorFromCtx(ctx, x, y) {
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    return imageData.data[3] === 0 ? 'transparent' : `#${this.componentToHex(imageData.data[0])}${this.componentToHex(imageData.data[1])}${this.componentToHex(imageData.data[2])}`;
+  }
+  
+  getPixelAlpha(x, y, frameIndex = this.project.currentFrame, layerIndex = this.project.currentLayer) {
+    const frame = this.project.frames[frameIndex];
+    const layer = frame.layers[layerIndex];
+    return this.getPixelAlphaFromCtx(layer.ctx, x, y);
+  }
+  
+  getPixelAlphaFromCtx(ctx, x, y) {
+    const imageData = ctx.getImageData(x, y, 1, 1);
+    return imageData.data[3];
+  }
+
+  hexToRgb(hex) {
+    return this.colorPicker.hexToRgb(hex);
+  }
+
+  componentToHex(c) {
+    const hex = c.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }
+
+  setColor(color) {
+    if (this.selectedColor === "primary") {
+      this.primaryColor = color;
+    } else {
+      this.secondaryColor = color;
+    }
+    this.updateColorIndicator();
+  }
+
+  formatDate(date) {
+    const pad = n => n.toString().padStart(2, "0");
+    return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+  }
+  
+  formatSize(bytes) {
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    if (bytes == 0) return '0B';
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+    return Math.round(bytes / Math.pow(1024, i), 2) + sizes[i];
+  }
+  
+  getColor() {
+    return this.selectedColor == 'primary' ? this.primaryColor : this.secondaryColor;
+  }
+
+  exitApp() {
+    this.showPopup(
+      __("Cerrar App||Exit App"),
+      __("¿Estás seguro de que quieres irte ahora? Cualquier cambio no guardado se perderá para siempre.||Are you sure you want to leave now? Any unsaved changes will be lost forever."),
+      [
+        { text: "No", class: "cancel", action: () => this.hidePopup() },
+        { text: __("Sí||Yes"), action: () => navigator.app.exitApp() }
+      ]
+    );
+  }
+}

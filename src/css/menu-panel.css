@@ -1,0 +1,90 @@
+/*
+  Menu Panel
+*/
+.menu-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.menu-panel-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.menu-panel-overlay.visible .menu-panel {
+  transform: translateX(0);
+  box-shadow: 2px 0 5px var(--shadow-color);
+}
+
+.menu-panel {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  width: 250px;
+  height: calc(100% - 90px);
+  background-color: var(--ui-color);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  will-change: transform;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.menu-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 10px;
+  overflow-x: scroll;
+}
+
+.menu-tab {
+  padding: 8px 15px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: background 0.3s;
+}
+
+.menu-tab:hover {
+  background: var(--ui-highlight);
+}
+
+.menu-tab.active {
+  border-bottom-color: var(--primary-color);
+}
+
+.menu-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.menu-section {
+  margin-bottom: 15px;
+}
+
+.menu-section h3 {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.menu-item {
+  padding: 8px 5px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.menu-item:hover {
+  background-color: var(--ui-highlight);
+}

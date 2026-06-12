@@ -1,0 +1,45 @@
+{
+  "name": "pixelite",
+  "version": "1.0.2",
+  "description": "Collaborative Pixel Art Editor",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "npm run build:all",
+    "build:all": "node build.js --all",
+    "build:web": "node build.js --web --minify",
+    "build:cordova": "node build.js --cordova",
+    "build:android": "npm run build:cordova",
+    "build:min": "node build.js --all --minify",
+    "build:none": "node build.js --none",
+    "build:dev": "node build.js --none --debug",
+    "build:termux": "npm run build:cordova && termux-open ./dist/pixelite-*.apk && npm run build:dev",
+    "build:release": "node build.js --all --minify --zipalign",
+    "serve": "node index.js",
+    "serve:dist": "node index.js",
+    "serve:dev": "node index.js --src",
+    "serve:src": "node index.js --src",
+    "dev": "npm run build:dev && npm run serve:dist",
+    "dev:fast": "npm run serve:src",
+    "clean": "rm -rf dist && mkdir dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RetoraDev/pixelite.git"
+  },
+  "author": "RetoraDev",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/RetoraDev/pixelite#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "nodemon": "^3.1.14",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "clean-css": "^5.3.3",
+    "terser": "^5.46.0"
+  }
+}
