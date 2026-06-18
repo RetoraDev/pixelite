@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.0 dev
- * Built: 6/12/2026, 6:32:11 AM
+ * Version: v1.0.2 dev
+ * Built: 6/14/2026, 5:35:16 PM
  * Platform: Development
  * Debug: true
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.0 dev";
+const VERSION = "v1.0.2 dev";
 const HOST = "ws://localhost:8080";
 const DEBUG = true;
 
@@ -10093,7 +10093,7 @@ class PixelArtEditor {
     this.toolButtonContainer.appendChild(this.toolDropdown);
 
     // Tool settings button (visible only when tool has settings)
-    this.toolSettingsButton = this.createButton("tool-settings", "icon-settings", () => this.showToolSettings());
+    this.toolSettingsButton = this.createButton("tool-settings", "icon-settings", () => this.toggleToolSettings());
     this.toolSettingsButton.title = __("Opciones de herramienta||Tool settings");
     this.toolSettingsButton.style.display = "none";
     this.toolSelectionContainer.appendChild(this.toolSettingsButton);
@@ -10101,7 +10101,6 @@ class PixelArtEditor {
     // Tool settings popup
     this.toolSettingsPopup = document.createElement("div");
     this.toolSettingsPopup.className = "tool-settings-popup";
-    this.toolSettingsPopup.style.display = "none";
     this.uiLayer.appendChild(this.toolSettingsPopup);
 
     // Add close handler
@@ -10533,8 +10532,8 @@ class PixelArtEditor {
       cursor: "crosshair",
       shortcut: "r",
       settings: {
-        filled: { type: "boolean", default: false },
-        perfect: { type: "boolean", default: false }
+        filled: { displayName: __("Rellenar||Filled"), type: "boolean", default: false },
+        perfect: { displayName: __("Perfecto||Perfect"), type: "boolean", default: false }
       },
       onDown: (x, y) => {
         this.historyManager.startBatch("draw", __('Rectángulo||Rectangle'));
@@ -10562,8 +10561,8 @@ class PixelArtEditor {
       cursor: "crosshair",
       shortcut: "e",
       settings: {
-        filled: { type: "boolean", default: false },
-        perfect: { type: "boolean", default: false }
+        filled: { displayName: __("Rellenar||Filled"), type: "boolean", default: false },
+        perfect: { displayName: __("Perfecto||Perfect"), type: "boolean", default: false }
       },
       onDown: (x, y) => {
         this.historyManager.startBatch("draw", __('Elipse||Ellipse'));
@@ -10606,8 +10605,17 @@ class PixelArtEditor {
       cursor: "crosshair",
       shortcut: "a",
       dontBroadcast: true,
+      settings: {
+        includeReference: { displayName: __("Include Reference||Incluir Referencia"), type: "boolean", default: false },
+      },
       onDown: (x, y) => {
-        this.pickColor(x, y);
+        this.pickColor(x, y, this.currentTool.settings?.includeReference?.value, true);
+      },
+      onMove: (x, y) => {
+        this.pickColor(x, y, this.currentTool.settings?.includeReference?.value, true);
+      },
+      onUp: (x, y) => {
+        this.pickColor(x, y, this.currentTool.settings?.includeReference?.value, false);
       }
     });
     
@@ -12610,7 +12618,7 @@ class PixelArtEditor {
         // If pixel is not transparent
         const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
         this.setColor(color);
-        if (!silent) this.showOperationMessage(`<span style="aspect-ratio: 1/1; width: 1em; height: 1em; background: ${color}">${color}</span>`);
+        if (!silent) this.showOperationMessage(`<div class="palette-color" style="background-color: ${color}"></div> ${color.toUpperCase()}`);
         return true;
       } else {
         return false;
@@ -13472,6 +13480,14 @@ class PixelArtEditor {
       }, 0);
     }
   }
+  
+  toggleToolSettings() {
+    if (this.toolSettingsPopup.classList.contains("visible")) {
+      this.hideToolSettings();
+    } else {
+      this.showToolSettings();
+    }
+  }
 
   showToolSettings() {
     if (!this.currentTool || Object.keys(this.currentTool.settings).length === 0) return;
@@ -13479,18 +13495,13 @@ class PixelArtEditor {
     // Clear previous content
     this.toolSettingsPopup.innerHTML = "";
 
-    // Add title
-    const title = document.createElement("h3");
-    title.textContent = `${this.currentTool.name} Settings`;
-    this.toolSettingsPopup.appendChild(title);
-
     // Add settings controls
     for (const [key, setting] of Object.entries(this.currentTool.settings)) {
       const settingControl = document.createElement("div");
       settingControl.className = "tool-setting";
 
       const label = document.createElement("label");
-      label.textContent = key.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase());
+      label.textContent = setting.displayName || this.keyToText(key);
       settingControl.appendChild(label);
 
       if (setting.type === "boolean") {
@@ -13531,27 +13542,16 @@ class PixelArtEditor {
       this.toolSettingsPopup.appendChild(settingControl);
     }
 
-    // Position near the settings button
-    const rect = this.toolSettingsButton.getBoundingClientRect();
-    this.toolSettingsPopup.style.position = "absolute";
-    this.toolSettingsPopup.style.bottom = `${window.innerHeight - rect.top + 10}px`;
-    this.toolSettingsPopup.style.right = `${window.innerWidth - rect.right}px`;
-    this.toolSettingsPopup.style.display = "block";
-
-    // Close when clicking outside
-    setTimeout(() => {
-      const clickHandler = e => {
-        if (!this.toolSettingsPopup.contains(e.target)) {
-          this.hideToolSettings();
-          document.removeEventListener("click", clickHandler);
-        }
-      };
-      document.addEventListener("click", clickHandler);
-    }, 0);
+    // Show the dialogue
+    this.toolSettingsPopup.classList.add("visible");
   }
 
   hideToolSettings() {
-    this.toolSettingsPopup.style.display = "none";
+    this.toolSettingsPopup.classList.remove("visible");
+  }
+  
+  keyToText(key) {
+    return key.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase());
   }
 
   // Color management

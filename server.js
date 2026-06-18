@@ -642,6 +642,21 @@ app.get('/api/sessions/:id', (req, res) => {
   });
 });
 
+app.get('/', (req, res) => {
+  res.send(`
+<html>
+  <head><title>Pixelite Server</title></head>
+  <body>
+    <h1>Pixelite Collab Server</h1>
+    <ul>
+      <li>Server version: ${SERVER_VERSION}</li>
+      <li>Compatible client versions: ${COMPATIBLE_VERSIONS.join(', ')}</li>
+    </ul>
+  </body>
+</html>
+  `);
+});
+
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`Collaboration server running on port ${PORT}`);
