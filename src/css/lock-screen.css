@@ -17,7 +17,7 @@
 
 .lock-screen-overlay.blur-backdrop {
   backdrop-filter: blur(10px);
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: var(--ui-backdrop);
 }
 
 .lock-screen-overlay.visible {

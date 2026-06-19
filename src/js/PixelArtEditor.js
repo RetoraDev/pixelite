@@ -4955,12 +4955,12 @@ class PixelArtEditor {
     
     for (let f = 0; f < this.project.frames.length; f++) {
       const frame = this.project.frames[f];
-      
-      for (let l = 0; l < frame.layers.length; l++) {
-        const layer = frame.layers[0];
-        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
-        const data = imageData.data;
-        
+    
+      const layer = frame.layers[0];
+      const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+      const data = imageData.data;
+                
+      for (let i = 0; i < data.length; i += 4) {
         // Si el píxel es transparente (alpha = 0)
         if (data[i + 3] === 0) {
           // Rellenar con el color secundario y hacerlo opaco
@@ -4970,9 +4970,9 @@ class PixelArtEditor {
           data[i + 3] = 255;
           totalPixelsModified++;
         }
-        
-        layer.ctx.putImageData(imageData, 0, 0);
       }
+      
+      layer.ctx.putImageData(imageData, 0, 0);
     }
     
     if (totalPixelsModified > 0) {
@@ -6127,7 +6127,7 @@ class PixelArtEditor {
       moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
       moveUpBtn.title = __("Subir||Move Up");
       if (i >= layerCount - 1) {
-        moveUpBtn.disabled = true;
+        moveUpBtn.dsabled = true;
         moveUpBtn.classList.add("disabled");
       } else {
         moveUpBtn.addEventListener("click", e => {
@@ -6583,7 +6583,7 @@ class PixelArtEditor {
     fileBrowser.show();
   }
 
-  saveProject(quickSave) {
+  saveProject(quickSave = true) {
     if (!this.project) return;
 
     if (quickSave && this.lastSavedPath) {
@@ -6797,7 +6797,7 @@ class PixelArtEditor {
         fileSystem => {
           // Create or get the file
           fileSystem.root.getFile(
-            this.fileBrowser.workingDirectory + filename,
+            this.fileBrowser.projectDirectory + filename,
             { create: true, exclusive: false },
             entry => {
               entry.createWriter(

@@ -509,6 +509,11 @@ button:active {
   opacity: 1;
 }
 
+.theme-light .operation-message,
+.operation-message.theme-light {
+  color: #ffffff !important;
+}
+
 /*
   Bottom Menus
 */
@@ -608,6 +613,7 @@ button:active {
 #current-tool .icon {
   width: 28px;
   height: 28px;
+  filter: none;
 }
 
 /* Tool switch button */

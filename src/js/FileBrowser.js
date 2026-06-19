@@ -37,6 +37,7 @@ class FileBrowser {
     this.currentDirectory = null;
     this.currentPath = null;
     this.workingDirectory = "";
+    this.projectDirectory = "";
     this.lastMode = null;
     this.visible = false;
 
@@ -110,7 +111,7 @@ class FileBrowser {
 
   initCordovaUI() {
     // Set full screen
-    // this.overlay.classList.add("fullscreen");
+    this.overlay.classList.add("fullscreen");
     
     // Clear existing content but preserve elements if they exist
     this.pathDisplay = this.pathDisplay || document.createElement("div");
@@ -317,7 +318,7 @@ class FileBrowser {
       // Add native open if on root directory
       if (this.options.mode === "open") {
         this.addListItem({
-          text: "[File Selector]",
+          text: "[Android File Selector]",
           icon: "folder",
           onClick: () => {
             const input = document.createElement("input");
@@ -451,6 +452,7 @@ class FileBrowser {
           entry: entry,
           fullPath: entry.toURL()
         });
+        this.projectDirectory = this.workingDirectory;
         this.hide();
       } else {
         this.filenameInput.value = entry.name;
@@ -587,7 +589,9 @@ class FileBrowser {
       if (this.isCordova && this.isFilePluginAvailable && this.currentDirectory) {
         result.directory = this.currentDirectory;
       }
-
+      
+      this.projectDirectory = this.workingDirectory;
+      
       this.options.onConfirm(result);
     }
 

@@ -4,15 +4,15 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.2 dev
- * Built: 6/14/2026, 5:35:16 PM
+ * Version: v1.0.3 dev
+ * Built: 6/19/2026, 8:23:12 AM
  * Platform: Development
  * Debug: true
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.2 dev";
+const VERSION = "v1.0.3 dev";
 const HOST = "ws://localhost:8080";
 const DEBUG = true;
 
@@ -8524,6 +8524,7 @@ class FileBrowser {
     this.currentDirectory = null;
     this.currentPath = null;
     this.workingDirectory = "";
+    this.projectDirectory = "";
     this.lastMode = null;
     this.visible = false;
 
@@ -8597,7 +8598,7 @@ class FileBrowser {
 
   initCordovaUI() {
     // Set full screen
-    // this.overlay.classList.add("fullscreen");
+    this.overlay.classList.add("fullscreen");
     
     // Clear existing content but preserve elements if they exist
     this.pathDisplay = this.pathDisplay || document.createElement("div");
@@ -8804,7 +8805,7 @@ class FileBrowser {
       // Add native open if on root directory
       if (this.options.mode === "open") {
         this.addListItem({
-          text: "[File Selector]",
+          text: "[Android File Selector]",
           icon: "folder",
           onClick: () => {
             const input = document.createElement("input");
@@ -8938,6 +8939,7 @@ class FileBrowser {
           entry: entry,
           fullPath: entry.toURL()
         });
+        this.projectDirectory = this.workingDirectory;
         this.hide();
       } else {
         this.filenameInput.value = entry.name;
@@ -9074,7 +9076,9 @@ class FileBrowser {
       if (this.isCordova && this.isFilePluginAvailable && this.currentDirectory) {
         result.directory = this.currentDirectory;
       }
-
+      
+      this.projectDirectory = this.workingDirectory;
+      
       this.options.onConfirm(result);
     }
 
@@ -14066,12 +14070,12 @@ class PixelArtEditor {
     
     for (let f = 0; f < this.project.frames.length; f++) {
       const frame = this.project.frames[f];
-      
-      for (let l = 0; l < frame.layers.length; l++) {
-        const layer = frame.layers[0];
-        const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
-        const data = imageData.data;
-        
+    
+      const layer = frame.layers[0];
+      const imageData = layer.ctx.getImageData(0, 0, this.project.width, this.project.height);
+      const data = imageData.data;
+                
+      for (let i = 0; i < data.length; i += 4) {
         // Si el píxel es transparente (alpha = 0)
         if (data[i + 3] === 0) {
           // Rellenar con el color secundario y hacerlo opaco
@@ -14081,9 +14085,9 @@ class PixelArtEditor {
           data[i + 3] = 255;
           totalPixelsModified++;
         }
-        
-        layer.ctx.putImageData(imageData, 0, 0);
       }
+      
+      layer.ctx.putImageData(imageData, 0, 0);
     }
     
     if (totalPixelsModified > 0) {
@@ -15238,7 +15242,7 @@ class PixelArtEditor {
       moveUpBtn.innerHTML = '<div class="icon icon-up"></div>';
       moveUpBtn.title = __("Subir||Move Up");
       if (i >= layerCount - 1) {
-        moveUpBtn.disabled = true;
+        moveUpBtn.dsabled = true;
         moveUpBtn.classList.add("disabled");
       } else {
         moveUpBtn.addEventListener("click", e => {
@@ -15694,7 +15698,7 @@ class PixelArtEditor {
     fileBrowser.show();
   }
 
-  saveProject(quickSave) {
+  saveProject(quickSave = true) {
     if (!this.project) return;
 
     if (quickSave && this.lastSavedPath) {
@@ -15908,7 +15912,7 @@ class PixelArtEditor {
         fileSystem => {
           // Create or get the file
           fileSystem.root.getFile(
-            this.fileBrowser.workingDirectory + filename,
+            this.fileBrowser.projectDirectory + filename,
             { create: true, exclusive: false },
             entry => {
               entry.createWriter(
