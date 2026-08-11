@@ -128,8 +128,8 @@ class SelectionManager {
     }
     
     // Clamp to project bounds
-    const maxX = this.editor.project.width - 1;
-    const maxY = this.editor.project.height - 1;
+    const maxX = this.editor.project.width;
+    const maxY = this.editor.project.height;
     const clampedX = Math.max(0, Math.min(x, maxX));
     const clampedY = Math.max(0, Math.min(y, maxY));
     
@@ -140,8 +140,8 @@ class SelectionManager {
   onMove(x, y) {
     if (!this.isSelecting || this.isTransforming) return;
     
-    const maxX = this.editor.project.width - 1;
-    const maxY = this.editor.project.height - 1;
+    const maxX = this.editor.project.width;
+    const maxY = this.editor.project.height;
     const clampedX = Math.max(0, Math.min(x, maxX));
     const clampedY = Math.max(0, Math.min(y, maxY));
     
@@ -169,8 +169,8 @@ class SelectionManager {
       this.clear();
     } else if (this.rect) {
       // Ensure final rect is within bounds
-      const maxX = this.editor.project.width - 1;
-      const maxY = this.editor.project.height - 1;
+      const maxX = this.editor.project.width;
+      const maxY = this.editor.project.height;
       this.rect.x = Math.max(0, Math.min(this.rect.x, maxX));
       this.rect.y = Math.max(0, Math.min(this.rect.y, maxY));
       this.rect.width = Math.min(this.rect.width, maxX - this.rect.x);

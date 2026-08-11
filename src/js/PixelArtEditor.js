@@ -65,6 +65,7 @@ class PixelArtEditor {
     this.ensureBoundsDrawing = false;
     
     // Collab Session
+    this.collabManagerHost = null;
     this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
     this.collabMemberColor = localStorage.getItem('collab_user_color') || ['red', 'blue', 'green', 'yellow', 'orange', 'purple'][Math.floor(Math.random() * 6)];
     
@@ -89,9 +90,12 @@ class PixelArtEditor {
       this.spritesheetLoader = new SpritesheetLoader(this);
       this.referenceManager = new ReferenceManager(this);
       this.selectionManager = new SelectionManager(this);
+      this.contextMenu = new ContextMenuManager(this);
       this.paletteManager = new PaletteManager(this);
       this.colorPicker = new ColorPicker(this);
       this.lockScreen = new LockScreen(this);
+
+      this.registerContextMenus();
 
       if (this.useCordova) {
         this.initCordova();
@@ -455,6 +459,24 @@ class PixelArtEditor {
       }
     });
     
+    collabCat.addSetting({
+      id: 'collabManagerHost',
+      label: 'Dirección del servidor||Server Adress',
+      description: 'Dirección del servidor colaborativo. Se recomienda dejar esta configuración en su valor predeterminado||Collab server address. It is recommended to leave this setting at its default',
+      type: 'text',
+      forceReset: DEBUG,
+      placeholder: HOST,
+      defaultValue: HOST,
+      needsReload: false,
+      onInit: (value, editor) => {
+        this.collabManagerHost = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        this.collabManagerHost = value;
+        this.collabManager.host = value;
+      }
+    });
+    
     // Lock Screen Category
     const lockScreenCategory = this.settings.addCategory({
       id: 'lock_screen',
@@ -617,6 +639,181 @@ class PixelArtEditor {
   setSmoothPanning(enabled) {
     document.body.style.setProperty("--transform-transition", enabled ? "0.2s" : "none");
   }
+  
+  registerContextMenus() {
+    // Register color indicators
+    if (this.colorPrimary) {
+      const colorMenu = [
+        {
+          label: __('Copiar color||Copy Color'),
+          action: () => {
+            navigator.clipboard?.writeText(this.primaryColor);
+            this.showToast(__('Color copiado||Color copied'));
+          }
+        },
+        {
+          label: __('Pegar color||Paste Color'),
+          action: async () => {
+            try {
+              const text = await navigator.clipboard?.readText();
+              if (text && /^#[0-9a-f]{6}$/i.test(text)) {
+                this.primaryColor = text;
+                this.updateColorIndicator();
+              }
+            } catch (e) {}
+          }
+        },
+        { separator: true },
+        {
+          label: __('Intercambiar colores||Swap Colors'),
+          action: () => {
+            const temp = this.primaryColor;
+            this.primaryColor = this.secondaryColor;
+            this.secondaryColor = temp;
+            this.updateColorIndicator();
+          }
+        }
+      ];
+      
+      this.contextMenu.register(this.colorPrimary, colorMenu);
+    }
+    if (this.colorSecondary) {
+      const colorMenu = [
+        {
+          label: __('Copiar color||Copy Color'),
+          action: () => {
+            navigator.clipboard?.writeText(this.secondaryColor);
+            this.showToast(__('Color copiado||Color copied'));
+          }
+        },
+        {
+          label: __('Pegar color||Paste Color'),
+          action: async () => {
+            try {
+              const text = await navigator.clipboard?.readText();
+              if (text && /^#[0-9a-f]{6}$/i.test(text)) {
+                this.secondaryColor = text;
+                this.updateColorIndicator();
+              }
+            } catch (e) {}
+          }
+        }
+      ];
+      
+      this.contextMenu.register(this.colorSecondary, colorMenu);
+    }
+    
+    // Register timeline frames with context menu
+    this.timelineContent?.addEventListener('contextmenu', (e) => {
+      const frameElement = e.target.closest('.timeline-frame');
+      if (frameElement) {
+        e.preventDefault();
+        const index = parseInt(frameElement.dataset.index);
+        if (!isNaN(index)) {
+          const frameMenu = [
+            {
+              label: __('Ir al frame||Go to Frame'),
+              action: () => { this.project.currentFrame = index; this.render(); }
+            },
+            {
+              label: __('Duplicar frame||Duplicate Frame'),
+              action: () => this.duplicateFrame(index)
+            },
+            {
+              label: __('Eliminar frame||Remove Frame'),
+              action: () => this.removeFrame(index)
+            },
+            { separator: true },
+            {
+              label: __('Mover a la izquierda||Move Left'),
+              action: () => {
+                if (index > 0) this.moveFrame(index, index - 1);
+              }
+            },
+            {
+              label: __('Mover a la derecha||Move Right'),
+              action: () => {
+                if (index < this.project.frames.length - 1) this.moveFrame(index, index + 1);
+              }
+            },
+            { separator: true },
+            {
+              label: __('Cambiar tiempo del frame||Change Frame Time'),
+              action: () => this.showFrameTimeDialog(index)
+            }
+          ];
+          
+          this.contextMenu.show(e.clientX, e.clientY, frameMenu);
+        }
+      }
+    });
+    
+    // Register layers list with context menu
+    this.layersContainer?.addEventListener('contextmenu', (e) => {
+      const layerElement = e.target.closest('.layer-item');
+      if (layerElement) {
+        e.preventDefault();
+        const index = parseInt(layerElement.dataset.index);
+        if (!isNaN(index)) {
+          const frame = this.project?.frames[this.project.currentFrame];
+          const layer = frame?.layers[index];
+          if (!layer) return;
+          
+          const layerMenu = [
+            {
+              label: __('Activar capa||Activate Layer'),
+              action: () => { this.project.currentLayer = index; this.updateLayersUI(); }
+            },
+            {
+              label: layer.visible ? __('Ocultar capa||Hide Layer') : __('Mostrar capa||Show Layer'),
+              action: () => this.setLayerVisibility(this.project.currentFrame, index, !layer.visible)
+            },
+            {
+              label: __('Renombrar capa||Rename Layer'),
+              action: () => {
+                const newName = prompt(__('Nuevo nombre para la capa||New layer name:'), layer.name);
+                if (newName) this.renameLayer(newName, index);
+              }
+            },
+            { separator: true },
+            {
+              label: __('Duplicar capa||Duplicate Layer'),
+              action: () => this.duplicateLayer()
+            },
+            {
+              label: __('Combinar hacia arriba||Merge Up'),
+              action: () => this.mergeLayerUp(index)
+            },
+            {
+              label: __('Combinar hacia abajo||Merge Down'),
+              action: () => this.mergeLayerDown(index)
+            },
+            { separator: true },
+            {
+              label: __('Mover hacia arriba||Move Up'),
+              action: () => {
+                if (index < frame.layers.length - 1) this.moveLayer(this.project.currentFrame, index, index + 1);
+              }
+            },
+            {
+              label: __('Mover hacia abajo||Move Down'),
+              action: () => {
+                if (index > 0) this.moveLayer(this.project.currentFrame, index, index - 1);
+              }
+            },
+            { separator: true },
+            {
+              label: __('Eliminar capa||Remove Layer'),
+              class: 'danger',
+              action: () => this.removeLayer(index)
+            }
+          ];
+          
+          this.contextMenu.show(e.clientX, e.clientY, layerMenu);
+        }
+      }
+    });
+  }
 
   initCordova() {
     const script = document.createElement("script");
@@ -660,6 +857,8 @@ class PixelArtEditor {
   }
 
   onBackButtonDown() {
+    if (this.generatingTimelapse) return;
+    
     if (this.popupOpen) {
       this.hidePopup();
     } else if (this.fileBrowser && this.fileBrowser.visible) {
@@ -953,7 +1152,11 @@ class PixelArtEditor {
     this.colorSelector.className = "color-selector";
     this.colorIndicator.appendChild(this.colorSelector);
 
-    this.colorIndicator.addEventListener("click", () => this.colorPicker.toggleSelectedColor());
+    this.colorIndicator.addEventListener("click", (e) => {
+      if (e.button == 0) {
+        this.colorPicker.toggleSelectedColor();
+      }
+    });
 
     this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.colorPicker.show());
     this.topBar.appendChild(this.colorPickerButton);
@@ -2442,7 +2645,7 @@ class PixelArtEditor {
     this.updateCanvasTransform();
   }
 
-  zoom(factor, clientX = this.panStartCanvasPoint.x, clientY = this.panStartCanvasPoint.y) {
+  zoom(factor, clientX = window.innerWidth / 2, clientY = window.innerHeight / 2) {
     const oldScale = this.scale;
     this.scale *= factor;
 
@@ -2516,6 +2719,14 @@ class PixelArtEditor {
     this.canvas.style.backgroundSize = `${bgSize}px ${bgSize}px`;
   }
   
+  showContextMenu(x, y, items) {
+    this.contextMenu.show(x, y, items);
+  }
+  
+  hideContextMenu() {
+    this.contextMenu.hide();
+  }
+
   // Project management
   newProject(width = this.defaultWidth, height = this.defaultHeight, imageData = null) {
     if (this.collabManager.isConnected && !this.collabManager.isHost) {
@@ -2586,6 +2797,11 @@ class PixelArtEditor {
 
     this.canvas.width = this.project.width;
     this.canvas.height = this.project.height;
+    
+    this.panStartX = 0;
+    this.panStartY = 0;
+    this.panStartCanvasPoint = this.getCanvasPosition(this.panStartX, this.panStartY);
+    this.panStartScale = this.scale;
   }
   
   startResizeCanvas(mode = 'crop') {
@@ -3502,10 +3718,11 @@ class PixelArtEditor {
     const pickFromCtx = ctx => {
       const imageData = ctx.getImageData(x, y, 1, 1);
       const data = imageData.data;
+      
+      const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
 
-      if (data[3] > 0) {
+      if (data[3] > 0 && (!this.transparentBackground ? this.transparentBackground != color : true)) {
         // If pixel is not transparent
-        const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
         this.setColor(color);
         if (!silent) this.showOperationMessage(`<div class="palette-color" style="background-color: ${color}"></div> ${color.toUpperCase()}`);
         return true;
@@ -3518,6 +3735,11 @@ class PixelArtEditor {
     const layerCtx = this.getCurrentLayerContext();
     if (pickFromCtx(layerCtx)) return;
     
+    // Check for reference image (top)
+    if (includeReferenceImage && this.referenceManager.traceImage && this.referenceManager.traceOnTop) {
+      if (pickFromCtx(this.ctx)) return;
+    }
+    
     // Check layers from top to bottom
     for (let l = frame.layers.length - 1; l >= 0; l--) {
       const layer = frame.layers[l];
@@ -3527,9 +3749,16 @@ class PixelArtEditor {
       }
     }
 
-    // Check for reference image
-    if (includeReferenceImage && this.referenceManager.traceImage) {
+    // Check for reference image (bottom)
+    if (includeReferenceImage && this.referenceManager.traceImage && !this.referenceManager.traceOnTop) {
       if (pickFromCtx(this.ctx)) return;
+    }
+    
+    // Otherwise it's transparent
+    if (!this.transparentBackground) {
+      const color = this.project.backgroundColor;
+      this.setColor(color);
+      if (!silent) this.showOperationMessage(`<div class="palette-color" style="background-color: ${color}"></div> ${color.toUpperCase()}`);
     }
   }
 
@@ -6925,11 +7154,11 @@ class PixelArtEditor {
     content.innerHTML = `
       <div style="margin-bottom: 15px;">
         <label style="display: block; margin-bottom: 5px;">FPS:</label>
-        <input type="number" id="timelapse-fps" value="${this.timelapseFPS}" min="1" max="60" style="width: 100%; padding: 5px;">
+        <input type="number" id="timelapse-fps" value="60" min="1" max="60" style="width: 100%; padding: 5px;">
       </div>
       <div style="margin-bottom: 15px;">
         <label style="display: block; margin-bottom: 5px;">${__("Escala||Scale")}:</label>
-        <input type="number" id="timelapse-scale" value="4" min="1" max="10" style="width: 100%; padding: 5px;">
+        <input type="number" id="timelapse-scale" value="1" min="1" max="10" style="width: 100%; padding: 5px;">
       </div>
       <img style="display:none;image-rendering:pixelated;width:100%;height:auto;background-color:#fff;border:1px solid #000" class="timelapse-preview">
       <div class="timelapse-progress" style="display: none;">
@@ -6952,8 +7181,8 @@ class PixelArtEditor {
       {
         text: __("Generar||Generate"),
         action: async () => {
-          const fps = parseInt(document.getElementById("timelapse-fps").value) || 30;
-          const scale = parseInt(document.getElementById("timelapse-scale").value) || 4;
+          const fps = parseInt(document.getElementById("timelapse-fps").value) || 60;
+          const scale = parseInt(document.getElementById("timelapse-scale").value) || 1;
 
           // Show progress UI
           content.querySelector("div:first-child").style.display = "none";
@@ -6963,6 +7192,8 @@ class PixelArtEditor {
           this.hidePopupButtons();
 
           try {
+            this.generatingTimelapse = true;
+            
             const videoBlob = await this.generateTimelapse(fps, scale, (progress, previewImageData) => {
               progressBar.value = progress;
               progressText.textContent = `${progress}%`;
@@ -6972,6 +7203,8 @@ class PixelArtEditor {
                 preview.src = previewImageData;
               }
             });
+            
+            this.generatingTimelapse = false;
 
             // Now show file browser to save the video
             this.hidePopup();

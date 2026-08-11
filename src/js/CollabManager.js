@@ -3,7 +3,7 @@ class CollabManager {
   constructor(editor) {
     this.editor = editor;
     this.ws = null;
-    this.host = HOST;
+    this.host = editor.collabManagerHost || HOST;
     this.sessionId = null;
     this.sessionName = '';
     this.memberId = null;

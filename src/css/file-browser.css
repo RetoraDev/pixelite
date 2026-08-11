@@ -173,6 +173,7 @@
   border-radius: 4px;
 }
 
+.file-browser-list::-webkit-scrollbar-thumb:active,
 .file-browser-list::-webkit-scrollbar-thumb:hover {
   background: var(--ui-highlight);
 }
