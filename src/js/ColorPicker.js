@@ -576,6 +576,8 @@ class ColorPicker {
     if (e.type.startsWith("touch")) {
       e.preventDefault();
       e.stopPropagation();
+    } else if (e.button !== 0) {
+      return;
     }
     
     this.colorPickStartTime = Date.now();

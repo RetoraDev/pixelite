@@ -43,6 +43,7 @@ class SettingsManager {
       min: config.min,
       max: config.max,
       step: config.step,
+      forceReset: config.forceReset || false,
       
       // Callbacks
       needsReload: config.needsReload || false,
@@ -59,7 +60,7 @@ class SettingsManager {
     
     // Set initial value
     const savedValue = this.values.get(setting.id);
-    if (savedValue !== undefined) {
+    if (!setting.forceReset && savedValue !== undefined) {
       setting.value = savedValue;
     } else {
       this.values.set(setting.id, setting.defaultValue);

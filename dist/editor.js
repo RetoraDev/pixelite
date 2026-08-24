@@ -4,17 +4,17 @@
  * Licensed under the Pixelite License (see LICENSE file for full terms)
  * 
  * Source: https://github.com/RetoraDev/pixelite
- * Version: v1.0.3 dev
- * Built: 6/19/2026, 8:23:12 AM
- * Platform: Development
- * Debug: true
+ * Version: v1.0.4
+ * Built: 8/23/2026, 10:39:59 PM
+ * Platform: Android (Cordova)
+ * Debug: false
  * Minified: false
  */
 
 const COPYRIGHT = "(C) RETORA 2026";
-const VERSION = "v1.0.3 dev";
-const HOST = "ws://localhost:8080";
-const DEBUG = true;
+const VERSION = "v1.0.4";
+const HOST = "wss://pixelite.onrender.com";
+const DEBUG = false;
 
 // Global language processor
 window.__ = function(text) {
@@ -254,6 +254,7 @@ class SettingsManager {
       min: config.min,
       max: config.max,
       step: config.step,
+      forceReset: config.forceReset || false,
       
       // Callbacks
       needsReload: config.needsReload || false,
@@ -270,7 +271,7 @@ class SettingsManager {
     
     // Set initial value
     const savedValue = this.values.get(setting.id);
-    if (savedValue !== undefined) {
+    if (!setting.forceReset && savedValue !== undefined) {
       setting.value = savedValue;
     } else {
       this.values.set(setting.id, setting.defaultValue);
@@ -1803,8 +1804,8 @@ class SelectionManager {
     }
     
     // Clamp to project bounds
-    const maxX = this.editor.project.width - 1;
-    const maxY = this.editor.project.height - 1;
+    const maxX = this.editor.project.width;
+    const maxY = this.editor.project.height;
     const clampedX = Math.max(0, Math.min(x, maxX));
     const clampedY = Math.max(0, Math.min(y, maxY));
     
@@ -1815,8 +1816,8 @@ class SelectionManager {
   onMove(x, y) {
     if (!this.isSelecting || this.isTransforming) return;
     
-    const maxX = this.editor.project.width - 1;
-    const maxY = this.editor.project.height - 1;
+    const maxX = this.editor.project.width;
+    const maxY = this.editor.project.height;
     const clampedX = Math.max(0, Math.min(x, maxX));
     const clampedY = Math.max(0, Math.min(y, maxY));
     
@@ -1844,8 +1845,8 @@ class SelectionManager {
       this.clear();
     } else if (this.rect) {
       // Ensure final rect is within bounds
-      const maxX = this.editor.project.width - 1;
-      const maxY = this.editor.project.height - 1;
+      const maxX = this.editor.project.width;
+      const maxY = this.editor.project.height;
       this.rect.x = Math.max(0, Math.min(this.rect.x, maxX));
       this.rect.y = Math.max(0, Math.min(this.rect.y, maxY));
       this.rect.width = Math.min(this.rect.width, maxX - this.rect.x);
@@ -4061,6 +4062,357 @@ class SpritesheetLoader {
   }
 }
 
+// Context Menu System Implementation
+class ContextMenuManager {
+  constructor(editor) {
+    this.editor = editor;
+    this.container = editor.container;
+    this.menuElement = null;
+    this.isVisible = false;
+    this.activeSubMenu = null;
+    this.longPressTimer = null;
+    this.longPressDelay = 500; // ms
+    
+    // Bind methods
+    this.hide = this.hide.bind(this);
+    this.handleClickOutside = this.handleClickOutside.bind(this);
+    this.handleKeyDown = this.handleKeyDown.bind(this);
+    
+    // Setup global event listeners
+    document.addEventListener('click', this.handleClickOutside);
+    document.addEventListener('keydown', this.handleKeyDown);
+    document.addEventListener('contextmenu', e => {
+      if (!e.target.dataset.contextMenu && !e.target._contextMenu) {
+        e.preventDefault();
+        this.handleClickOutside(e);
+      }
+    });
+  }
+  
+  show(x, y, menuItems, options = {}) {
+    // Hide existing menu
+    this.hide();
+    
+    if (!menuItems || menuItems.length === 0) return;
+    
+    // Create menu element
+    this.menuElement = document.createElement('div');
+    this.menuElement.className = 'context-menu';
+    this.menuElement.style.position = 'fixed';
+    this.menuElement.style.zIndex = '10000';
+    this.menuElement.style.minWidth = '180px';
+    this.menuElement.style.maxWidth = '300px';
+    
+    // Build menu structure
+    this.buildMenu(this.menuElement, menuItems);
+    
+    // Position the menu
+    this.positionMenu(x, y);
+    
+    // Add to container
+    this.container.appendChild(this.menuElement);
+    this.isVisible = true;
+    
+    // Add animation class after a small delay
+    requestAnimationFrame(() => {
+      this.menuElement?.classList.add('visible');
+    });
+  }
+  
+  buildMenu(parent, items, depth = 0) {
+    const list = document.createElement('ul');
+    list.className = `context-menu-list depth-${depth}`;
+    
+    items.forEach((item, index) => {
+      const li = document.createElement('li');
+      li.className = 'context-menu-item';
+      li.setAttribute('data-index', index);
+      
+      // Item content container
+      const content = document.createElement('div');
+      content.className = 'context-menu-content';
+      
+      // Icon (if provided)
+      if (item.icon) {
+        const icon = document.createElement('span');
+        icon.className = 'context-menu-icon';
+        icon.innerHTML = item.icon;
+        content.appendChild(icon);
+      }
+      
+      // Label
+      const label = document.createElement('span');
+      label.className = 'context-menu-label';
+      label.textContent = item.label || item.text || '';
+      content.appendChild(label);
+      
+      // Shortcut (if provided)
+      if (item.shortcut) {
+        const shortcut = document.createElement('span');
+        shortcut.className = 'context-menu-shortcut';
+        shortcut.textContent = item.shortcut;
+        content.appendChild(shortcut);
+      }
+      
+      // Submenu indicator
+      if (item.submenu && item.submenu.length > 0) {
+        const arrow = document.createElement('span');
+        arrow.className = 'context-menu-arrow';
+        arrow.textContent = '▶';
+        content.appendChild(arrow);
+      }
+      
+      li.appendChild(content);
+      
+      // Handle click
+      if (item.action && !item.submenu) {
+        li.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.hide();
+          item.action(e);
+        });
+      }
+      
+      // Handle submenu
+      if (item.submenu && item.submenu.length > 0) {
+        li.classList.add('has-submenu');
+        
+        let subMenuElement = null;
+        
+        const showSubMenu = (e) => {
+          e.stopPropagation();
+          
+          // Hide other submenus at same depth
+          const siblings = li.parentElement.querySelectorAll('li.has-submenu');
+          siblings.forEach(sibling => {
+            if (sibling !== li) {
+              const sub = sibling.querySelector('.context-menu-sub');
+              if (sub) {
+                sub.classList.remove('visible');
+              }
+            }
+          });
+          
+          // Create or show submenu
+          if (!subMenuElement) {
+            subMenuElement = document.createElement('div');
+            subMenuElement.className = 'context-menu-sub';
+            this.buildMenu(subMenuElement, item.submenu, depth + 1);
+            li.appendChild(subMenuElement);
+          }
+          
+          // Position submenu
+          const rect = li.getBoundingClientRect();
+          const subRect = subMenuElement.getBoundingClientRect();
+          
+          // Check if submenu fits to the right
+          const rightSpace = window.innerWidth - rect.right;
+          if (rightSpace > subRect.width || rightSpace > 250) {
+            subMenuElement.style.left = '100%';
+            subMenuElement.style.top = '0';
+          } else {
+            // Show to the left
+            subMenuElement.style.right = '100%';
+            subMenuElement.style.top = '0';
+          }
+          
+          // Check vertical overflow
+          const bottomSpace = window.innerHeight - rect.bottom;
+          if (bottomSpace < subRect.height) {
+            const overflow = subRect.height - bottomSpace;
+            subMenuElement.style.top = `-${Math.min(overflow, rect.height / 2)}px`;
+          }
+          
+          subMenuElement.classList.add('visible');
+          this.activeSubMenu = subMenuElement;
+        };
+        
+        const hideSubMenu = (e) => {
+          if (subMenuElement) {
+            // Don't hide if moving to submenu
+            const relatedTarget = e.relatedTarget;
+            if (relatedTarget && subMenuElement.contains(relatedTarget)) {
+              return;
+            }
+            subMenuElement.classList.remove('visible');
+            this.activeSubMenu = null;
+          }
+        };
+        
+        li.addEventListener('mouseenter', showSubMenu);
+        li.addEventListener('mouseleave', hideSubMenu);
+        
+        // Touch support for submenu
+        li.addEventListener('click', (e) => {
+          if (item.submenu && item.submenu.length > 0) {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (subMenuElement && subMenuElement.classList.contains('visible')) {
+              subMenuElement.classList.remove('visible');
+              this.activeSubMenu = null;
+            } else {
+              showSubMenu(e);
+            }
+          }
+        });
+      }
+      
+      // Separator
+      if (item.separator) {
+        li.className = 'context-menu-separator';
+        li.style.height = '1px';
+        li.style.margin = '4px 8px';
+        li.style.backgroundColor = 'var(--border-color, #444)';
+        li.style.padding = '0';
+      }
+      
+      // Disabled state
+      if (item.disabled) {
+        li.classList.add('disabled');
+        li.style.opacity = '0.5';
+        li.style.cursor = 'default';
+      }
+      
+      list.appendChild(li);
+    });
+    
+    parent.appendChild(list);
+  }
+  
+  positionMenu(x, y) {
+    if (!this.menuElement) return;
+    
+    // Add to DOM temporarily to measure
+    this.menuElement.style.visibility = 'hidden';
+    this.menuElement.style.display = 'block';
+    document.body.appendChild(this.menuElement);
+    
+    const rect = this.menuElement.getBoundingClientRect();
+    const menuWidth = rect.width;
+    const menuHeight = rect.height;
+    
+    // Remove from body
+    document.body.removeChild(this.menuElement);
+    this.menuElement.style.visibility = 'visible';
+    this.menuElement.style.display = '';
+    
+    // Calculate position
+    let left = x;
+    let top = y;
+    
+    // Check right edge
+    if (x + menuWidth > window.innerWidth) {
+      left = window.innerWidth - menuWidth - 10;
+    }
+    
+    // Check bottom edge
+    if (y + menuHeight > window.innerHeight) {
+      top = window.innerHeight - menuHeight - 10;
+    }
+    
+    // Ensure minimum position
+    left = Math.max(10, left);
+    top = Math.max(10, top);
+    
+    this.menuElement.style.left = left + 'px';
+    this.menuElement.style.top = top + 'px';
+  }
+  
+  hide() {
+    if (this.menuElement && this.menuElement.parentNode) {
+      this.menuElement.parentNode.removeChild(this.menuElement);
+    }
+    this.menuElement = null;
+    this.isVisible = false;
+    this.activeSubMenu = null;
+  }
+  
+  handleClickOutside(e) {
+    if (!this.isVisible) return;
+    
+    // Check if click is inside menu or submenu
+    let target = e.target;
+    while (target) {
+      if (target === this.menuElement || 
+          (target.classList && target.classList.contains('context-menu-sub'))) {
+        return;
+      }
+      target = target.parentNode;
+    }
+    
+    this.hide();
+  }
+  
+  handleKeyDown(e) {
+    if (!this.isVisible) return;
+    
+    if (e.key === 'Escape') {
+      this.hide();
+      e.preventDefault();
+    }
+  }
+  
+  getMenuFromData(element) {
+    const menuData = element.dataset.contextMenu;
+    if (!menuData) return null;
+    
+    try {
+      return JSON.parse(menuData);
+    } catch (e) {
+      console.warn('Invalid context menu data:', e);
+      return null;
+    }
+  }
+  
+  register(element, menuItems, options = {}) {
+    if (!element) return;
+    
+    // Store menu data on element
+    if (typeof menuItems === 'string') {
+      element.dataset.contextMenu = menuItems;
+    } else {
+      element._contextMenu = menuItems;
+    }
+    
+    // Right click
+    element.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const items = this.getMenuItems(element);
+      if (items) {
+        const x = options.offsetX ? e.clientX + options.offsetX : e.clientX;
+        const y = options.offsetY ? e.clientY + options.offsetY : e.clientY;
+        this.show(x, y, items, options);
+      }
+    });
+  }
+  
+  getMenuItems(element) {
+    if (element._contextMenu) {
+      return element._contextMenu;
+    }
+    
+    const data = element.dataset.contextMenu;
+    if (data) {
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    return null;
+  }
+  
+  destroy() {
+    document.removeEventListener('click', this.handleClickOutside);
+    document.removeEventListener('keydown', this.handleKeyDown);
+    this.hide();
+  }
+}
+
 // Undo History Manager 
 class HistoryManager {
   constructor(editor) {
@@ -4225,9 +4577,9 @@ class HistoryManager {
     });
     
     // Update UI after applying operations
-    this.editor.updateFramesUI();
-    this.editor.updateLayersUI();
-    this.editor.render();
+    if (project == this.editor.project) {
+      this.editor.render();
+    }
   }
 
   // Specific operation handlers
@@ -4436,7 +4788,7 @@ class HistoryManager {
   
   applyMergeLayersOperation(project, operation, isUndo) {
     const { frameIndex, sourceIndex, targetIndex, sourceData, targetData } = operation;
-    const frame = projectframes[frameIndex];
+    const frame = project.frames[frameIndex];
     
     if (isUndo) {
       // Restore both layers to their original state
@@ -4826,25 +5178,17 @@ class HistoryManager {
       
       // Apply next history entry
       const entry = this.history[currentHistoryIndex];
-      this.applyHistoryEntryToProject(entry, project, frameTimes, false);
+      this.applyHistoryEntry(entry, false, project);
       
       // Check if frame has changed
       const currentFrameIndex = project.currentFrame || 0;
       const frameChanged = currentFrameIndex !== lastFrameIndex;
       lastFrameIndex = currentFrameIndex;
       
-      // Always clear the canvas completely for each frame
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
       // Draw background
-      if (!this.editor.transparentBackground) {
-        ctx.fillStyle = this.editor.secondaryColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      
+      ctx.fillStyle = this.editor.secondaryColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
       // Create temporary canvas for the frame layers layers
       const layerCanvas = document.createElement('canvas');
       layerCanvas.width = project.width;
@@ -4902,6 +5246,7 @@ class HistoryManager {
   }
 
   // Project-specific operation handlers (similar to the main ones but for a target project) used to generate timelapse
+/*
   applyHistoryEntryToProject(entry, project, frameTimes, isUndo) {
     const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
     
@@ -5199,7 +5544,7 @@ class HistoryManager {
       }
     });
   }
-  
+*/
   // Serialize history for saving
   serialize() {
     return JSON.stringify({
@@ -5320,7 +5665,7 @@ class CollabManager {
   constructor(editor) {
     this.editor = editor;
     this.ws = null;
-    this.host = HOST;
+    this.host = editor.collabManagerHost || HOST;
     this.sessionId = null;
     this.sessionName = '';
     this.memberId = null;
@@ -8040,6 +8385,8 @@ class ColorPicker {
     if (e.type.startsWith("touch")) {
       e.preventDefault();
       e.stopPropagation();
+    } else if (e.button !== 0) {
+      return;
     }
     
     this.colorPickStartTime = Date.now();
@@ -9156,7 +9503,9 @@ class PixelArtEditor {
     this.showMiniView = false;
     this.useCordova = window.location.href.startsWith("file");
     this.deviceReady = false;
+    this.isCordova = typeof window.cordova !== "undefined";
     this.isFilePluginAvailable = false;
+    this.lastSavedPath = null;
     this.fileBrowser = null;
     this.defaultFileBrowserPathUrl = null;
     this.timelapseFPS = 30;
@@ -9180,6 +9529,7 @@ class PixelArtEditor {
     this.ensureBoundsDrawing = false;
     
     // Collab Session
+    this.collabManagerHost = null;
     this.collabMemberName = localStorage.getItem('collab_username') || 'user_' + Math.floor(Math.random() * 10000);
     this.collabMemberColor = localStorage.getItem('collab_user_color') || ['red', 'blue', 'green', 'yellow', 'orange', 'purple'][Math.floor(Math.random() * 6)];
     
@@ -9204,9 +9554,12 @@ class PixelArtEditor {
       this.spritesheetLoader = new SpritesheetLoader(this);
       this.referenceManager = new ReferenceManager(this);
       this.selectionManager = new SelectionManager(this);
+      this.contextMenu = new ContextMenuManager(this);
       this.paletteManager = new PaletteManager(this);
       this.colorPicker = new ColorPicker(this);
       this.lockScreen = new LockScreen(this);
+
+      this.registerContextMenus();
 
       if (this.useCordova) {
         this.initCordova();
@@ -9570,6 +9923,24 @@ class PixelArtEditor {
       }
     });
     
+    collabCat.addSetting({
+      id: 'collabManagerHost',
+      label: 'Dirección del servidor||Server Adress',
+      description: 'Dirección del servidor colaborativo. Se recomienda dejar esta configuración en su valor predeterminado||Collab server address. It is recommended to leave this setting at its default',
+      type: 'text',
+      forceReset: DEBUG,
+      placeholder: HOST,
+      defaultValue: HOST,
+      needsReload: false,
+      onInit: (value, editor) => {
+        this.collabManagerHost = value;
+      },
+      onUpdate: (value, oldValue, editor) => {
+        this.collabManagerHost = value;
+        this.collabManager.host = value;
+      }
+    });
+    
     // Lock Screen Category
     const lockScreenCategory = this.settings.addCategory({
       id: 'lock_screen',
@@ -9732,6 +10103,181 @@ class PixelArtEditor {
   setSmoothPanning(enabled) {
     document.body.style.setProperty("--transform-transition", enabled ? "0.2s" : "none");
   }
+  
+  registerContextMenus() {
+    // Register color indicators
+    if (this.colorPrimary) {
+      const colorMenu = [
+        {
+          label: __('Copiar color||Copy Color'),
+          action: () => {
+            navigator.clipboard?.writeText(this.primaryColor);
+            this.showToast(__('Color copiado||Color copied'));
+          }
+        },
+        {
+          label: __('Pegar color||Paste Color'),
+          action: async () => {
+            try {
+              const text = await navigator.clipboard?.readText();
+              if (text && /^#[0-9a-f]{6}$/i.test(text)) {
+                this.primaryColor = text;
+                this.updateColorIndicator();
+              }
+            } catch (e) {}
+          }
+        },
+        { separator: true },
+        {
+          label: __('Intercambiar colores||Swap Colors'),
+          action: () => {
+            const temp = this.primaryColor;
+            this.primaryColor = this.secondaryColor;
+            this.secondaryColor = temp;
+            this.updateColorIndicator();
+          }
+        }
+      ];
+      
+      this.contextMenu.register(this.colorPrimary, colorMenu);
+    }
+    if (this.colorSecondary) {
+      const colorMenu = [
+        {
+          label: __('Copiar color||Copy Color'),
+          action: () => {
+            navigator.clipboard?.writeText(this.secondaryColor);
+            this.showToast(__('Color copiado||Color copied'));
+          }
+        },
+        {
+          label: __('Pegar color||Paste Color'),
+          action: async () => {
+            try {
+              const text = await navigator.clipboard?.readText();
+              if (text && /^#[0-9a-f]{6}$/i.test(text)) {
+                this.secondaryColor = text;
+                this.updateColorIndicator();
+              }
+            } catch (e) {}
+          }
+        }
+      ];
+      
+      this.contextMenu.register(this.colorSecondary, colorMenu);
+    }
+    
+    // Register timeline frames with context menu
+    this.timelineContent?.addEventListener('contextmenu', (e) => {
+      const frameElement = e.target.closest('.timeline-frame');
+      if (frameElement) {
+        e.preventDefault();
+        const index = parseInt(frameElement.dataset.index);
+        if (!isNaN(index)) {
+          const frameMenu = [
+            {
+              label: __('Ir al frame||Go to Frame'),
+              action: () => { this.project.currentFrame = index; this.render(); }
+            },
+            {
+              label: __('Duplicar frame||Duplicate Frame'),
+              action: () => this.duplicateFrame(index)
+            },
+            {
+              label: __('Eliminar frame||Remove Frame'),
+              action: () => this.removeFrame(index)
+            },
+            { separator: true },
+            {
+              label: __('Mover a la izquierda||Move Left'),
+              action: () => {
+                if (index > 0) this.moveFrame(index, index - 1);
+              }
+            },
+            {
+              label: __('Mover a la derecha||Move Right'),
+              action: () => {
+                if (index < this.project.frames.length - 1) this.moveFrame(index, index + 1);
+              }
+            },
+            { separator: true },
+            {
+              label: __('Cambiar tiempo del frame||Change Frame Time'),
+              action: () => this.showFrameTimeDialog(index)
+            }
+          ];
+          
+          this.contextMenu.show(e.clientX, e.clientY, frameMenu);
+        }
+      }
+    });
+    
+    // Register layers list with context menu
+    this.layersContainer?.addEventListener('contextmenu', (e) => {
+      const layerElement = e.target.closest('.layer-item');
+      if (layerElement) {
+        e.preventDefault();
+        const index = parseInt(layerElement.dataset.index);
+        if (!isNaN(index)) {
+          const frame = this.project?.frames[this.project.currentFrame];
+          const layer = frame?.layers[index];
+          if (!layer) return;
+          
+          const layerMenu = [
+            {
+              label: __('Activar capa||Activate Layer'),
+              action: () => { this.project.currentLayer = index; this.updateLayersUI(); }
+            },
+            {
+              label: layer.visible ? __('Ocultar capa||Hide Layer') : __('Mostrar capa||Show Layer'),
+              action: () => this.setLayerVisibility(this.project.currentFrame, index, !layer.visible)
+            },
+            {
+              label: __('Renombrar capa||Rename Layer'),
+              action: () => {
+                const newName = prompt(__('Nuevo nombre para la capa||New layer name:'), layer.name);
+                if (newName) this.renameLayer(newName, index);
+              }
+            },
+            { separator: true },
+            {
+              label: __('Duplicar capa||Duplicate Layer'),
+              action: () => this.duplicateLayer()
+            },
+            {
+              label: __('Combinar hacia arriba||Merge Up'),
+              action: () => this.mergeLayerUp(index)
+            },
+            {
+              label: __('Combinar hacia abajo||Merge Down'),
+              action: () => this.mergeLayerDown(index)
+            },
+            { separator: true },
+            {
+              label: __('Mover hacia arriba||Move Up'),
+              action: () => {
+                if (index < frame.layers.length - 1) this.moveLayer(this.project.currentFrame, index, index + 1);
+              }
+            },
+            {
+              label: __('Mover hacia abajo||Move Down'),
+              action: () => {
+                if (index > 0) this.moveLayer(this.project.currentFrame, index, index - 1);
+              }
+            },
+            { separator: true },
+            {
+              label: __('Eliminar capa||Remove Layer'),
+              class: 'danger',
+              action: () => this.removeLayer(index)
+            }
+          ];
+          
+          this.contextMenu.show(e.clientX, e.clientY, layerMenu);
+        }
+      }
+    });
+  }
 
   initCordova() {
     const script = document.createElement("script");
@@ -9775,6 +10321,8 @@ class PixelArtEditor {
   }
 
   onBackButtonDown() {
+    if (this.generatingTimelapse) return;
+    
     if (this.popupOpen) {
       this.hidePopup();
     } else if (this.fileBrowser && this.fileBrowser.visible) {
@@ -10068,7 +10616,11 @@ class PixelArtEditor {
     this.colorSelector.className = "color-selector";
     this.colorIndicator.appendChild(this.colorSelector);
 
-    this.colorIndicator.addEventListener("click", () => this.colorPicker.toggleSelectedColor());
+    this.colorIndicator.addEventListener("click", (e) => {
+      if (e.button == 0) {
+        this.colorPicker.toggleSelectedColor();
+      }
+    });
 
     this.colorPickerButton = this.createButton("color-picker", "icon-palette", () => this.colorPicker.show());
     this.topBar.appendChild(this.colorPickerButton);
@@ -11631,6 +12183,14 @@ class PixelArtEditor {
     this.canvas.style.backgroundSize = `${bgSize}px ${bgSize}px`;
   }
   
+  showContextMenu(x, y, items) {
+    this.contextMenu.show(x, y, items);
+  }
+  
+  hideContextMenu() {
+    this.contextMenu.hide();
+  }
+
   // Project management
   newProject(width = this.defaultWidth, height = this.defaultHeight, imageData = null) {
     if (this.collabManager.isConnected && !this.collabManager.isHost) {
@@ -12617,10 +13177,11 @@ class PixelArtEditor {
     const pickFromCtx = ctx => {
       const imageData = ctx.getImageData(x, y, 1, 1);
       const data = imageData.data;
+      
+      const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
 
-      if (data[3] > 0) {
+      if (data[3] > 0 && (!this.transparentBackground ? this.transparentBackground != color : true)) {
         // If pixel is not transparent
-        const color = `#${this.componentToHex(data[0])}${this.componentToHex(data[1])}${this.componentToHex(data[2])}`;
         this.setColor(color);
         if (!silent) this.showOperationMessage(`<div class="palette-color" style="background-color: ${color}"></div> ${color.toUpperCase()}`);
         return true;
@@ -12633,6 +13194,11 @@ class PixelArtEditor {
     const layerCtx = this.getCurrentLayerContext();
     if (pickFromCtx(layerCtx)) return;
     
+    // Check for reference image (top)
+    if (includeReferenceImage && this.referenceManager.traceImage && this.referenceManager.traceOnTop) {
+      if (pickFromCtx(this.ctx)) return;
+    }
+    
     // Check layers from top to bottom
     for (let l = frame.layers.length - 1; l >= 0; l--) {
       const layer = frame.layers[l];
@@ -12642,9 +13208,16 @@ class PixelArtEditor {
       }
     }
 
-    // Check for reference image
-    if (includeReferenceImage && this.referenceManager.traceImage) {
+    // Check for reference image (bottom)
+    if (includeReferenceImage && this.referenceManager.traceImage && !this.referenceManager.traceOnTop) {
       if (pickFromCtx(this.ctx)) return;
+    }
+    
+    // Otherwise it's transparent
+    if (!this.transparentBackground) {
+      const color = this.project.backgroundColor;
+      this.setColor(color);
+      if (!silent) this.showOperationMessage(`<div class="palette-color" style="background-color: ${color}"></div> ${color.toUpperCase()}`);
     }
   }
 
@@ -15650,13 +16223,6 @@ class PixelArtEditor {
     this.showFrameTimeDialog(this.project.currentFrame);
   }
 
-  // Initialize file handling
-  initFileHandling() {
-    this.isCordova = typeof window.cordova !== "undefined";
-    this.isFilePluginAvailable = this.isCordova && typeof window.File !== "undefined";
-    this.lastSavedPath = null;
-  }
-
   // Main file operations
   openFile() {
     if (this.collabManager.isConnected && !this.collabManager.isHost) {
@@ -15669,6 +16235,8 @@ class PixelArtEditor {
       fileTypes: ["pxl", "psd", "png", "jpg", "jpeg", "pal"],
       onConfirm: async fileInfo => {
         try {
+          this.lastSavedPath = fileInfo.name;
+          
           const fileData = await this.readFile(fileInfo);
           
           if (fileInfo.type === "pxl") {
@@ -15698,11 +16266,12 @@ class PixelArtEditor {
     fileBrowser.show();
   }
 
-  saveProject(quickSave = true) {
+  async saveProject(quickSave = true) {
     if (!this.project) return;
 
     if (quickSave && this.lastSavedPath) {
-      this.saveFile(this.lastSavedPath, "pxl", this.getProjectData(true));
+      await this.saveFile(this.lastSavedPath, "pxl", this.getProjectData(true));
+      this.showToast(__("¡Archivo guardado!|File saved!"));
     } else {
       this.saveAs();
     }
@@ -16040,11 +16609,11 @@ class PixelArtEditor {
     content.innerHTML = `
       <div style="margin-bottom: 15px;">
         <label style="display: block; margin-bottom: 5px;">FPS:</label>
-        <input type="number" id="timelapse-fps" value="${this.timelapseFPS}" min="1" max="60" style="width: 100%; padding: 5px;">
+        <input type="number" id="timelapse-fps" value="60" min="1" max="60" style="width: 100%; padding: 5px;">
       </div>
       <div style="margin-bottom: 15px;">
         <label style="display: block; margin-bottom: 5px;">${__("Escala||Scale")}:</label>
-        <input type="number" id="timelapse-scale" value="4" min="1" max="10" style="width: 100%; padding: 5px;">
+        <input type="number" id="timelapse-scale" value="1" min="1" max="10" style="width: 100%; padding: 5px;">
       </div>
       <img style="display:none;image-rendering:pixelated;width:100%;height:auto;background-color:#fff;border:1px solid #000" class="timelapse-preview">
       <div class="timelapse-progress" style="display: none;">
@@ -16067,8 +16636,8 @@ class PixelArtEditor {
       {
         text: __("Generar||Generate"),
         action: async () => {
-          const fps = parseInt(document.getElementById("timelapse-fps").value) || 30;
-          const scale = parseInt(document.getElementById("timelapse-scale").value) || 4;
+          const fps = parseInt(document.getElementById("timelapse-fps").value) || 60;
+          const scale = parseInt(document.getElementById("timelapse-scale").value) || 1;
 
           // Show progress UI
           content.querySelector("div:first-child").style.display = "none";
@@ -16078,6 +16647,8 @@ class PixelArtEditor {
           this.hidePopupButtons();
 
           try {
+            this.generatingTimelapse = true;
+            
             const videoBlob = await this.generateTimelapse(fps, scale, (progress, previewImageData) => {
               progressBar.value = progress;
               progressText.textContent = `${progress}%`;
@@ -16087,6 +16658,8 @@ class PixelArtEditor {
                 preview.src = previewImageData;
               }
             });
+            
+            this.generatingTimelapse = false;
 
             // Now show file browser to save the video
             this.hidePopup();

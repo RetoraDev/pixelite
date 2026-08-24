@@ -162,9 +162,9 @@ class HistoryManager {
     });
     
     // Update UI after applying operations
-    this.editor.updateFramesUI();
-    this.editor.updateLayersUI();
-    this.editor.render();
+    if (project == this.editor.project) {
+      this.editor.render();
+    }
   }
 
   // Specific operation handlers
@@ -373,7 +373,7 @@ class HistoryManager {
   
   applyMergeLayersOperation(project, operation, isUndo) {
     const { frameIndex, sourceIndex, targetIndex, sourceData, targetData } = operation;
-    const frame = projectframes[frameIndex];
+    const frame = project.frames[frameIndex];
     
     if (isUndo) {
       // Restore both layers to their original state
@@ -763,25 +763,17 @@ class HistoryManager {
       
       // Apply next history entry
       const entry = this.history[currentHistoryIndex];
-      this.applyHistoryEntryToProject(entry, project, frameTimes, false);
+      this.applyHistoryEntry(entry, false, project);
       
       // Check if frame has changed
       const currentFrameIndex = project.currentFrame || 0;
       const frameChanged = currentFrameIndex !== lastFrameIndex;
       lastFrameIndex = currentFrameIndex;
       
-      // Always clear the canvas completely for each frame
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
       // Draw background
-      if (!this.editor.transparentBackground) {
-        ctx.fillStyle = this.editor.secondaryColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      
+      ctx.fillStyle = this.editor.secondaryColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
       // Create temporary canvas for the frame layers layers
       const layerCanvas = document.createElement('canvas');
       layerCanvas.width = project.width;
@@ -839,6 +831,7 @@ class HistoryManager {
   }
 
   // Project-specific operation handlers (similar to the main ones but for a target project) used to generate timelapse
+/*
   applyHistoryEntryToProject(entry, project, frameTimes, isUndo) {
     const operations = isUndo ? [...entry.operations].reverse() : entry.operations;
     
@@ -1136,7 +1129,7 @@ class HistoryManager {
       }
     });
   }
-  
+*/
   // Serialize history for saving
   serialize() {
     return JSON.stringify({
