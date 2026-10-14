@@ -859,7 +859,10 @@ class PixelArtEditor {
   }
 
   onBackButtonDown() {
-    if (this.generatingTimelapse) return;
+    if (this.generatingTimelapse) {
+      this.historyManager.cancelTimelapse();
+      return;
+    }
     
     if (this.popupOpen) {
       this.hidePopup();
@@ -7142,6 +7145,11 @@ class PixelArtEditor {
       return;
     }
 
+    if (!this.historyManager.supportsTimelapseEncoding()) {
+      this.showToast(__("La exportación de timelapse no es compatible con este navegador||Timelapse export is not supported in this browser"), 5000);
+      return;
+    }
+
     // Show configuration dialog
     const content = document.createElement("div");
     content.innerHTML = `
@@ -7164,12 +7172,23 @@ class PixelArtEditor {
     const progressSection = content.querySelector(".timelapse-progress");
     const progressBar = content.querySelector("progress");
     const progressText = content.querySelector(".progress-text");
+    const preview = content.querySelector(".timelapse-preview");
+
+    // Small offscreen canvas for cheap, throttled preview frames
+    const previewCanvas = document.createElement("canvas");
+    let lastPreviewTime = 0;
 
     this.showPopup(__("Exportar Timelapse||Export Timelapse"), content, [
       {
         text: __("Cancelar||Cancel"),
         class: "cancel",
-        action: () => this.hidePopup()
+        action: () => {
+          if (this.generatingTimelapse) {
+            this.historyManager.cancelTimelapse();
+          } else {
+            this.hidePopup();
+          }
+        }
       },
       {
         text: __("Generar||Generate"),
@@ -7182,29 +7201,50 @@ class PixelArtEditor {
           content.querySelector("div:nth-child(2)").style.display = "none";
           progressSection.style.display = "block";
           
-          this.hidePopupButtons();
+          // Keep the Cancel button available during generation
+          if (this.popupButtons && this.popupButtons[1]) this.popupButtons[1].style.display = "none";
 
           try {
             this.generatingTimelapse = true;
             
-            const videoBlob = await this.generateTimelapse(fps, scale, (progress, previewImageData) => {
+            const videoBlob = await this.generateTimelapse(fps, scale, (progress, sourceCanvas) => {
               progressBar.value = progress;
               progressText.textContent = `${progress}%`;
-              const preview = content.querySelector(".timelapse-preview");
-              if (preview && previewImageData) {
-                preview.style.display = "flex";
-                preview.src = previewImageData;
-              }
+
+              if (!preview || !sourceCanvas) return;
+              const now = performance.now();
+              if (now - lastPreviewTime < 200) return;
+              lastPreviewTime = now;
+
+              const maxWidth = 256;
+              const ratio = sourceCanvas.width > maxWidth ? maxWidth / sourceCanvas.width : 1;
+              previewCanvas.width = Math.max(1, Math.round(sourceCanvas.width * ratio));
+              previewCanvas.height = Math.max(1, Math.round(sourceCanvas.height * ratio));
+              const previewCtx = previewCanvas.getContext("2d");
+              previewCtx.imageSmoothingEnabled = false;
+              previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+              previewCtx.drawImage(sourceCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+
+              preview.style.display = "block";
+              preview.src = previewCanvas.toDataURL("image/png");
             });
             
             this.generatingTimelapse = false;
+
+            if (!videoBlob) {
+              // Cancelled by the user
+              this.hidePopup();
+              this.showToast(__("Generación de timelapse cancelada||Timelapse generation cancelled"));
+              return;
+            }
 
             // Now show file browser to save the video
             this.hidePopup();
             this.saveTimelapseWithBrowser(videoBlob);
           } catch (error) {
+            this.generatingTimelapse = false;
+            this.hidePopup();
             this.showToast(__(`(Error generando proceso|Error generating timelapse): ${error.message}`), 5000);
-            throw error;
           }
         }
       }

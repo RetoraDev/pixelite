@@ -299,6 +299,7 @@ function generateDevIndexHtml() {
   // Add lib files to head
   headContent += '<script src="./lib/eruda.js"></script>\n';
   headContent += '    <script src="./lib/ag-psd.js"></script>\n';
+  headContent += '    <script src="./lib/webm-muxer.js"></script>\n';
 
   // Add all source CSS files in order to head
   build.cssFileOrder.forEach(filePath => {

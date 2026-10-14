@@ -367,6 +367,16 @@ function copyLibFiles() {
   } else {
     log('ag-psd.js not found in lib directory', 'warning');
   }
+
+  // Copy webm-muxer.js for timelapse export (always, not just debug)
+  const muxerSrc = path.join(config.libDir, 'webm-muxer.js');
+  const muxerDest = path.join(libDest, 'webm-muxer.js');
+  if (fs.existsSync(muxerSrc)) {
+    fs.copyFileSync(muxerSrc, muxerDest);
+    log('webm-muxer.js copied', 'success');
+  } else {
+    log('webm-muxer.js not found in lib directory', 'warning');
+  }
 }
 
 function copyStaticFiles() {

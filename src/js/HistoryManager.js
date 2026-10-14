@@ -705,129 +705,155 @@ class HistoryManager {
     }
   }  
   
-  // Generate timelapse by replaying history
-  async generateTimelapse(fps, scale, progressCallback) {
-    // Create a temporary project to replay history
-    const tempProject = this.editor.getNewProjectData(this.editor.project.width, this.editor.project.height);
-    const tempFrameTimes = [...this.editor.project.frameTimes];
-    
-    // Get canvas for rendering
-    const { canvas: tempCanvas, ctx: tempCtx } = this.editor.getTempCanvas(tempProject.width * scale, tempProject.height * scale);
-    
-    // Set up media recording
-    const stream = tempCanvas.captureStream();
-    const recorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 8000000
-    });
-    
-    const chunks = [];
-    recorder.ondataavailable = e => {
-      if (e.data.size > 0) chunks.push(e.data);
-    };
-    
-    return new Promise((resolve) => {
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        resolve(blob);
-      };
-      
-      recorder.start();
-      
-      // Replay history to create timelapse
-      this.replayHistoryForTimelapse(
-        tempProject, 
-        tempFrameTimes, 
-        tempCanvas, 
-        tempCtx, 
-        scale, 
-        fps, 
-        progressCallback,
-        () => {
-          setTimeout(() => recorder.stop(), 1000 / fps);
-        }
-      );
-    });
+  supportsTimelapseEncoding() {
+    return typeof VideoEncoder !== 'undefined' &&
+           typeof VideoFrame !== 'undefined' &&
+           typeof WebMMuxer !== 'undefined' &&
+           typeof WebMMuxer.Muxer === 'function';
   }
 
-  async replayHistoryForTimelapse(project, frameTimes, canvas, ctx, scale, fps, progressCallback, onComplete) {
-    const frameInterval = 1000 / fps;
-    let currentHistoryIndex = 0;
-    let lastFrameIndex = project.currentFrame || 0;
-    
-    const renderFrame = async () => {
-      if (currentHistoryIndex >= this.history.length) {
-        onComplete();
-        return;
+  cancelTimelapse() {
+    this._timelapseCancelled = true;
+  }
+
+  // Generate a timelapse video by replaying history.
+  // Frames are rendered and VP9-encoded as fast as the machine allows (no
+  // real-time capture involved), then muxed into a WebM container. Because
+  // each frame carries its own timestamp, timing is independent of how long
+  // rendering or encoding actually takes, so frames are never dropped or
+  // duplicated. Resolves to a Blob, or null if the user cancelled.
+  async generateTimelapse(fps, scale, progressCallback) {
+    if (!this.supportsTimelapseEncoding()) {
+      throw new Error(__("Este navegador no soporta la exportación de timelapse||This browser does not support timelapse export"));
+    }
+
+    this._timelapseCancelled = false;
+
+    const srcWidth = this.editor.project.width;
+    const srcHeight = this.editor.project.height;
+
+    // Video encoders expect even dimensions
+    const encWidth = (srcWidth * scale) + ((srcWidth * scale) % 2);
+    const encHeight = (srcHeight * scale) + ((srcHeight * scale) % 2);
+
+    const totalSteps = this.history.length;
+    const frameDurationUs = Math.max(1, Math.round(1000000 / fps));
+    const keyFrameInterval = Math.max(1, Math.round(fps * 2));
+
+    // Temporary project to replay history into
+    const tempProject = this.editor.getNewProjectData(srcWidth, srcHeight);
+
+    // Reusable render + layer-compositing canvases
+    const renderCanvas = document.createElement("canvas");
+    renderCanvas.width = encWidth;
+    renderCanvas.height = encHeight;
+    const renderCtx = this.editor.getCanvasContext(renderCanvas);
+
+    const layerCanvas = document.createElement("canvas");
+    layerCanvas.width = srcWidth;
+    layerCanvas.height = srcHeight;
+    const layerCtx = this.editor.getCanvasContext(layerCanvas);
+
+    // Set up muxer + VP9 encoder
+    const muxer = new WebMMuxer.Muxer({
+      target: new WebMMuxer.ArrayBufferTarget(),
+      video: {
+        codec: "V_VP9",
+        width: encWidth,
+        height: encHeight,
+        frameRate: fps
       }
-      
-      // Apply next history entry
-      const entry = this.history[currentHistoryIndex];
-      this.applyHistoryEntry(entry, false, project);
-      
-      // Check if frame has changed
-      const currentFrameIndex = project.currentFrame || 0;
-      const frameChanged = currentFrameIndex !== lastFrameIndex;
-      lastFrameIndex = currentFrameIndex;
-      
-      // Draw background
-      ctx.fillStyle = this.editor.secondaryColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-      // Create temporary canvas for the frame layers layers
-      const layerCanvas = document.createElement('canvas');
-      layerCanvas.width = project.width;
-      layerCanvas.height = project.height;
-      const layerCtx = this.editor.getCanvasContext(layerCanvas);
-      
-      // Draw current frame
-      const frame = project.frames[currentFrameIndex];
-      for (let l = 0; l < frame.layers.length; l++) {
-        const layer = frame.layers[l];
-        if (layer.visible) {
-          // Clear the temporary canvas
-          layerCtx.clearRect(0, 0, project.width, project.height);
-          
-          // If we have image data, put it on the canvas
-          if (layer.imageData) {
-            const imageData = new ImageData(
-              new Uint8ClampedArray(layer.imageData),
-              project.width,
-              project.height
-            );
-            layerCtx.putImageData(imageData, 0, 0);
-          } else if (layer.canvas) {
-            // If we have a canvas, draw it
-            layerCtx.drawImage(layer.canvas, 0, 0);
+    });
+
+    let encoderError = null;
+    const encoder = new VideoEncoder({
+      output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
+      error: (error) => { encoderError = error; }
+    });
+
+    encoder.configure({
+      codec: "vp09.00.10.08",
+      width: encWidth,
+      height: encHeight,
+      bitrate: 8000000,
+      framerate: fps
+    });
+
+    try {
+      for (let i = 0; i < totalSteps; i++) {
+        if (this._timelapseCancelled) break;
+        if (encoderError) throw encoderError;
+
+        // Apply the next history entry to the temporary project
+        this.applyHistoryEntry(this.history[i], false, tempProject);
+
+        // Composite the current frame's visible layers
+        renderCtx.fillStyle = this.editor.secondaryColor;
+        renderCtx.fillRect(0, 0, encWidth, encHeight);
+
+        const frame = tempProject.frames[tempProject.currentFrame || 0];
+        if (frame) {
+          for (let l = 0; l < frame.layers.length; l++) {
+            const layer = frame.layers[l];
+            if (!layer.visible) continue;
+
+            layerCtx.clearRect(0, 0, srcWidth, srcHeight);
+            if (layer.imageData) {
+              layerCtx.putImageData(
+                new ImageData(new Uint8ClampedArray(layer.imageData), srcWidth, srcHeight),
+                0, 0
+              );
+            } else if (layer.canvas) {
+              layerCtx.drawImage(layer.canvas, 0, 0);
+            }
+
+            renderCtx.imageSmoothingEnabled = false;
+            renderCtx.drawImage(layerCanvas, 0, 0, srcWidth, srcHeight, 0, 0, encWidth, encHeight);
           }
-          
-          // Draw scaled to the main canvas
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(
-            layerCanvas, 
-            0, 0, project.width, project.height,
-            0, 0, canvas.width, canvas.height
-          );
+        }
+
+        // Encode the frame with an explicit timestamp
+        const videoFrame = new VideoFrame(renderCanvas, {
+          timestamp: Math.round(i * frameDurationUs),
+          duration: frameDurationUs
+        });
+        encoder.encode(videoFrame, { keyFrame: i % keyFrameInterval === 0 });
+        videoFrame.close();
+
+        // Throttle if the encoder queue grows too large
+        while (encoder.encodeQueueSize > 8 && !this._timelapseCancelled && !encoderError) {
+          await new Promise(resolve => setTimeout(resolve, 4));
+        }
+
+        if (progressCallback) {
+          progressCallback(Math.floor(((i + 1) / totalSteps) * 100), renderCanvas);
+        }
+
+        // Yield to the event loop so the UI can repaint and cancels register
+        if (i % 4 === 3) {
+          await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
-      
-      // Update progress
-      progressCallback(Math.floor((currentHistoryIndex / this.history.length) * 100), canvas.toDataURL());
-      
-      currentHistoryIndex++;
-      
-      // Schedule next frame
-      if (currentHistoryIndex < this.history.length) {
-        setTimeout(renderFrame, frameInterval);
-      } else {
-        setTimeout(() => {
-          onComplete();
-        }, frameInterval);
+
+      if (this._timelapseCancelled) {
+        this._timelapseCancelled = false;
+        return null;
       }
-    };
-    
-    // Start rendering
-    renderFrame();
+
+      if (encoderError) throw encoderError;
+
+      // Flush remaining frames and finalize the container
+      await encoder.flush();
+      muxer.finalize();
+
+      return new Blob([muxer.target.buffer], { type: "video/webm" });
+    } finally {
+      try {
+        if (encoder.state !== "closed") encoder.close();
+      } catch (e) {
+        // Ignore double-close
+      }
+    }
   }
 
   // Serialize history for saving
