@@ -788,8 +788,12 @@ class HistoryManager {
         this.applyHistoryEntry(this.history[i], false, tempProject);
 
         // Composite the current frame's visible layers
-        renderCtx.fillStyle = this.editor.secondaryColor;
-        renderCtx.fillRect(0, 0, encWidth, encHeight);
+        if (this.editor.transparentBackground) {
+          renderCtx.clearRect(0, 0, encWidth, encHeight);
+        } else {
+          renderCtx.fillStyle = this.editor.secondaryColor || "#ffffff";
+          renderCtx.fillRect(0, 0, encWidth, encHeight);
+        }
 
         const frame = tempProject.frames[tempProject.currentFrame || 0];
         if (frame) {

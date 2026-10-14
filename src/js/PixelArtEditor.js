@@ -7159,7 +7159,7 @@ class PixelArtEditor {
       </div>
       <div style="margin-bottom: 15px;">
         <label style="display: block; margin-bottom: 5px;">${__("Escala||Scale")}:</label>
-        <input type="number" id="timelapse-scale" value="1" min="1" max="10" style="width: 100%; padding: 5px;">
+        <input type="number" id="timelapse-scale" value="6" min="1" max="10" style="width: 100%; padding: 5px;">
       </div>
       <img style="display:none;image-rendering:pixelated;width:100%;height:auto;background-color:#fff;border:1px solid #000" class="timelapse-preview">
       <div class="timelapse-progress" style="display: none;">
