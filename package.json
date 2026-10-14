@@ -13,7 +13,7 @@
     "build:min": "node build.js --all --minify",
     "build:none": "node build.js --none",
     "build:dev": "node build.js --none --debug",
-    "build:termux-dev": "node build.js --cordova --debug && termux-open ./dist/pixelite-*.apk && npm run build:dev && termux-open ../",
+    "build:termux-dev": "node build.js --cordova --debug && termux-open ./dist/pixelite-*.apk",
     "build:termux": "npm run build:cordova && termux-open ./dist/pixelite-*.apk",
     "build:release": "node build.js --all --minify --zipalign",
     "serve": "node index.js",
